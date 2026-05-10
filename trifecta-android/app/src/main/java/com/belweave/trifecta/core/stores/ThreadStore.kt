@@ -72,9 +72,13 @@ class ThreadStore(val threadId: ThreadID) {
         mutex.withLock {
             this.client = client
             subscription?.cancel()
-            subscription = client.subscribeThread(threadId) { item ->
-                handle(item)
-            }
+            subscription = null
+        }
+        try {
+            val sub = client.subscribeThread(threadId) { item -> handle(item) }
+            mutex.withLock { subscription = sub }
+        } catch (t: Throwable) {
+            _lastError.value = t.message
         }
     }
 

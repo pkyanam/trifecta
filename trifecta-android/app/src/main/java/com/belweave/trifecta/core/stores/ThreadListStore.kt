@@ -8,6 +8,7 @@ import com.belweave.trifecta.core.networking.StreamSubscription
 import com.belweave.trifecta.core.networking.T3Client
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +27,7 @@ import java.time.Instant
 class ThreadListStore {
 
     private val mutex = Mutex()
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var subscription: StreamSubscription? = null
     private var client: T3Client? = null
 

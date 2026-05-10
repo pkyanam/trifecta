@@ -26,7 +26,7 @@ export function Nav() {
         </div>
         <div className="hidden md:flex">
           <Link
-            href="https://github.com/belweave/trifecta"
+            href="https://github.com/pkyanam/trifecta"
             className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.08] px-4 text-[11px] text-[#ececec] transition-colors hover:border-white/[0.15] hover:bg-white/[0.02]"
           >
             get trifecta

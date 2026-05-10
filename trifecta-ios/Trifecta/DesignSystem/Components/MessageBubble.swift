@@ -83,7 +83,7 @@ struct MessageBubble: View {
     private var roleLabel: String {
         switch role {
         case .system: "SYSTEM"
-        case .assistant: "T3 CODE"
+        case .assistant: "TRIFECTA"
         case .user: "YOU"
         }
     }
