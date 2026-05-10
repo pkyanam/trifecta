@@ -444,6 +444,28 @@ function stageWindowsIcons(stageResourcesDir: string, sourceIco: string) {
       });
     }
 
+    const sourceHeader = yield* fs.readFile(sourceIco).pipe(
+      Effect.map((bytes) => bytes.slice(0, 4)),
+      Effect.mapError(
+        (cause) =>
+          new BuildScriptError({
+            message: `Desktop Windows icon source could not be read at ${sourceIco}`,
+            cause,
+          }),
+      ),
+    );
+    if (
+      sourceHeader.length < 4 ||
+      sourceHeader[0] !== 0 ||
+      sourceHeader[1] !== 0 ||
+      sourceHeader[2] !== 1 ||
+      sourceHeader[3] !== 0
+    ) {
+      return yield* new BuildScriptError({
+        message: `Desktop Windows icon source must be a valid .ico file at ${sourceIco}`,
+      });
+    }
+
     const iconPath = path.join(stageResourcesDir, "icon.ico");
     yield* fs.copyFile(sourceIco, iconPath);
   });
