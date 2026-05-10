@@ -12,10 +12,12 @@ import {
 } from "./brand-assets.ts";
 
 describe("brand-assets", () => {
+  const resolveRepoPath = (relativePath: string) => `${import.meta.dirname}/../../${relativePath}`;
+
   const expectPngHasAlpha = (relativePath: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const png = yield* fs.readFile(relativePath);
+      const png = yield* fs.readFile(resolveRepoPath(relativePath));
       expect(Array.from(png.subarray(1, 4))).toEqual([80, 78, 71]);
 
       const colorType = png[25];
