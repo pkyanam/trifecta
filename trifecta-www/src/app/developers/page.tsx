@@ -105,10 +105,10 @@ export default function DevelopersPage() {
               trifecta is built in the open. explore the source code, file issues, and contribute to the project on github.
             </p>
             <div className="flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-xs text-[#555]">
+              <a href="https://github.com/belweave/trifecta" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-xs text-[#555] transition-colors hover:text-[#ececec] hover:border-white/[0.08]">
                 <ExternalLink className="h-3 w-3" />
                 github
-              </span>
+              </a>
               <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.04] bg-white/[0.02] px-3 py-1.5 text-xs text-[#555]">
                 <MessageSquare className="h-3 w-3" />
                 discussions
