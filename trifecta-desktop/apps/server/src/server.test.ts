@@ -3327,16 +3327,16 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
   it.effect("enriches replayed project events with repository identity metadata", () =>
     Effect.gen(function* () {
       const repositoryIdentity = {
-        canonicalKey: "github.com/t3tools/t3code",
+        canonicalKey: "github.com/belweave/trifecta",
         locator: {
           source: "git-remote" as const,
           remoteName: "origin",
-          remoteUrl: "git@github.com:T3Tools/t3code.git",
+          remoteUrl: "git@github.com:Belweave/trifecta.git",
         },
-        displayName: "T3Tools/t3code",
+        displayName: "Belweave/trifecta",
         provider: "github",
-        owner: "T3Tools",
-        name: "t3code",
+        owner: "Belweave",
+        name: "trifecta",
       };
 
       yield* buildAppUnderTest({
@@ -3818,7 +3818,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             isRepo: true,
             hasPrimaryRemote: true,
             isDefaultRef: false,
-            refName: "t3code/bootstrap-refName",
+            refName: "trifecta/bootstrap-refName",
             hasWorkingTreeChanges: false,
             workingTree: {
               files: [],
@@ -3835,7 +3835,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           (_: Parameters<GitVcsDriver.GitVcsDriverShape["createWorktree"]>[0]) =>
             Effect.succeed({
               worktree: {
-                refName: "t3code/bootstrap-refName",
+                refName: "trifecta/bootstrap-refName",
                 path: "/tmp/bootstrap-worktree",
               },
             }),
@@ -3904,7 +3904,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                 prepareWorktree: {
                   projectCwd: "/tmp/project",
                   baseBranch: "main",
-                  branch: "t3code/bootstrap-refName",
+                  branch: "trifecta/bootstrap-refName",
                 },
                 runSetupScript: true,
               },
@@ -3927,7 +3927,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         assert.deepEqual(createWorktree.mock.calls[0]?.[0], {
           cwd: "/tmp/project",
           refName: "main",
-          newRefName: "t3code/bootstrap-refName",
+          newRefName: "trifecta/bootstrap-refName",
           path: null,
         });
         assert.deepEqual(runForThread.mock.calls[0]?.[0], {
@@ -3961,7 +3961,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         (_: Parameters<GitVcsDriver.GitVcsDriverShape["createWorktree"]>[0]) =>
           Effect.succeed({
             worktree: {
-              refName: "t3code/bootstrap-refName",
+              refName: "trifecta/bootstrap-refName",
               path: "/tmp/bootstrap-worktree",
             },
           }),
@@ -4021,7 +4021,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               prepareWorktree: {
                 projectCwd: "/tmp/project",
                 baseBranch: "main",
-                branch: "t3code/bootstrap-refName",
+                branch: "trifecta/bootstrap-refName",
               },
               runSetupScript: true,
             },
@@ -4055,7 +4055,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         (_: Parameters<GitVcsDriver.GitVcsDriverShape["createWorktree"]>[0]) =>
           Effect.succeed({
             worktree: {
-              refName: "t3code/bootstrap-refName",
+              refName: "trifecta/bootstrap-refName",
               path: "/tmp/bootstrap-worktree",
             },
           }),
@@ -4138,7 +4138,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               prepareWorktree: {
                 projectCwd: "/tmp/project",
                 baseBranch: "main",
-                branch: "t3code/bootstrap-refName",
+                branch: "trifecta/bootstrap-refName",
               },
               runSetupScript: true,
             },
@@ -4222,7 +4222,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               prepareWorktree: {
                 projectCwd: "/tmp/project",
                 baseBranch: "main",
-                branch: "t3code/bootstrap-refName",
+                branch: "trifecta/bootstrap-refName",
               },
               runSetupScript: false,
             },

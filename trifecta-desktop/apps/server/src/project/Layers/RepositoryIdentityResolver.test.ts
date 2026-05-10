@@ -44,18 +44,18 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
       });
 
       yield* git(cwd, ["init"]);
-      yield* git(cwd, ["remote", "add", "origin", "git@github.com:T3Tools/t3code.git"]);
+      yield* git(cwd, ["remote", "add", "origin", "git@github.com:Belweave/trifecta.git"]);
 
       const resolver = yield* RepositoryIdentityResolver;
       const identity = yield* resolver.resolve(cwd);
 
       expect(identity).not.toBeNull();
-      expect(identity?.canonicalKey).toBe("github.com/t3tools/t3code");
+      expect(identity?.canonicalKey).toBe("github.com/belweave/trifecta");
       expect(normalizeResolvedPath(identity?.rootPath ?? "")).toBe(normalizeResolvedPath(cwd));
-      expect(identity?.displayName).toBe("t3tools/t3code");
+      expect(identity?.displayName).toBe("belweave/trifecta");
       expect(identity?.provider).toBe("github");
-      expect(identity?.owner).toBe("t3tools");
-      expect(identity?.name).toBe("t3code");
+      expect(identity?.owner).toBe("belweave");
+      expect(identity?.name).toBe("trifecta");
     }).pipe(Effect.provide(RepositoryIdentityResolverLive)),
   );
 
@@ -69,13 +69,13 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
 
       yield* fileSystem.makeDirectory(nestedWorkspace, { recursive: true });
       yield* git(repoRoot, ["init"]);
-      yield* git(repoRoot, ["remote", "add", "origin", "git@github.com:T3Tools/t3code.git"]);
+      yield* git(repoRoot, ["remote", "add", "origin", "git@github.com:Belweave/trifecta.git"]);
 
       const resolver = yield* RepositoryIdentityResolver;
       const identity = yield* resolver.resolve(nestedWorkspace);
 
       expect(identity).not.toBeNull();
-      expect(identity?.canonicalKey).toBe("github.com/t3tools/t3code");
+      expect(identity?.canonicalKey).toBe("github.com/belweave/trifecta");
       expect(normalizeResolvedPath(identity?.rootPath ?? "")).toBe(normalizeResolvedPath(repoRoot));
     }).pipe(Effect.provide(RepositoryIdentityResolverLive)),
   );
@@ -109,16 +109,16 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
       });
 
       yield* git(cwd, ["init"]);
-      yield* git(cwd, ["remote", "add", "origin", "git@github.com:julius/t3code.git"]);
-      yield* git(cwd, ["remote", "add", "upstream", "git@github.com:T3Tools/t3code.git"]);
+      yield* git(cwd, ["remote", "add", "origin", "git@github.com:julius/trifecta.git"]);
+      yield* git(cwd, ["remote", "add", "upstream", "git@github.com:Belweave/trifecta.git"]);
 
       const resolver = yield* RepositoryIdentityResolver;
       const identity = yield* resolver.resolve(cwd);
 
       expect(identity).not.toBeNull();
       expect(identity?.locator.remoteName).toBe("upstream");
-      expect(identity?.canonicalKey).toBe("github.com/t3tools/t3code");
-      expect(identity?.displayName).toBe("t3tools/t3code");
+      expect(identity?.canonicalKey).toBe("github.com/belweave/trifecta");
+      expect(identity?.displayName).toBe("belweave/trifecta");
     }).pipe(Effect.provide(RepositoryIdentityResolverLive)),
   );
 
@@ -130,16 +130,16 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
       });
 
       yield* git(cwd, ["init"]);
-      yield* git(cwd, ["remote", "add", "origin", "git@gitlab.com:T3Tools/platform/t3code.git"]);
+      yield* git(cwd, ["remote", "add", "origin", "git@gitlab.com:Belweave/platform/trifecta.git"]);
 
       const resolver = yield* RepositoryIdentityResolver;
       const identity = yield* resolver.resolve(cwd);
 
       expect(identity).not.toBeNull();
-      expect(identity?.canonicalKey).toBe("gitlab.com/t3tools/platform/t3code");
-      expect(identity?.displayName).toBe("t3tools/platform/t3code");
-      expect(identity?.owner).toBe("t3tools");
-      expect(identity?.name).toBe("t3code");
+      expect(identity?.canonicalKey).toBe("gitlab.com/belweave/platform/trifecta");
+      expect(identity?.displayName).toBe("belweave/platform/trifecta");
+      expect(identity?.owner).toBe("belweave");
+      expect(identity?.name).toBe("trifecta");
     }).pipe(Effect.provide(RepositoryIdentityResolverLive)),
   );
 
@@ -158,7 +158,7 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
         const initialIdentity = yield* resolver.resolve(cwd);
         expect(initialIdentity).toBeNull();
 
-        yield* git(cwd, ["remote", "add", "origin", "git@github.com:T3Tools/t3code.git"]);
+        yield* git(cwd, ["remote", "add", "origin", "git@github.com:Belweave/trifecta.git"]);
 
         for (const _attempt of [1, 2, 3]) {
           const cachedIdentity = yield* resolver.resolve(cwd);
@@ -169,8 +169,8 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
 
         const refreshedIdentity = yield* resolver.resolve(cwd);
         expect(refreshedIdentity).not.toBeNull();
-        expect(refreshedIdentity?.canonicalKey).toBe("github.com/t3tools/t3code");
-        expect(refreshedIdentity?.name).toBe("t3code");
+        expect(refreshedIdentity?.canonicalKey).toBe("github.com/belweave/trifecta");
+        expect(refreshedIdentity?.name).toBe("trifecta");
       }).pipe(
         Effect.provide(
           Layer.merge(
@@ -192,26 +192,26 @@ it.layer(NodeServices.layer)("RepositoryIdentityResolverLive", (it) => {
       });
 
       yield* git(cwd, ["init"]);
-      yield* git(cwd, ["remote", "add", "origin", "git@github.com:T3Tools/t3code.git"]);
+      yield* git(cwd, ["remote", "add", "origin", "git@github.com:Belweave/trifecta.git"]);
 
       const resolver = yield* RepositoryIdentityResolver;
       const initialIdentity = yield* resolver.resolve(cwd);
       expect(initialIdentity).not.toBeNull();
-      expect(initialIdentity?.canonicalKey).toBe("github.com/t3tools/t3code");
+      expect(initialIdentity?.canonicalKey).toBe("github.com/belweave/trifecta");
 
-      yield* git(cwd, ["remote", "set-url", "origin", "git@github.com:T3Tools/t3code-next.git"]);
+      yield* git(cwd, ["remote", "set-url", "origin", "git@github.com:Belweave/trifecta-next.git"]);
 
       const cachedIdentity = yield* resolver.resolve(cwd);
       expect(cachedIdentity).not.toBeNull();
-      expect(cachedIdentity?.canonicalKey).toBe("github.com/t3tools/t3code");
+      expect(cachedIdentity?.canonicalKey).toBe("github.com/belweave/trifecta");
 
       yield* TestClock.adjust(Duration.millis(180));
 
       const refreshedIdentity = yield* resolver.resolve(cwd);
       expect(refreshedIdentity).not.toBeNull();
-      expect(refreshedIdentity?.canonicalKey).toBe("github.com/t3tools/t3code-next");
-      expect(refreshedIdentity?.displayName).toBe("t3tools/t3code-next");
-      expect(refreshedIdentity?.name).toBe("t3code-next");
+      expect(refreshedIdentity?.canonicalKey).toBe("github.com/belweave/trifecta-next");
+      expect(refreshedIdentity?.displayName).toBe("belweave/trifecta-next");
+      expect(refreshedIdentity?.name).toBe("trifecta-next");
     }).pipe(
       Effect.provide(
         Layer.merge(

@@ -1,7 +1,7 @@
 import { matchers, routes, type VercelConfig } from "@vercel/config/v1";
 
 const ROUTER_HOST = "app.t3.codes";
-const HOSTED_WEB_CHANNEL_COOKIE = "t3code_web_channel";
+const HOSTED_WEB_CHANNEL_COOKIE = "trifecta_web_channel";
 const LATEST_ORIGIN = "https://latest.app.t3.codes";
 const NIGHTLY_ORIGIN = "https://nightly.app.t3.codes";
 
@@ -26,7 +26,7 @@ export const config: VercelConfig = {
     "bun add -g turbo && bun install --filter '@t3tools/contracts' --filter '@t3tools/client-runtime' --filter '@t3tools/scripts' --filter '@t3tools/web'",
   routes: [
     {
-      src: "/__t3code/channel",
+      src: "/__trifecta/channel",
       has: [matchers.query("channel", "nightly")],
       headers: {
         Location: "/",
@@ -35,7 +35,7 @@ export const config: VercelConfig = {
       status: 302,
     },
     {
-      src: "/__t3code/channel",
+      src: "/__trifecta/channel",
       headers: {
         Location: "/",
         "Set-Cookie": channelCookie("latest"),

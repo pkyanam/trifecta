@@ -2,7 +2,7 @@
 
 Trifecta is a cross-platform coding agent platform. It consists of a desktop server that runs AI coding agents, plus native mobile clients for iOS and Android that let you chat with your agent, review changes, and manage your development workflow from anywhere.
 
-The mobile apps are also designed to be compatible with the official T3 Code desktop server.
+The mobile apps are also designed to be compatible with the official Trifecta desktop server.
 
 ## What's in this repo
 
@@ -52,7 +52,7 @@ See [trifecta-desktop/README.md](trifecta-desktop/README.md) for full details.
 
 ## Trifecta for iOS
 
-Native iOS client written in SwiftUI. Connects to the Trifecta desktop server to give you mobile access to your coding agent. Also compatible with the official T3 Code desktop server.
+Native iOS client written in SwiftUI. Connects to the Trifecta desktop server to give you mobile access to your coding agent. Also compatible with the official Trifecta desktop server.
 
 ### Features
 
@@ -80,7 +80,7 @@ See [trifecta-ios/README.md](trifecta-ios/README.md) for the full engineering gu
 
 ## Trifecta for Android
 
-Native Android client written in Kotlin and Jetpack Compose. Mirrors the iOS feature set for a consistent cross-platform experience. Also compatible with the official T3 Code desktop server.
+Native Android client written in Kotlin and Jetpack Compose. Mirrors the iOS feature set for a consistent cross-platform experience. Also compatible with the official Trifecta desktop server.
 
 ### Features
 
