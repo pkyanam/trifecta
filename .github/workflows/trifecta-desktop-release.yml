@@ -27,6 +27,8 @@ on:
         options:
           - all
           - mac
+          - mac-arm64
+          - mac-universal
           - linux
           - windows
 
@@ -149,6 +151,12 @@ jobs:
           case "${PLATFORMS:-all}" in
             mac)
               matrix='{"include":[{"label":"macOS arm64","runner":"macos-latest","platform":"mac","target":"dmg","arch":"arm64"},{"label":"macOS x64","runner":"macos-13","platform":"mac","target":"dmg","arch":"x64"}]}'
+              ;;
+            mac-arm64)
+              matrix='{"include":[{"label":"macOS arm64","runner":"macos-latest","platform":"mac","target":"dmg","arch":"arm64"}]}'
+              ;;
+            mac-universal)
+              matrix='{"include":[{"label":"macOS universal","runner":"macos-latest","platform":"mac","target":"dmg","arch":"universal"}]}'
               ;;
             linux)
               matrix='{"include":[{"label":"Linux x64","runner":"ubuntu-24.04","platform":"linux","target":"AppImage","arch":"x64"}]}'

@@ -583,6 +583,7 @@ export function resolveDesktopProductName(version: string): string {
 const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   platform: typeof BuildPlatform.Type,
   target: string,
+  arch: typeof BuildArch.Type,
   version: string,
   signed: boolean,
   mockUpdates: boolean,
@@ -610,11 +611,16 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   }
 
   if (platform === "mac") {
-    buildConfig.mac = {
+    const macConfig: Record<string, unknown> = {
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
       category: "public.app-category.developer-tools",
     };
+    if (arch === "universal") {
+      macConfig.mergeASARs = true;
+      macConfig.x64ArchFiles = "**";
+    }
+    buildConfig.mac = macConfig;
   }
 
   if (platform === "linux") {
@@ -811,6 +817,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     build: yield* createBuildConfig(
       options.platform,
       options.target,
+      options.arch,
       appVersion,
       options.signed,
       options.mockUpdates,
