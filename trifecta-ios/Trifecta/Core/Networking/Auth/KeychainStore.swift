@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 enum KeychainStore {
-    private static let service = "com.belweave.T3-Code"
+    private static let service = "com.belweave.trifecta"
 
     enum Key: String {
         case bearerToken = "t3.bearer.token"

@@ -7,13 +7,13 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		609943022FADCC44007535A7 /* Trifecta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Trifecta.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		609943022FADCC44007535A7 /* Trifecta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Trifecta.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		609943042FADCC44007535A7 /* Trifecta */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Trifecta";
+			path = Trifecta;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -63,10 +63,10 @@
 			fileSystemSynchronizedGroups = (
 				609943042FADCC44007535A7 /* Trifecta */,
 			);
-			name = "Trifecta";
+			name = Trifecta;
 			packageProductDependencies = (
 			);
-			productName = "Trifecta";
+			productName = Trifecta;
 			productReference = 609943022FADCC44007535A7 /* Trifecta.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -252,7 +252,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 6D56G8D849;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -281,7 +281,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 6D56G8D849;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;

@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct T3_CodeApp: App {
+struct TrifectaApp: App {
     @State private var env = AppEnvironment()
     @AppStorage("accent") private var accentRaw: String = AppAccent.blue.rawValue
 

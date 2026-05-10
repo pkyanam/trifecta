@@ -2,7 +2,6 @@
 
 Native iOS client for the Trifecta coding agent platform. Chat with your AI coding assistant, review changes, approve actions, and manage development threads from your iPhone or iPad.
 
-This app is also designed to be compatible with the official T3 Code desktop server.
 
 ## Features
 
@@ -30,7 +29,7 @@ trifecta-ios/
 ├── Info.plist                          # Bundle metadata and permissions
 ├── PrivacyInfo.xcprivacy               # Required API declarations
 └── Trifecta/                           # Sources
-    ├── T3_CodeApp.swift                # @main entry point
+    ├── TrifectaApp.swift               # @main entry point
     ├── Assets.xcassets/                # App icon and accent color
     ├── App/                            # Root routing, environment, tabs
     │   ├── AppRoot.swift               # Routes between setup and main UI
