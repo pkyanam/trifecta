@@ -12,33 +12,9 @@ Trifecta is a minimal web GUI for coding agents (currently Codex, Claude, and Op
 > - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
 > - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
 
-### Run without installing
-
-```bash
-npx t3
-```
-
 ### Desktop app
 
-Install the latest version of the desktop app from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), or from your favorite package registry:
-
-#### Windows (`winget`)
-
-```bash
-winget install Trifecta.Trifecta
-```
-
-#### macOS (Homebrew)
-
-```bash
-brew install --cask t3-code
-```
-
-#### Arch Linux (AUR)
-
-```bash
-yay -S trifecta-bin
-```
+Install the latest version of the desktop app from [GitHub Releases](https://github.com/pkyanam/trifecta/releases).
 
 ## Some notes
 

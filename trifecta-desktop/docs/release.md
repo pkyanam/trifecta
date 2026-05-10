@@ -1,13 +1,13 @@
 # Release Checklist
 
-This document covers the unified release workflow for stable and nightly desktop releases.
+This document covers the monorepo desktop release workflow for stable and manual nightly releases.
 
 ## What the workflow does
 
-- Workflow: `.github/workflows/release.yml`
+- Monorepo workflow: `.github/workflows/trifecta-desktop-release.yml`
+- Legacy upstream workflow copy: `trifecta-desktop/.github/workflows/release.yml`
 - Triggers:
   - push tag matching `v*.*.*` for stable releases
-  - scheduled nightly at `09:00 UTC`
   - manual `workflow_dispatch` for either channel
 - Runs quality gates first: lint, typecheck, test.
 - Builds four artifacts in parallel for both channels:
@@ -21,20 +21,18 @@ This document covers the unified release workflow for stable and nightly desktop
   - Nightly runs are always GitHub prereleases and never marked latest.
   - Automatically generated release notes are pinned to the previous tag in the same channel, so stable compares to the previous stable tag and nightly compares to the previous nightly tag.
 - Includes Electron auto-update metadata (for example `latest*.yml`, `nightly*.yml`, and `*.blockmap`) in release assets.
-- Publishes the CLI package (`apps/server`, npm package `t3`) with OIDC trusted publishing from the same workflow file:
-  - stable releases publish npm dist-tag `latest`
-  - nightly releases publish npm dist-tag `nightly`
-- Deploys the hosted web app to Vercel only after a release is published:
-  - stable releases are aliased to the `latest` hosted app channel
-  - nightly releases are aliased to the `nightly` hosted app channel
+- Does not publish the CLI package yet.
+- Does not deploy the hosted web app yet.
 - Signing is optional and auto-detected per platform from secrets.
 
 ## Hosted web app release deployment
 
+Hosted web deployment is deferred in the monorepo release workflow. The details
+below are the intended setup when `deploy_web` is reintroduced.
+
 The hosted app is intentionally not deployed by Vercel's Git integration. The
 web project disables automatic Git deployments in `apps/web/vercel.ts` via
-`git.deploymentEnabled: false`, and `.github/workflows/release.yml` deploys the
-web app with Vercel CLI after the GitHub Release succeeds.
+`git.deploymentEnabled: false`.
 
 Required GitHub Actions secrets:
 
@@ -45,20 +43,20 @@ Required GitHub Actions secrets:
 Optional GitHub Actions variables:
 
 - `VERCEL_TEAM_SLUG`: overrides the Vercel CLI scope when the team slug is preferred over the `VERCEL_ORG_ID` secret.
-- `TRIFECTA_WEB_ROUTER_URL`: defaults to `https://app.t3.codes`.
-- `TRIFECTA_WEB_LATEST_DOMAIN`: defaults to `latest.app.t3.codes`.
-- `TRIFECTA_WEB_NIGHTLY_DOMAIN`: defaults to `nightly.app.t3.codes`.
+- `TRIFECTA_WEB_ROUTER_URL`: defaults to `https://app.trifecta.dev`.
+- `TRIFECTA_WEB_LATEST_DOMAIN`: defaults to `latest.app.trifecta.dev`.
+- `TRIFECTA_WEB_NIGHTLY_DOMAIN`: defaults to `nightly.app.trifecta.dev`.
 
 Required Vercel domains:
 
-- `app.t3.codes`: the stable router domain users open.
-- `latest.app.t3.codes`: channel alias updated by stable releases.
-- `nightly.app.t3.codes`: channel alias updated by nightly releases.
+- `app.trifecta.dev`: the stable router domain users open.
+- `latest.app.trifecta.dev`: channel alias updated by stable releases.
+- `nightly.app.trifecta.dev`: channel alias updated by nightly releases.
 
 The router domain uses `apps/web/vercel.ts` routes. Users opt into a channel by
 visiting `/__trifecta/channel?channel=latest` or
 `/__trifecta/channel?channel=nightly`; the router stores the
-`trifecta_web_channel` cookie and rewrites future requests on `app.t3.codes` to
+`trifecta_web_channel` cookie and rewrites future requests on `app.trifecta.dev` to
 the matching channel alias.
 
 The release deploy job rewrites release package versions before upload so the
@@ -76,14 +74,13 @@ One-time Vercel dashboard setup:
    `vercel.ts` setting is the source-of-truth, but disconnecting Git in the
    dashboard is also safe.
 4. Promote or alias one deployment containing the router rules in `apps/web/vercel.ts` to
-   `app.t3.codes` once. Future release jobs should only update the channel
+   `app.trifecta.dev` once. Future release jobs should only update the channel
    aliases.
 
 ## Nightly builds
 
-- Workflow: `.github/workflows/release.yml`
+- Workflow: `.github/workflows/trifecta-desktop-release.yml`
 - Triggers:
-  - scheduled every day at `09:00 UTC`
   - manual `workflow_dispatch` with `channel=nightly`
 - Runs the same desktop quality gates and artifact matrix as the tagged release flow.
 - Publishes a GitHub prerelease only:
@@ -92,7 +89,6 @@ One-time Vercel dashboard setup:
   - `make_latest` is always `false`
 - Uses the next stable patch version as the nightly base. For example, `0.0.17` produces nightlies on `0.0.18-nightly.*`.
 - Publishes Electron auto-update metadata to the dedicated `nightly` updater channel, so desktop users can opt into that track independently from stable.
-- Publishes the CLI package (`apps/server`, npm package `t3`) to the `nightly` npm dist-tag using the same nightly version.
 - Does not commit version bumps back to `main`.
 
 ## Desktop auto-update notes
@@ -119,23 +115,19 @@ One-time Vercel dashboard setup:
 
 ## 0) npm OIDC trusted publishing setup (CLI)
 
-The workflow publishes the CLI with `npm publish` from `apps/server` after bumping
-the package version to the release tag version.
+CLI publishing is deferred. Do not enable npm publishing until the package name
+and bin name are final.
 
 Checklist:
 
-1. Confirm npm org/user owns package `t3` (or rename package first if needed).
+1. Confirm npm org/user owns the chosen package name.
 2. In npm package settings, configure Trusted Publisher:
    - Provider: GitHub Actions
    - Repository: this repo
-   - Workflow file: `.github/workflows/release.yml`
+   - Workflow file: `.github/workflows/trifecta-desktop-release.yml`
    - Environment (if used): match your npm trusted publishing config
 3. Ensure npm account and org policies allow trusted publishing for the package.
-4. Create release tag `vX.Y.Z` and push; workflow will:
-   - set `apps/server/package.json` version to `X.Y.Z`
-   - build web + server
-   - run `npm publish --access public --tag latest`
-5. Nightly runs from the same workflow file publish with `npm publish --access public --tag nightly`.
+4. Reintroduce a `publish_cli` job after desktop releases and updates are proven.
 
 ## 1) Dry-run release without signing
 
@@ -145,7 +137,7 @@ Use this first to validate the release pipeline.
 2. Create a test tag:
    - `git tag v0.0.0-test.1`
    - `git push origin v0.0.0-test.1`
-3. Wait for `.github/workflows/release.yml` to finish.
+3. Wait for `.github/workflows/trifecta-desktop-release.yml` to finish.
 4. Verify the GitHub Release contains all platform artifacts.
 5. Download each artifact and sanity-check installation on each OS.
 
