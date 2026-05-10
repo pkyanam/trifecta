@@ -50,6 +50,7 @@ jobs:
       previous_tag: ${{ steps.previous_tag.outputs.previous_tag }}
       is_prerelease: ${{ steps.release_meta.outputs.is_prerelease }}
       make_latest: ${{ steps.release_meta.outputs.make_latest }}
+      build_matrix: ${{ steps.build_matrix.outputs.matrix }}
       ref: ${{ github.sha }}
     steps:
       - name: Checkout
@@ -139,43 +140,41 @@ jobs:
             --current-tag "${{ steps.release_meta.outputs.tag }}" \
             --github-output
 
+      - id: build_matrix
+        name: Resolve build matrix
+        shell: bash
+        env:
+          PLATFORMS: ${{ github.event.inputs.platforms }}
+        run: |
+          case "${PLATFORMS:-all}" in
+            mac)
+              matrix='{"include":[{"label":"macOS arm64","runner":"macos-latest","platform":"mac","target":"dmg","arch":"arm64"},{"label":"macOS x64","runner":"macos-13","platform":"mac","target":"dmg","arch":"x64"}]}'
+              ;;
+            linux)
+              matrix='{"include":[{"label":"Linux x64","runner":"ubuntu-24.04","platform":"linux","target":"AppImage","arch":"x64"}]}'
+              ;;
+            windows)
+              matrix='{"include":[{"label":"Windows x64","runner":"windows-2025","platform":"win","target":"nsis","arch":"x64"}]}'
+              ;;
+            all|"")
+              matrix='{"include":[{"label":"macOS arm64","runner":"macos-latest","platform":"mac","target":"dmg","arch":"arm64"},{"label":"macOS x64","runner":"macos-13","platform":"mac","target":"dmg","arch":"x64"},{"label":"Linux x64","runner":"ubuntu-24.04","platform":"linux","target":"AppImage","arch":"x64"},{"label":"Windows x64","runner":"windows-2025","platform":"win","target":"nsis","arch":"x64"}]}'
+              ;;
+            *)
+              echo "Unsupported platform selection: ${PLATFORMS}" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build ${{ matrix.label }}
     needs: preflight
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.platforms == 'all' ||
-      github.event.inputs.platforms == matrix.platform_group
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - label: macOS arm64
-            platform_group: mac
-            runner: macos-latest
-            platform: mac
-            target: dmg
-            arch: arm64
-          - label: macOS x64
-            platform_group: mac
-            runner: macos-13
-            platform: mac
-            target: dmg
-            arch: x64
-          - label: Linux x64
-            platform_group: linux
-            runner: ubuntu-24.04
-            platform: linux
-            target: AppImage
-            arch: x64
-          - label: Windows x64
-            platform_group: windows
-            runner: windows-2025
-            platform: win
-            target: nsis
-            arch: x64
+      matrix: ${{ fromJSON(needs.preflight.outputs.build_matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
