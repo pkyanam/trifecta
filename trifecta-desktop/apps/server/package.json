@@ -4,7 +4,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pkyanam/trifecta",
+    "url": "https://github.com/Belweave/trifecta",
     "directory": "apps/server"
   },
   "bin": {

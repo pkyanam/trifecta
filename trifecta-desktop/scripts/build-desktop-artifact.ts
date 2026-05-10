@@ -812,7 +812,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     trifectaCommitHash: commitHash,
     private: true,
     description: "Trifecta desktop build",
-    author: "T3 Tools",
+    author: "Belweave",
     main: "apps/desktop/dist-electron/main.cjs",
     build: yield* createBuildConfig(
       options.platform,

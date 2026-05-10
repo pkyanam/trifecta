@@ -150,7 +150,7 @@ jobs:
         run: |
           case "${PLATFORMS:-all}" in
             mac)
-              matrix='{"include":[{"label":"macOS arm64","runner":"macos-latest","platform":"mac","target":"dmg","arch":"arm64"},{"label":"macOS x64","runner":"macos-13","platform":"mac","target":"dmg","arch":"x64"}]}'
+              matrix='{"include":[{"label":"macOS universal","runner":"macos-latest","platform":"mac","target":"dmg","arch":"universal"}]}'
               ;;
             mac-arm64)
               matrix='{"include":[{"label":"macOS arm64","runner":"macos-latest","platform":"mac","target":"dmg","arch":"arm64"}]}'
@@ -165,7 +165,7 @@ jobs:
               matrix='{"include":[{"label":"Windows x64","runner":"windows-2025","platform":"win","target":"nsis","arch":"x64"}]}'
               ;;
             all|"")
-              matrix='{"include":[{"label":"macOS arm64","runner":"macos-latest","platform":"mac","target":"dmg","arch":"arm64"},{"label":"macOS x64","runner":"macos-13","platform":"mac","target":"dmg","arch":"x64"},{"label":"Linux x64","runner":"ubuntu-24.04","platform":"linux","target":"AppImage","arch":"x64"},{"label":"Windows x64","runner":"windows-2025","platform":"win","target":"nsis","arch":"x64"}]}'
+              matrix='{"include":[{"label":"macOS universal","runner":"macos-latest","platform":"mac","target":"dmg","arch":"universal"},{"label":"Linux x64","runner":"ubuntu-24.04","platform":"linux","target":"AppImage","arch":"x64"},{"label":"Windows x64","runner":"windows-2025","platform":"win","target":"nsis","arch":"x64"}]}'
               ;;
             *)
               echo "Unsupported platform selection: ${PLATFORMS}" >&2
@@ -291,7 +291,7 @@ jobs:
             done
           done
 
-          if [[ "${{ matrix.platform }}" == "mac" && "${{ matrix.arch }}" != "arm64" ]]; then
+          if [[ "${{ matrix.platform }}" == "mac" && "${{ matrix.arch }}" == "x64" ]]; then
             shopt -s nullglob
             for manifest in release-publish/*-mac.yml; do
               mv "$manifest" "${manifest%.yml}-${{ matrix.arch }}.yml"
