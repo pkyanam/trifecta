@@ -52,3 +52,22 @@ yarn-error.log*
 
 # turbo
 .turbo
+
+# trifecta desktop generated artifacts
+trifecta-desktop/.bun/
+trifecta-desktop/.electron-runtime/
+trifecta-desktop/.logs/
+trifecta-desktop/.tanstack/
+trifecta-desktop/.vitest-*/
+trifecta-desktop/.astro/
+trifecta-desktop/**/.astro/
+trifecta-desktop/**/.vite/
+trifecta-desktop/**/.turbo/
+trifecta-desktop/**/dist-electron/
+trifecta-desktop/release/
+trifecta-desktop/release-mock/
+trifecta-desktop/squashfs-root/
+trifecta-desktop/apps/web/.playwright/
+trifecta-desktop/apps/web/playwright-report/
+trifecta-desktop/apps/web/src/components/__screenshots__/
+trifecta-desktop/**/__screenshots__/

@@ -20,9 +20,9 @@ describe("branding", () => {
       value: {
         desktopBridge: {
           getAppBranding: () => ({
-            baseName: "T3 Code",
+            baseName: "Trifecta",
             stageLabel: "Nightly",
-            displayName: "T3 Code (Nightly)",
+            displayName: "Trifecta (Nightly)",
           }),
         },
       },
@@ -30,9 +30,9 @@ describe("branding", () => {
 
     const branding = await import("./branding");
 
-    expect(branding.APP_BASE_NAME).toBe("T3 Code");
+    expect(branding.APP_BASE_NAME).toBe("Trifecta");
     expect(branding.APP_STAGE_LABEL).toBe("Nightly");
-    expect(branding.APP_DISPLAY_NAME).toBe("T3 Code (Nightly)");
+    expect(branding.APP_DISPLAY_NAME).toBe("Trifecta (Nightly)");
   });
 
   it("normalizes hosted app channel metadata", async () => {

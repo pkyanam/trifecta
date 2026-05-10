@@ -491,7 +491,7 @@ it.layer(NodeServices.layer)("launchDetached", (it) => {
   it.effect("rejects when command does not exist", () =>
     Effect.gen(function* () {
       const result = yield* launchDetached({
-        command: `t3code-no-such-command-${yield* Random.nextUUIDv4}`,
+        command: `trifecta-no-such-command-${yield* Random.nextUUIDv4}`,
         args: [],
       }).pipe(Effect.result);
       assert.equal(result._tag, "Failure");
