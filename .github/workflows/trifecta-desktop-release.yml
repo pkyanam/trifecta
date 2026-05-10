@@ -19,6 +19,16 @@ on:
         description: "Release version (for example 1.2.3 or v1.2.3)"
         required: false
         type: string
+      platforms:
+        description: "Platforms to build"
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - mac
+          - linux
+          - windows
 
 permissions:
   contents: write
@@ -132,6 +142,10 @@ jobs:
   build:
     name: Build ${{ matrix.label }}
     needs: preflight
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.platforms == 'all' ||
+      github.event.inputs.platforms == matrix.platform_group
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
@@ -139,21 +153,25 @@ jobs:
       matrix:
         include:
           - label: macOS arm64
-            runner: macos-15-arm64
+            platform_group: mac
+            runner: macos-latest
             platform: mac
             target: dmg
             arch: arm64
           - label: macOS x64
+            platform_group: mac
             runner: macos-13
             platform: mac
             target: dmg
             arch: x64
           - label: Linux x64
+            platform_group: linux
             runner: ubuntu-24.04
             platform: linux
             target: AppImage
             arch: x64
           - label: Windows x64
+            platform_group: windows
             runner: windows-2025
             platform: win
             target: nsis
