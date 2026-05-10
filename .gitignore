@@ -1,6 +1,9 @@
 # t3 code original reference folder (development only)
 t3code-original/
 
+# temporary local assets
+tempAssetsDoNotCommit/
+
 # system files
 .DS_Store
 Thumbs.db
