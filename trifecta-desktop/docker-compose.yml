@@ -12,7 +12,7 @@
 services:
   trifecta:
     build:
-      context: ./trifecta-desktop
+      context: .
       dockerfile: Dockerfile
     container_name: trifecta-server
     ports:
