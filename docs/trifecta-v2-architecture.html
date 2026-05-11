@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trifecta v2 — AWS Cloud Sandbox Architecture</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'JetBrains Mono', monospace; background: #020617; min-height: 100vh; padding: 2rem; color: white; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #22d3ee; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container { background: rgba(15, 23, 42, 0.5); border-radius: 1rem; border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto; }
+    svg { width: 100%; min-width: 1100px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { background: rgba(15, 23, 42, 0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Trifecta v2 — Cloud Sandbox Architecture</h1>
+      </div>
+      <p class="subtitle">Firecracker microVM sandboxes · Control plane on ECS Fargate · Pairing-based multi-client access</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1150 780">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+          </marker>
+          <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24" />
+          </marker>
+          <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- ====== EXTERNAL: Users & Clients ====== -->
+        <!-- Web Client (Frontend) -->
+        <rect x="490" y="30" width="170" height="60" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="575" y="52" fill="white" font-size="11" font-weight="600" text-anchor="middle">Web Client</text>
+        <text x="575" y="68" fill="#94a3b8" font-size="9" text-anchor="middle">React · S3+CloudFront</text>
+        <text x="575" y="82" fill="#22d3ee" font-size="7" text-anchor="middle">app.trifecta.dev</text>
+
+        <!-- Mobile Clients -->
+        <rect x="720" y="30" width="170" height="60" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="805" y="52" fill="white" font-size="11" font-weight="600" text-anchor="middle">Mobile Clients</text>
+        <text x="805" y="68" fill="#94a3b8" font-size="9" text-anchor="middle">iOS · Android</text>
+
+        <!-- Desktop Client -->
+        <rect x="260" y="30" width="170" height="60" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="345" y="52" fill="white" font-size="11" font-weight="600" text-anchor="middle">Desktop App</text>
+        <text x="345" y="68" fill="#94a3b8" font-size="9" text-anchor="middle">Electron · "Add Environment"</text>
+
+        <!-- ====== AWS REGION BOUNDARY ====== -->
+        <rect x="20" y="120" width="1110" height="640" rx="12" fill="rgba(251, 191, 36, 0.04)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="32" y="138" fill="#fbbf24" font-size="10" font-weight="600">AWS Region: us-east-1</text>
+
+        <!-- ====== PUBLIC SUBNET ====== -->
+        <rect x="40" y="155" width="320" height="250" rx="8" fill="rgba(34, 211, 238, 0.03)" stroke="#22d3ee" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <text x="50" y="170" fill="#22d3ee" font-size="8" font-weight="600">Public Subnet — 10.0.1.0/24</text>
+
+        <!-- ALB -->
+        <rect x="60" y="190" width="140" height="55" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="130" y="212" fill="white" font-size="11" font-weight="600" text-anchor="middle">ALB</text>
+        <text x="130" y="228" fill="#94a3b8" font-size="9" text-anchor="middle">HTTPS :443</text>
+        <text x="130" y="238" fill="#fbbf24" font-size="7" text-anchor="middle">WSS /api/* /pair</text>
+
+        <!-- CloudFront -->
+        <rect x="60" y="290" width="140" height="50" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="130" y="312" fill="white" font-size="11" font-weight="600" text-anchor="middle">CloudFront</text>
+        <text x="130" y="328" fill="#94a3b8" font-size="9" text-anchor="middle">Static Assets · CDN</text>
+
+        <!-- S3 (Static Site) -->
+        <rect x="250" y="190" width="95" height="50" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="297" y="212" fill="white" font-size="10" font-weight="600" text-anchor="middle">S3</text>
+        <text x="297" y="228" fill="#94a3b8" font-size="8" text-anchor="middle">Static Site</text>
+
+        <!-- NAT Gateway -->
+        <rect x="250" y="290" width="95" height="50" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="297" y="312" fill="white" font-size="9" font-weight="600" text-anchor="middle">NAT GW</text>
+        <text x="297" y="328" fill="#94a3b8" font-size="8" text-anchor="middle">VM Egress</text>
+
+        <!-- ====== CONTROL PLANE SUBNET (Private) ====== -->
+        <rect x="390" y="155" width="350" height="250" rx="8" fill="rgba(52, 211, 153, 0.03)" stroke="#34d399" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <text x="400" y="170" fill="#34d399" font-size="8" font-weight="600">Control Plane Subnet — 10.0.2.0/24</text>
+
+        <!-- Trifecta Server (ECS Fargate) -->
+        <rect x="430" y="190" width="160" height="65" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="510" y="212" fill="white" font-size="11" font-weight="600" text-anchor="middle">Trifecta Server</text>
+        <text x="510" y="228" fill="#94a3b8" font-size="9" text-anchor="middle">ECS Fargate · Bun</text>
+        <text x="510" y="242" fill="#34d399" font-size="8" text-anchor="middle">Effect-TS · WebSocket RPC</text>
+        <text x="510" y="252" fill="#94a3b8" font-size="7" text-anchor="middle">Provider SPI · Auth · Sessions</text>
+
+        <!-- DynamoDB -->
+        <rect x="620" y="190" width="100" height="55" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="670" y="212" fill="white" font-size="10" font-weight="600" text-anchor="middle">DynamoDB</text>
+        <text x="670" y="228" fill="#94a3b8" font-size="8" text-anchor="middle">Sessions</text>
+        <text x="670" y="240" fill="#94a3b8" font-size="8" text-anchor="middle">Users</text>
+
+        <!-- S3 (Workspaces) -->
+        <rect x="620" y="290" width="100" height="55" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="670" y="312" fill="white" font-size="10" font-weight="600" text-anchor="middle">S3</text>
+        <text x="670" y="328" fill="#94a3b8" font-size="8" text-anchor="middle">Workspaces</text>
+        <text x="670" y="340" fill="#94a3b8" font-size="7" text-anchor="middle">Artifacts</text>
+
+        <!-- ====== SANDBOX SUBNET (Isolated/Private) ====== -->
+        <rect x="40" y="430" width="1070" height="155" rx="8" fill="rgba(251, 146, 60, 0.03)" stroke="#fb923c" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <text x="50" y="446" fill="#fb923c" font-size="8" font-weight="600">Sandbox Subnet — 10.0.3.0/24 (no internet ingress, NAT-only egress)</text>
+
+        <!-- Sandbox Manager -->
+        <rect x="60" y="465" width="150" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="135" y="487" fill="white" font-size="10" font-weight="600" text-anchor="middle">Sandbox Manager</text>
+        <text x="135" y="503" fill="#94a3b8" font-size="8" text-anchor="middle">EC2 c6i.4xlarge</text>
+
+        <!-- Security Group for Sandbox Host -->
+        <rect x="58" y="463" width="1075" height="118" rx="8" fill="transparent" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="1070" y="476" fill="#fb7185" font-size="8" text-anchor="end">sg-sandbox :vsock-only + :9090</text>
+
+        <!-- Firecracker VM Pool -->
+        <rect x="260" y="465" width="100" height="50" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="310" y="487" fill="white" font-size="10" font-weight="600" text-anchor="middle">VM Pool</text>
+        <text x="310" y="503" fill="#94a3b8" font-size="8" text-anchor="middle">Warm Snapshots</text>
+
+        <!-- Firecracker VM 1 -->
+        <rect x="410" y="465" width="140" height="55" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="480" y="487" fill="white" font-size="10" font-weight="600" text-anchor="middle">Firecracker VM</text>
+        <text x="480" y="503" fill="#94a3b8" font-size="8" text-anchor="middle">Alpine · 512MB · 1vCPU</text>
+        <text x="480" y="515" fill="#34d399" font-size="7" text-anchor="middle">guest-agent · codex CLI</text>
+
+        <!-- Firecracker VM 2 -->
+        <rect x="590" y="465" width="140" height="55" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="660" y="487" fill="white" font-size="10" font-weight="600" text-anchor="middle">Firecracker VM</text>
+        <text x="660" y="503" fill="#94a3b8" font-size="8" text-anchor="middle">Alpine · 1GB · 2vCPU</text>
+        <text x="660" y="515" fill="#34d399" font-size="7" text-anchor="middle">guest-agent · codex CLI</text>
+
+        <!-- Firecracker VM 3 -->
+        <rect x="770" y="465" width="140" height="55" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="840" y="487" fill="white" font-size="10" font-weight="600" text-anchor="middle">Firecracker VM</text>
+        <text x="840" y="503" fill="#94a3b8" font-size="8" text-anchor="middle">Alpine · 1GB · 2vCPU</text>
+        <text x="840" y="515" fill="#34d399" font-size="7" text-anchor="middle">guest-agent · codex CLI</text>
+
+        <!-- Firecracker VM (idle) -->
+        <rect x="950" y="465" width="140" height="55" rx="6" fill="rgba(30, 41, 59, 0.4)" stroke="#475569" stroke-width="1.5"/>
+        <text x="1020" y="487" fill="#94a3b8" font-size="10" font-weight="600" text-anchor="middle">Firecracker VM</text>
+        <text x="1020" y="503" fill="#64748b" font-size="8" text-anchor="middle">Idle · Pool</text>
+        <text x="1020" y="515" fill="#475569" font-size="7" text-anchor="middle">reserved</text>
+
+        <!-- ====== EXTERNAL: AI Provider APIs ====== -->
+        <rect x="940" y="155" width="170" height="55" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="1025" y="178" fill="white" font-size="11" font-weight="600" text-anchor="middle">AI Provider APIs</text>
+        <text x="1025" y="194" fill="#94a3b8" font-size="9" text-anchor="middle">Codex · Claude · OpenRouter</text>
+
+        <!-- ====== ARROWS & DATA FLOWS ====== -->
+
+        <!-- Desktop → ALB (pairing) -->
+        <line x1="345" y1="90" x2="200" y2="188" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+        <text x="230" y="130" fill="#22d3ee" font-size="8">HTTPS · Pairing URL</text>
+
+        <!-- Web Client → CloudFront -->
+        <line x1="575" y1="90" x2="200" y2="288" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+        <text x="360" y="180" fill="#94a3b8" font-size="8">CloudFront CDN</text>
+
+        <!-- CloudFront → S3 Static -->
+        <line x1="200" y1="315" x2="248" y2="315" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+
+        <!-- Mobile → ALB -->
+        <line x1="805" y1="90" x2="805" y2="190" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+        <text x="818" y="140" fill="#94a3b8" font-size="8">WSS</text>
+
+        <!-- ALB → Trifecta Server -->
+        <line x1="200" y1="218" x2="428" y2="222" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- Trifecta Server → DynamoDB -->
+        <line x1="590" y1="217" x2="618" y2="217" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+
+        <!-- Trifecta Server → S3 Workspaces -->
+        <path d="M 510 255 L 510 280 Q 510 300 530 300 L 618 300 L 618 312" fill="none" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+
+        <!-- Trifecta Server → Sandbox Manager -->
+        <path d="M 430 255 L 430 270 L 210 270 L 210 463" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+        <text x="250" y="350" fill="#34d399" font-size="8">REST API · Provision VM</text>
+
+        <!-- Sandbox Manager → VM Pool -->
+        <line x1="210" y1="490" x2="258" y2="490" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+        <text x="220" y="483" fill="#94a3b8" font-size="7">Pool</text>
+
+        <!-- Sandbox Manager → Firecracker VMs (vsock) -->
+        <line x1="210" y1="505" x2="408" y2="495" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+        <text x="310" y="540" fill="#94a3b8" font-size="7">vsock · exec commands</text>
+
+        <!-- Firecracker VMs → AI Provider APIs -->
+        <path d="M 550 490 L 700 490 L 700 182 L 938 182" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="820" y="330" fill="#94a3b8" font-size="8">Agent API Calls</text>
+
+        <!-- NAT Gateway → Firecracker VMs (egress path) -->
+        <path d="M 297 340 L 297 400 Q 297 420 317 420 L 480 420 L 480 463" fill="none" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,4"/>
+
+        <!-- Auth flow: pairing token exchange -->
+        <path d="M 345 90 L 345 140 Q 345 160 325 160 L 200 160 L 200 188" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="5,5"/>
+        <text x="270" y="148" fill="#fb7185" font-size="7">Pairing + Bearer Token</text>
+
+        <!-- ====== VPC Endpoints ====== -->
+        <rect x="40" y="610" width="130" height="30" rx="4" fill="rgba(120, 53, 15, 0.2)" stroke="#fbbf24" stroke-width="0.8"/>
+        <text x="105" y="629" fill="#94a3b8" font-size="7" text-anchor="middle">VPC Endpoints · S3, DynamoDB, ECR</text>
+
+        <!-- ====== LEGEND ====== -->
+        <rect x="740" y="610" width="370" height="140" rx="8" fill="rgba(15, 23, 42, 0.7)" stroke="#1e293b" stroke-width="1"/>
+        <text x="755" y="628" fill="white" font-size="11" font-weight="600">Legend</text>
+
+        <rect x="755" y="640" width="16" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="777" y="649" fill="#94a3b8" font-size="8">Client / Frontend</text>
+
+        <rect x="755" y="656" width="16" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="777" y="665" fill="#94a3b8" font-size="8">Backend / Server</text>
+
+        <rect x="755" y="672" width="16" height="10" rx="2" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="777" y="681" fill="#94a3b8" font-size="8">AWS / Cloud Service</text>
+
+        <rect x="755" y="688" width="16" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="777" y="697" fill="#94a3b8" font-size="8">Database</text>
+
+        <rect x="755" y="704" width="16" height="10" rx="2" fill="rgba(30, 41, 59, 0.4)" stroke="#475569" stroke-width="1"/>
+        <text x="777" y="713" fill="#94a3b8" font-size="8">Idle / Reserved</text>
+
+        <line x1="920" y1="640" x2="936" y2="640" stroke="#fb7185" stroke-width="1" stroke-dasharray="5,5"/>
+        <text x="942" y="643" fill="#fb7185" font-size="8">Auth Flow</text>
+
+        <rect x="920" y="656" width="16" height="10" rx="2" fill="transparent" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="942" y="665" fill="#fb7185" font-size="8">Security Group</text>
+
+        <line x1="920" y1="680" x2="936" y2="680" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="942" y="683" fill="#94a3b8" font-size="8">NAT Route</text>
+
+        <rect x="920" y="696" width="16" height="10" rx="2" fill="transparent" stroke="#22d3ee" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <text x="942" y="705" fill="#94a3b8" font-size="8">Subnet Boundary</text>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>Control Plane</h3>
+        </div>
+        <ul>
+          <li>• ECS Fargate — no KVM needed, serverless</li>
+          <li>• Existing Effect-TS server (Bun)</li>
+          <li>• Provider SPI unchanged — new Firecracker driver</li>
+          <li>• Auth pairing flow identical to v1</li>
+          <li>• DynamoDB for sessions + user state</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>Sandbox Layer</h3>
+        </div>
+        <ul>
+          <li>• EC2 c6i.4xlarge — nested virt (KVM)</li>
+          <li>• Firecracker microVMs: Alpine + codex CLI</li>
+          <li>• Snapshot pools: &lt;100ms VM provision</li>
+          <li>• vsock comms — no network attack surface</li>
+          <li>• Workspaces: S3 pull → tmpfs → S3 push</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot rose"></div>
+          <h3>Security Model</h3>
+        </div>
+        <ul>
+          <li>• Each VM: own kernel (KVM boundary)</li>
+          <li>• No cross-VM networking — NAT-only egress</li>
+          <li>• Ephemeral disks (tmpfs) — destroyed on stop</li>
+          <li>• Pairing tokens: one-time use, scoped</li>
+          <li>• WSS tokens: short-lived, per-connection</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footer">
+      Trifecta v2 · Firecracker Sandbox Architecture · Designed for Belweave · May 2026
+    </p>
+  </div>
+</body>
+</html>

@@ -2,7 +2,6 @@
 
 Native Android client for the Trifecta coding agent platform. Chat with your AI coding assistant, review changes, approve actions, and manage development threads from your Android phone or tablet.
 
-This app is also designed to be compatible with the official T3 Code desktop server.
 
 ## Features
 
