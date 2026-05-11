@@ -169,7 +169,7 @@ export class ServerManager {
       : null;
 
     const wsUrl = wsToken
-      ? `ws://127.0.0.1:${port}/ws?token=${encodeURIComponent(wsToken)}`
+      ? `ws://127.0.0.1:${port}/ws?wsToken=${encodeURIComponent(wsToken)}`
       : `ws://127.0.0.1:${port}`;
 
     this.outputChannel.appendLine(
