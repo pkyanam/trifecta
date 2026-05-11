@@ -66,14 +66,13 @@ ARG INSTALL_CLAUDE=false
 ARG INSTALL_OPENCODE=false
 ARG INSTALL_CURSOR=false
 
-RUN if [ "$INSTALL_CODEX" = "true" ]; then npm install -g @openai/codex; fi && \
-    if [ "$INSTALL_CLAUDE" = "true" ]; then npm install -g @anthropic-ai/claude-code; fi && \
+RUN if [ "$INSTALL_CODEX" = "true" ]; then bun add -g @openai/codex; fi && \
+    if [ "$INSTALL_CLAUDE" = "true" ]; then bun add -g @anthropic-ai/claude-code; fi && \
     if [ "$INSTALL_OPENCODE" = "true" ]; then \
-      npm install -g opencode-ai 2>/dev/null || curl -fsSL https://opencode.ai/install | bash; \
+      bun add -g opencode-ai 2>/dev/null || curl -fsSL https://opencode.ai/install | bash; \
     fi && \
     if [ "$INSTALL_CURSOR" = "true" ]; then curl -fsSL https://cursor.com/install | bash; fi && \
-    npm cache clean --force && \
-    rm -rf /tmp/* /root/.npm/_cacache
+    rm -rf /tmp/* /root/.bun/install/cache
 
 # ── Runtime configuration ────────────────────────────────────────────
 ENV TRIFECTA_HOST=0.0.0.0
