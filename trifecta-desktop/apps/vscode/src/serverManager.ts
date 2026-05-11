@@ -1,13 +1,14 @@
 /**
  * ServerManager — spawns and manages the Trifecta server process.
  *
- * Pattern mirrors the Electron DesktopBackendManager but simplified for
- * the VS Code extension environment:
- *   1. Find the server entry point
- *   2. Spawn as child process (bun or node)
+ * Lifecycle:
+ *   1. Find server entry point (bun-monorepo or configured path)
+ *   2. Spawn as child process (bun preferred, node fallback)
  *   3. Poll health endpoint until ready
- *   4. Notify webview when connected
- *   5. Clean shutdown on deactivate
+ *   4. Capture the headless pairing token from stdout
+ *   5. Bootstrap auth (pairing token → session → WebSocket token)
+ *   6. Return WebSocket URL + token to the webview
+ *   7. Clean shutdown on deactivate
  */
 
 import * as vscode from "vscode";
@@ -17,48 +18,49 @@ import * as fs from "fs";
 import * as os from "os";
 import * as net from "net";
 
-interface ReadyListener {
-  (port: number): void;
+export interface ServerConnection {
+  /** Where the webview connects via WebSocket. */
+  wsUrl: string;
+  /** Port for HTTP API calls. */
+  port: number;
 }
+
+type ReadyListener = (conn: ServerConnection) => void;
 
 export class ServerManager {
   private process: ChildProcess | null = null;
-  private port: number | null = null;
+  private connection: ServerConnection | null = null;
   private listeners: ReadyListener[] = [];
   private outputChannel: vscode.OutputChannel;
-  private starting: Promise<number> | null = null;
+  private starting: Promise<ServerConnection> | null = null;
+  private stdoutBuffer = "";
 
   constructor(private context: vscode.ExtensionContext) {
     this.outputChannel = vscode.window.createOutputChannel("Trifecta Server");
     context.subscriptions.push(this.outputChannel);
   }
 
-  /**
-   * Start the Trifecta server. Idempotent — if already running, returns
-   * the existing port immediately.
-   */
-  async start(): Promise<number> {
-    if (this.port !== null) return this.port;
+  /** Start the server. Idempotent. */
+  async start(): Promise<ServerConnection> {
+    if (this.connection !== null) return this.connection;
     if (this.starting) return this.starting;
 
     this.starting = this.doStart();
     try {
-      this.port = await this.starting;
+      this.connection = await this.starting;
       this.starting = null;
-      this.notifyListeners(this.port);
-      return this.port;
+      this.notifyListeners(this.connection);
+      return this.connection;
     } catch (err) {
       this.starting = null;
       throw err;
     }
   }
 
-  /** Stop the server. Safe to call multiple times. */
   stop(): void {
     if (this.process) {
       this.outputChannel.appendLine("[trifecta] Stopping server…");
       this.process.kill("SIGTERM");
-      // Force kill after 5s if still alive
       setTimeout(() => {
         if (this.process && !this.process.killed) {
           this.process.kill("SIGKILL");
@@ -66,45 +68,36 @@ export class ServerManager {
       }, 5000);
       this.process = null;
     }
-    this.port = null;
+    this.connection = null;
   }
 
-  /** Register a callback for when the server becomes ready. */
   onReady(listener: ReadyListener): void {
     this.listeners.push(listener);
-    if (this.port !== null) {
-      listener(this.port);
+    if (this.connection !== null) {
+      listener(this.connection);
     }
   }
 
-  /** Get the current server port, or null if not ready. */
-  getReadyPort(): number | null {
-    return this.port;
+  getConnection(): ServerConnection | null {
+    return this.connection;
   }
 
   // ── Internal ─────────────────────────────────
 
-  private notifyListeners(port: number): void {
+  private notifyListeners(conn: ServerConnection): void {
     for (const l of this.listeners) {
-      try {
-        l(port);
-      } catch (_) {
-        // Don't let one broken listener break others
-      }
+      try { l(conn); } catch (_) {}
     }
   }
 
-  private async doStart(): Promise<number> {
-    // 1. Resolve the server entry point
+  private async doStart(): Promise<ServerConnection> {
     const serverPath = await this.resolveServerPath();
-
-    // 2. Find a free port
     const port = await findFreePort();
+
     this.outputChannel.appendLine(
       `[trifecta] Starting server on port ${port}…`,
     );
 
-    // 3. Spawn the server process
     const runtime = await this.resolveRuntime();
     const env: NodeJS.ProcessEnv = {
       ...process.env,
@@ -114,7 +107,6 @@ export class ServerManager {
       TRIFECTA_NO_BROWSER: "true",
       TRIFECTA_TAILSCALE_SERVE: "false",
       NODE_ENV: process.env.NODE_ENV || "development",
-      // Pass through provider auth from host
       HOME: os.homedir(),
       CODEX_HOME: process.env.CODEX_HOME || path.join(os.homedir(), ".codex"),
       CLAUDE_CONFIG_DIR:
@@ -125,15 +117,14 @@ export class ServerManager {
         path.join(os.homedir(), ".config", "opencode"),
     };
 
-    // For bun: `bun run <serverPath> serve --host ... --port ...`
-    // For node: `node <serverPath> serve --host ... --port ...`
-    // `serve` is already headless — no --headless flag needed.
-    const args = runtime === "bun"
-      ? ["run", serverPath, "serve", "--host", "127.0.0.1", "--port", String(port)]
-      : [serverPath, "serve", "--host", "127.0.0.1", "--port", String(port)];
+    const args =
+      runtime === "bun"
+        ? [serverPath, "serve", "--host", "127.0.0.1", "--port", String(port)]
+        : [serverPath, "serve", "--host", "127.0.0.1", "--port", String(port)];
 
     const execPath = runtime === "bun" ? "bun" : process.execPath;
 
+    this.stdoutBuffer = "";
     this.process = spawn(execPath, args, {
       cwd: path.dirname(serverPath),
       env,
@@ -142,12 +133,12 @@ export class ServerManager {
 
     this.process.stdout?.on("data", (data: Buffer) => {
       const text = data.toString();
+      this.stdoutBuffer += text;
       this.outputChannel.append(text);
     });
 
     this.process.stderr?.on("data", (data: Buffer) => {
-      const text = data.toString();
-      this.outputChannel.append(text);
+      this.outputChannel.append(data.toString());
     });
 
     this.process.on("exit", (code, signal) => {
@@ -155,7 +146,7 @@ export class ServerManager {
         `[trifecta] Server exited (code=${code}, signal=${signal})`,
       );
       this.process = null;
-      this.port = null;
+      this.connection = null;
     });
 
     this.process.on("error", (err) => {
@@ -164,43 +155,110 @@ export class ServerManager {
       );
     });
 
-    // 4. Wait for server to be ready (poll health endpoint)
+    // Wait for health check
     await this.waitForReady(port);
 
     this.outputChannel.appendLine(
       `[trifecta] Server ready on http://127.0.0.1:${port}`,
     );
 
-    return port;
+    // Complete pairing flow: read token from stdout → bootstrap → get WS token
+    const pairingToken = this.parsePairingToken();
+    const wsToken = pairingToken
+      ? await this.bootstrapAuth(port, pairingToken)
+      : null;
+
+    const wsUrl = wsToken
+      ? `ws://127.0.0.1:${port}/ws?token=${encodeURIComponent(wsToken)}`
+      : `ws://127.0.0.1:${port}`;
+
+    this.outputChannel.appendLine(
+      `[trifecta] WebSocket ready at ${wsUrl}`,
+    );
+
+    return { wsUrl, port };
   }
 
   /**
-   * Resolve the server entry point.
-   *
-   * Priority:
-   *   1. Configured path (trifecta.serverPath)
-   *   2. Monorepo: ../server/dist/bin.mjs relative to this extension
-   *   3. Monorepo: ~/projects/trifecta/trifecta-desktop/apps/server/dist/bin.mjs
+   * Parse the pairing token from the server's headless stdout.
+   * The server prints: "Token: XXXX-XXXX-XXXX"
    */
+  private parsePairingToken(): string | null {
+    const match = this.stdoutBuffer.match(/Token:\s*(\S+)/);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Complete the pairing flow:
+   *   1. POST /api/auth/bootstrap/bearer with pairing token
+   *   2. Extract sessionToken from response
+   *   3. POST /api/auth/ws-token with session token
+   *   4. Return wsToken
+   */
+  private async bootstrapAuth(
+    port: number,
+    pairingToken: string,
+  ): Promise<string | null> {
+    const base = `http://127.0.0.1:${port}`;
+    try {
+      // Step 1: Exchange pairing credential for session token
+      const bootstrapResp = await fetch(
+        `${base}/api/auth/bootstrap/bearer`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credential: pairingToken }),
+        },
+      );
+      if (!bootstrapResp.ok) {
+        this.outputChannel.appendLine(
+          `[trifecta] Bootstrap failed: ${bootstrapResp.status}`,
+        );
+        return null;
+      }
+
+      const bootstrap = await bootstrapResp.json();
+      const sessionToken = bootstrap.sessionToken;
+      if (!sessionToken) {
+        this.outputChannel.appendLine(
+          "[trifecta] No session token in bootstrap response",
+        );
+        return null;
+      }
+
+      // Step 2: Exchange session token for WebSocket token
+      const wsTokenResp = await fetch(`${base}/api/auth/ws-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({}),
+      });
+      if (!wsTokenResp.ok) {
+        this.outputChannel.appendLine(
+          `[trifecta] WS token request failed: ${wsTokenResp.status}`,
+        );
+        return null;
+      }
+
+      const wsTokenData = await wsTokenResp.json();
+      return wsTokenData.token || null;
+    } catch (err) {
+      this.outputChannel.appendLine(
+        `[trifecta] Auth error: ${err}`,
+      );
+      return null;
+    }
+  }
+
   private async resolveServerPath(): Promise<string> {
     const config = vscode.workspace.getConfiguration("trifecta");
     const configured = config.get<string>("serverPath");
+    if (configured && fs.existsSync(configured)) return configured;
 
-    if (configured && fs.existsSync(configured)) {
-      return configured;
-    }
-
-    // Look in the monorepo (extension is at apps/vscode/)
     const candidates = [
-      // Extension is in monorepo at apps/vscode/
-      path.resolve(
-        this.context.extensionPath,
-        "..",
-        "server",
-        "dist",
-        "bin.mjs",
-      ),
-      // Default project location
+      path.resolve(this.context.extensionPath, "..", "server", "dist", "bin.mjs"),
       path.join(
         os.homedir(),
         "projects",
@@ -213,22 +271,20 @@ export class ServerManager {
       ),
     ];
 
-    for (const candidate of candidates) {
-      if (fs.existsSync(candidate)) {
-        return candidate;
-      }
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return c;
     }
 
-    // Not found — show error with instructions
     const message =
-      `Trifecta server not found. Build it first:\n\n` +
-      `  cd ~/projects/trifecta/trifecta-desktop\n` +
-      `  bun install && bun run build --filter=t3\n\n` +
-      `Or set the path in VS Code settings: "trifecta.serverPath"`;
+      "Trifecta server not found. Build it first:\n\n" +
+      "  cd ~/projects/trifecta/trifecta-desktop\n" +
+      "  bun install && bun run build --filter=t3\n\n" +
+      'Or set "trifecta.serverPath" in VS Code settings.';
 
-    vscode.window.showErrorMessage("Trifecta server not found", "Show Details")
-      .then((selection) => {
-        if (selection === "Show Details") {
+    vscode.window
+      .showErrorMessage("Trifecta server not found", "Show Details")
+      .then((sel) => {
+        if (sel === "Show Details") {
           this.outputChannel.show();
           this.outputChannel.appendLine(message);
         }
@@ -237,18 +293,12 @@ export class ServerManager {
     throw new Error(message);
   }
 
-  /**
-   * Resolve the JavaScript runtime. Prefers bun but falls back to Node.js.
-   * Tries common bun install locations since the Extension Host may not
-   * have ~/.bun/bin in its PATH.
-   */
   private async resolveRuntime(): Promise<"bun" | "node"> {
-    // Common bun binary locations
     const bunCandidates = [
-      "bun",                                          // $PATH
-      path.join(os.homedir(), ".bun", "bin", "bun"),  // default install
-      "/usr/local/bin/bun",                            // Homebrew
-      "/opt/homebrew/bin/bun",                         // Apple Silicon Homebrew
+      "bun",
+      path.join(os.homedir(), ".bun", "bin", "bun"),
+      "/usr/local/bin/bun",
+      "/opt/homebrew/bin/bun",
     ];
 
     for (const bunPath of bunCandidates) {
@@ -259,14 +309,9 @@ export class ServerManager {
               stdio: "ignore",
               env: { ...process.env, PATH: process.env.PATH },
             });
-            proc.on("close", (code) =>
-              code === 0 ? resolve() : reject(),
-            );
+            proc.on("close", (code) => (code === 0 ? resolve() : reject()));
             proc.on("error", reject);
-            setTimeout(() => {
-              proc.kill();
-              reject(new Error("timeout"));
-            }, 3000);
+            setTimeout(() => { proc.kill(); reject(new Error("timeout")); }, 3000);
           });
           return "bun";
         } catch {
@@ -274,54 +319,43 @@ export class ServerManager {
         }
       }
     }
-
-    // Fall back to Node.js (the one VS Code uses)
     return "node";
   }
 
-  /**
-   * Poll the server's health endpoint until it responds.
-   * Timeout after 30 seconds.
-   */
   private async waitForReady(port: number): Promise<void> {
     const url = `http://127.0.0.1:${port}/.well-known/t3/environment`;
     const deadline = Date.now() + 30_000;
 
     while (Date.now() < deadline) {
       try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(1000) });
-        if (response.ok) {
-          return;
-        }
-      } catch {
-        // Server not ready yet
-      }
+        const resp = await fetch(url, { signal: AbortSignal.timeout(1000) });
+        if (resp.ok) return;
+      } catch {}
       await sleep(250);
     }
 
-    throw new Error(`Trifecta server did not become ready within 30s at ${url}`);
+    throw new Error(
+      `Trifecta server did not become ready within 30s at ${url}`,
+    );
   }
 }
 
-// ── Utilities ────────────────────────────────────
-
 async function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.unref();
-    server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (address && typeof address === "object") {
-        const port = address.port;
-        server.close(() => resolve(port));
+    const srv = net.createServer();
+    srv.unref();
+    srv.on("error", reject);
+    srv.listen(0, "127.0.0.1", () => {
+      const addr = srv.address();
+      if (addr && typeof addr === "object") {
+        srv.close(() => resolve(addr.port));
       } else {
-        server.close(() => reject(new Error("Could not get port")));
+        srv.close(() => reject(new Error("Could not get port")));
       }
     });
   });
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((r) => setTimeout(r, ms));
 }

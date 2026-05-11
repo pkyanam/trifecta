@@ -7,11 +7,12 @@
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": false,
     "sourceMap": true,
+    "moduleResolution": "node",
     "types": ["node", "vscode"]
   },
   "include": ["src/**/*"],
