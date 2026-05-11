@@ -77,7 +77,9 @@ RUN if [ "$INSTALL_CODEX" = "true" ]; then bun add -g @openai/codex; fi && \
       bun add -g opencode-ai 2>/dev/null || curl -fsSL https://opencode.ai/install | bash; \
     fi && \
     if [ "$INSTALL_CURSOR" = "true" ]; then curl -fsSL https://cursor.com/install | bash; fi && \
-    rm -rf /tmp/* /root/.bun/install/cache
+    rm -rf /tmp/* /root/.bun/install/cache && \
+    # Make bun's global bin accessible to the trifecta user
+    chmod 755 /root /root/.bun /root/.bun/bin
 
 # ── Runtime configuration ────────────────────────────────────────────
 ENV TRIFECTA_HOST=0.0.0.0
