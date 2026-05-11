@@ -125,11 +125,12 @@ export class ServerManager {
         path.join(os.homedir(), ".config", "opencode"),
     };
 
-    // For bun: `bun run <serverPath> serve --headless`
-    // For node: `node <serverPath> serve --headless`
+    // For bun: `bun run <serverPath> serve --host ... --port ...`
+    // For node: `node <serverPath> serve --host ... --port ...`
+    // `serve` is already headless — no --headless flag needed.
     const args = runtime === "bun"
-      ? ["run", serverPath, "serve", "--headless", "--host", "127.0.0.1", "--port", String(port)]
-      : [serverPath, "serve", "--headless", "--host", "127.0.0.1", "--port", String(port)];
+      ? ["run", serverPath, "serve", "--host", "127.0.0.1", "--port", String(port)]
+      : [serverPath, "serve", "--host", "127.0.0.1", "--port", String(port)];
 
     const execPath = runtime === "bun" ? "bun" : process.execPath;
 
