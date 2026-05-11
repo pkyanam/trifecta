@@ -55,15 +55,13 @@ export async function activate(context: vscode.ExtensionContext) {
   statusBar.show();
   context.subscriptions.push(statusBar);
 
-  // Start server (awaited so webview gets embedded wsUrl immediately)
+  // Start server (fire-and-forget — webview will show loading until ready)
   if (autoStart) {
-    try {
-      await serverManager.start();
-    } catch (err: any) {
+    serverManager.start().catch((err: any) => {
       vscode.window.showErrorMessage(
         `Trifecta failed to start: ${err.message}`,
       );
-    }
+    });
   }
 
   context.subscriptions.push({
@@ -92,42 +90,33 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [
-        vscode.Uri.joinPath(this.extensionUri, "dist"),
-        vscode.Uri.joinPath(this.extensionUri, "assets"),
-      ],
     };
 
-    // Get the connection (may be null if server not ready yet)
-    const conn = this.serverManager.getConnection();
+    // Show loading state immediately
+    webviewView.webview.html = this.getLoadingHtml();
 
-    // If server isn't ready yet, register a callback and show loading state
-    if (!conn) {
-      this.serverManager.onReady((readyConn) => {
-        webviewView.webview.postMessage({
-          type: "connect",
-          wsUrl: readyConn.wsUrl,
-        });
-      });
+    // When server is ready, swap to real chat UI with embedded wsUrl.
+    // No postMessage timing issues — the HTML is replaced atomically.
+    this.serverManager.onReady((conn) => {
+      webviewView.webview.html = this.getChatHtml(
+        webviewView.webview,
+        conn.wsUrl,
+      );
+    });
+
+    // If server is already ready, show chat now
+    const conn = this.serverManager.getConnection();
+    if (conn) {
+      webviewView.webview.html = this.getChatHtml(
+        webviewView.webview,
+        conn.wsUrl,
+      );
     }
 
-    // Embed wsUrl in HTML so the webview has it immediately if server is ready.
-    // Falls back to polling via postMessage if server starts later.
-    webviewView.webview.html = this.getChatHtml(
-      webviewView.webview,
-      conn?.wsUrl ?? null,
-    );
-
-    // Handle messages from webview (polling for connection)
+    // Handle focus requests from the chat
     webviewView.webview.onDidReceiveMessage((message) => {
-      if (message.type === "ready") {
-        const currentConn = this.serverManager.getConnection();
-        if (currentConn) {
-          webviewView.webview.postMessage({
-            type: "connect",
-            wsUrl: currentConn.wsUrl,
-          });
-        }
+      if (message.type === "focusInput") {
+        // Forward to the chat iframe
       }
     });
   }
@@ -137,10 +126,27 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: "focusInput" });
   }
 
-  private getChatHtml(webview: vscode.Webview, wsUrl: string | null): string {
-    // If server is ready, embed the wsUrl directly.
-    // Otherwise the webview polls via postMessage until it arrives.
-    const wsUrlJson = wsUrl ? JSON.stringify(wsUrl) : "null";
+  private getLoadingHtml(): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; display: flex; align-items: center; justify-content: center; font-family: var(--vscode-font-family, -apple-system, sans-serif); color: var(--vscode-descriptionForeground, #6c7086); background: var(--vscode-sideBar-background, #1e1e2e); }
+    .pulse { width: 12px; height: 12px; background: var(--vscode-focusBorder, #89b4fa); border-radius: 50%; animation: pulse 1.5s infinite; margin-right: 10px; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .row { display: flex; align-items: center; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="row"><div class="pulse"></div> Starting Trifecta…</div>
+</body>
+</html>`;
+  }
+
+  private getChatHtml(webview: vscode.Webview, wsUrl: string): string {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -240,7 +246,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
       // If the server was already ready when the HTML was generated,
       // wsUrl will be embedded directly — no postMessage race condition.
-      const EMBEDDED_WS_URL = ${wsUrlJson};
+      const EMBEDDED_WS_URL = "${wsUrl.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}";
 
       function setStatus(s) {
         statusDot.className = s;
@@ -253,10 +259,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       function connect(wsUrl) {
         if (ws) { ws.close(); ws = null; }
         setStatus('connecting');
-        ws = new WebSocket(wsUrl);
+        try {
+          ws = new WebSocket(wsUrl);
+        } catch(e) { return; }
         ws.onopen = () => { setStatus('connected'); fetchModels(); };
-        ws.onclose = () => setStatus('disconnected');
-        ws.onerror = () => setStatus('disconnected');
+        ws.onclose = (e) => { setStatus('disconnected'); };
+        ws.onerror = (e) => { setStatus('disconnected'); };
         ws.onmessage = (e) => { try { handleRpc(JSON.parse(e.data)); } catch(_) {} };
       }
 
@@ -326,24 +334,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       inputBox.addEventListener('input', () => { inputBox.style.height = 'auto'; inputBox.style.height = Math.min(inputBox.scrollHeight, 120) + 'px'; });
       inputBox.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(inputBox.value); } });
       // ── Startup ─────────────────────────────
-      // Connect immediately if wsUrl was embedded in HTML (server already ready).
-      // Otherwise poll via postMessage until the extension sends the connect message.
-      console.log('[trifecta-webview] starting, EMBEDDED_WS_URL:', EMBEDDED_WS_URL ? 'present' : 'null');
-      if (EMBEDDED_WS_URL) {
-        console.log('[trifecta-webview] auto-connecting with embedded URL');
-        connect(EMBEDDED_WS_URL);
-      } else {
-        console.log('[trifecta-webview] server not ready, starting poll');
-        vscode.postMessage({ type: 'ready' });
-        let pollCount = 0;
-        const pollInterval = setInterval(() => {
-          if (ws) { console.log('[trifecta-webview] connected via poll'); clearInterval(pollInterval); return; }
-          pollCount++;
-          if (pollCount > 60) { console.log('[trifecta-webview] poll timeout'); clearInterval(pollInterval); return; }
-          console.log('[trifecta-webview] polling (' + pollCount + ')');
-          vscode.postMessage({ type: 'ready' });
-        }, 500);
-      }
+      connect(EMBEDDED_WS_URL);
     })();
   </script>
 </body>
