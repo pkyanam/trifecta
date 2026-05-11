@@ -55,13 +55,15 @@ export async function activate(context: vscode.ExtensionContext) {
   statusBar.show();
   context.subscriptions.push(statusBar);
 
-  // Start server
+  // Start server (awaited so webview gets embedded wsUrl immediately)
   if (autoStart) {
-    serverManager.start().catch((err) => {
+    try {
+      await serverManager.start();
+    } catch (err: any) {
       vscode.window.showErrorMessage(
         `Trifecta failed to start: ${err.message}`,
       );
-    });
+    }
   }
 
   context.subscriptions.push({
@@ -326,16 +328,19 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       // ── Startup ─────────────────────────────
       // Connect immediately if wsUrl was embedded in HTML (server already ready).
       // Otherwise poll via postMessage until the extension sends the connect message.
+      console.log('[trifecta-webview] starting, EMBEDDED_WS_URL:', EMBEDDED_WS_URL ? 'present' : 'null');
       if (EMBEDDED_WS_URL) {
+        console.log('[trifecta-webview] auto-connecting with embedded URL');
         connect(EMBEDDED_WS_URL);
       } else {
+        console.log('[trifecta-webview] server not ready, starting poll');
         vscode.postMessage({ type: 'ready' });
-        // Keep polling every 500ms until we get a connect message or 30s timeout
         let pollCount = 0;
         const pollInterval = setInterval(() => {
-          if (ws) { clearInterval(pollInterval); return; }
+          if (ws) { console.log('[trifecta-webview] connected via poll'); clearInterval(pollInterval); return; }
           pollCount++;
-          if (pollCount > 60) { clearInterval(pollInterval); return; }
+          if (pollCount > 60) { console.log('[trifecta-webview] poll timeout'); clearInterval(pollInterval); return; }
+          console.log('[trifecta-webview] polling (' + pollCount + ')');
           vscode.postMessage({ type: 'ready' });
         }, 500);
       }
