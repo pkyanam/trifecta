@@ -83,8 +83,12 @@ ENV TRIFECTA_LOG_LEVEL=Info
 ENV TRIFECTA_TAILSCALE_SERVE=false
 ENV NODE_ENV=production
 
-# Create persistent data directory
-RUN mkdir -p /data
+# Create persistent data directory and unprivileged user
+RUN mkdir -p /data && \
+    useradd --system --no-create-home --shell /sbin/nologin trifecta && \
+    chown -R trifecta:trifecta /data /app
+
+USER trifecta
 
 EXPOSE 3773
 

@@ -73,7 +73,7 @@ curl http://<ec2-ip>:3773/.well-known/t3/environment
 
 Open Trifecta on iOS/Android, add a new server:
 
-```
+```text
 Server URL: http://<ec2-ip>:3773
 ```
 
@@ -112,5 +112,6 @@ docker restart trifecta
 
 ```bash
 docker stop trifecta && docker rm trifecta
-docker volume rm trifecta-data  # destroys all state (threads, tokens, settings)
+# The bind-mounted host directory — destroys all state (threads, tokens, settings)
+sudo rm -rf /opt/trifecta/data
 ```
