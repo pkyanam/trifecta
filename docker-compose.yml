@@ -1,0 +1,30 @@
+# ── Trifecta Cloud Sandbox — Local Testing ──────────────────────────
+# 
+# Quick start:
+#   docker compose up --build
+#
+# Then test:
+#   curl http://localhost:3773/.well-known/t3/environment
+#
+# Connect your iOS/Android app to http://localhost:3773
+# ─────────────────────────────────────────────────────────────────────
+
+services:
+  trifecta:
+    build:
+      context: ./trifecta-desktop
+      dockerfile: Dockerfile
+    container_name: trifecta-server
+    ports:
+      - "3773:3773"
+    volumes:
+      - trifecta-data:/data
+    environment:
+      TRIFECTA_HOST: "0.0.0.0"
+      TRIFECTA_PORT: "3773"
+      TRIFECTA_HOME: "/data"
+      TRIFECTA_LOG_LEVEL: "Info"
+    restart: unless-stopped
+
+volumes:
+  trifecta-data:
