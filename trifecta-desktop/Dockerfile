@@ -1,21 +1,16 @@
 # ── Trifecta Cloud Sandbox ──────────────────────────────────────────
 # Headless coding-agent server optimized for EC2 / cloud deployment.
 #
-# Build:
+# Build (minimal — no agents bundled):
 #   docker build -t trifecta-server ./trifecta-desktop
 #
-# Run (local test):
-#   docker run -p 3773:3773 -v trifecta-data:/data trifecta-server
+# Build (with agent CLIs):
+#   docker build --build-arg INSTALL_CLAUDE=true -t trifecta-server ./trifecta-desktop
 #
-# Run (EC2, full flags):
-#   docker run -d \
-#     --name trifecta \
-#     -p 3773:3773 \
-#     -v /opt/trifecta/data:/data \
-#     -e TRIFECTA_PORT=3773 \
-#     -e TRIFECTA_HOST=0.0.0.0 \
-#     -e TRIFECTA_HOME=/data \
-#     -e TRIFECTA_LOG_LEVEL=Info \
+# Run (EC2):
+#   docker run -d --name trifecta --restart unless-stopped \
+#     -p 3773:3773 -v /opt/trifecta/data:/data \
+#     -e TRIFECTA_PORT=3773 -e TRIFECTA_HOST=0.0.0.0 -e TRIFECTA_HOME=/data \
 #     trifecta-server
 # ─────────────────────────────────────────────────────────────────────
 
@@ -27,13 +22,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Install dependencies ─────────────────────────────────────────────
-# Copy only package manifests first for layer caching
+# ── Install + Build (single RUN to minimize disk usage) ──────────────
 COPY package.json bun.lock ./
 COPY patches/ patches/
 COPY turbo.json ./
 
-# Workspace package.json files (Bun needs them for workspace resolution)
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 COPY apps/marketing/package.json apps/marketing/
@@ -48,30 +41,38 @@ COPY packages/ssh/package.json packages/ssh/
 COPY oxlint-plugin-trifecta/package.json oxlint-plugin-trifecta/
 COPY scripts/package.json scripts/
 
-RUN bun install --frozen-lockfile
-
-# ── Build server ─────────────────────────────────────────────────────
 COPY . .
 
-# Build only the t3 server + its transitive dependencies
-RUN bun run build --filter=t3
+RUN bun install --frozen-lockfile && \
+    bun run build --filter=t3 && \
+    # Keep only what the runtime needs, drop everything else
+    rm -rf apps/web apps/marketing apps/desktop packages scripts oxlint-plugin-trifecta && \
+    rm -rf .turbo tsconfig.base.json turbo.json patches
 
 # ── Runtime stage ────────────────────────────────────────────────────
-FROM oven/bun:1.3.11-slim
+FROM oven/bun:1.3.11
 WORKDIR /app
 
-# Only runtime deps — no build tools needed at runtime
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
-COPY --from=builder /app/apps/server/package.json ./apps/server/package.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/bun.lock ./bun.lock
-
-# Server expects a client/ directory for the web UI at runtime.
-# In headless mode the web UI is optional, but the server still probes for it.
-# Copy the built web assets so the server can serve the full UI if desired.
 COPY --from=builder /app/apps/server/dist/client ./apps/server/dist/client
+
+# ── Agent CLIs (opt-in via build args) ────────────────────────────────
+ARG INSTALL_CODEX=false
+ARG INSTALL_CLAUDE=false
+ARG INSTALL_OPENCODE=false
+ARG INSTALL_CURSOR=false
+
+RUN if [ "$INSTALL_CODEX" = "true" ]; then bun add -g @openai/codex; fi && \
+    if [ "$INSTALL_CLAUDE" = "true" ]; then bun add -g @anthropic-ai/claude-code; fi && \
+    if [ "$INSTALL_OPENCODE" = "true" ]; then \
+      bun add -g opencode-ai 2>/dev/null || curl -fsSL https://opencode.ai/install | bash; \
+    fi && \
+    if [ "$INSTALL_CURSOR" = "true" ]; then curl -fsSL https://cursor.com/install | bash; fi && \
+    rm -rf /tmp/* /root/.bun/install/cache
 
 # ── Runtime configuration ────────────────────────────────────────────
 ENV TRIFECTA_HOST=0.0.0.0
@@ -83,24 +84,13 @@ ENV TRIFECTA_LOG_LEVEL=Info
 ENV TRIFECTA_TAILSCALE_SERVE=false
 ENV NODE_ENV=production
 
-# Create persistent data directory and unprivileged user
 RUN mkdir -p /data && \
-    useradd --system --no-create-home --shell /sbin/nologin trifecta && \
-    chown -R trifecta:trifecta /data /app
+    useradd --system --create-home --shell /bin/bash trifecta && \
+    mkdir -p /home/trifecta/.codex /home/trifecta/.claude /home/trifecta/.config/opencode && \
+    chown -R trifecta:trifecta /data /app /home/trifecta
 
 USER trifecta
+WORKDIR /home/trifecta
 
 EXPOSE 3773
-
-# ── Entrypoint ───────────────────────────────────────────────────────
-# Uses `bun` to match the runtime engine. `serve` subcommand starts
-# in headless mode — no browser open, prints pairing URL to stdout.
-ENTRYPOINT ["bun", "apps/server/dist/bin.mjs", "serve"]
-
-# --------------------------------------------------------------------
-# All settings are controllable via environment variables at runtime:
-#   TRIFECTA_HOST     — bind interface (default: 0.0.0.0)
-#   TRIFECTA_PORT     — HTTP/WS port     (default: 3773)
-#   TRIFECTA_HOME     — data directory   (default: /data)
-#   TRIFECTA_LOG_LEVEL— Debug|Info|Warning|Error
-# --------------------------------------------------------------------
+ENTRYPOINT ["bun", "/app/apps/server/dist/bin.mjs", "serve"]
