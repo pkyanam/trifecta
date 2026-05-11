@@ -6,7 +6,7 @@ Deploy the Trifecta server to AWS EC2 and connect your iOS / Android apps.
 
 ## Architecture
 
-```
+```text
 ┌──────────────────┐                  ┌──────────────────────┐
 │  iOS / Android   │  WebSocket       │  EC2 (t3.small+)     │
 │  Trifecta App    │◄──────────────► │                      │
@@ -33,7 +33,7 @@ are bind-mounted from the host (or passed as env vars).
 AWS Console → EC2 → Launch instance:
 
 - **AMI:** Ubuntu Server 24.04 LTS (x86)
-- **Instance type:** t3.small (free tier) or t3.medium
+- **Instance type:** t3.small or t3.medium
 - **Key pair:** create or select one
 - **Security group:** allow TCP 22 (SSH) + TCP 3773 (Trifecta) from 0.0.0.0/0
 - **Storage:** 15 GB gp3 minimum
@@ -51,9 +51,13 @@ sudo usermod -aG docker ubuntu
 newgrp docker
 ```
 
-Install and authenticate Codex on the host (auth dir will be bind-mounted into the container):
+Install Node.js and Codex on the host (auth dir will be bind-mounted into the container):
 
 ```bash
+# Install Node.js + npm
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
 # Install Codex CLI
 npm install -g @openai/codex
 
@@ -94,12 +98,19 @@ docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/trifecta:latest
 
 ## Step 4 — Pull and Run on EC2
 
+**Preferred:** Attach an IAM role to the EC2 instance with the
+`AmazonEC2ContainerRegistryReadOnly` policy (no credentials on disk).
+
+**Alternative (quick):** Configure AWS credentials:
+
 ```bash
-# Configure AWS credentials
 aws configure
 # paste Access Key + Secret Key, region: us-east-1
+```
 
-# Login to ECR
+Then login and run:
+
+```bash
 aws ecr get-login-password --region us-east-1 | \
   docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
 
