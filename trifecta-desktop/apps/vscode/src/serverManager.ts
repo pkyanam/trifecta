@@ -19,10 +19,9 @@ import * as os from "os";
 import * as net from "net";
 
 export interface ServerConnection {
-  /** Where the webview connects via WebSocket. */
   wsUrl: string;
-  /** Port for HTTP API calls. */
   port: number;
+  pairingToken: string | null;
 }
 
 type ReadyListener = (conn: ServerConnection) => void;
@@ -176,7 +175,7 @@ export class ServerManager {
       `[trifecta] WebSocket ready at ${wsUrl}`,
     );
 
-    return { wsUrl, port };
+    return { wsUrl, port, pairingToken };
   }
 
   /**

@@ -91,12 +91,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 
     // When server is ready, swap to embedded web UI
     this.serverManager.onReady((conn) => {
-      webviewView.webview.html = this.getChatHtml(conn.wsUrl);
+      webviewView.webview.html = this.getChatHtml(conn);
     });
 
     const conn = this.serverManager.getConnection();
     if (conn) {
-      webviewView.webview.html = this.getChatHtml(conn.wsUrl);
+      webviewView.webview.html = this.getChatHtml(conn);
     }
   }
 
@@ -124,10 +124,13 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 </html>`;
   }
 
-  private getChatHtml(wsUrl: string): string {
-    // Embed the server's React web app in an iframe.
-    // It has the real model picker, real RPC, real everything.
-    const serverUrl = wsUrl.replace(/^ws/, "http").replace(/\/ws.*/, "");
+  private getChatHtml(conn: { wsUrl: string; port: number; pairingToken: string | null }): string {
+    // Load the web app with pairing token so it auto-authenticates.
+    // Without the token, the web app shows a pairing screen (slow extra step).
+    const base = `http://127.0.0.1:${conn.port}`;
+    const iframeUrl = conn.pairingToken
+      ? `${base}/pair?host=127.0.0.1&token=${encodeURIComponent(conn.pairingToken)}#token=${encodeURIComponent(conn.pairingToken)}`
+      : base;
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -135,13 +138,13 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none';
-                 script-src ${serverUrl} 'unsafe-inline';
-                 style-src ${serverUrl} 'unsafe-inline';
-                 connect-src ${serverUrl} ws://127.0.0.1:* http://127.0.0.1:*;
-                 img-src ${serverUrl} data:;
-                 font-src ${serverUrl};">
-  <title>Trifecta</title>
-  <style>
+                 script-src ${iframeUrl} 'unsafe-inline';
+                 style-src ${iframeUrl} 'unsafe-inline';
+                 connect-src ${iframeUrl} ws://127.0.0.1:* http://127.0.0.1:*;
+                 img-src ${iframeUrl} data:;
+                 font-src ${iframeUrl};">
+...
+  <iframe src="${iframeUrl}"></iframe>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; overflow: hidden; }
     iframe { width: 100%; height: 100%; border: none; }
