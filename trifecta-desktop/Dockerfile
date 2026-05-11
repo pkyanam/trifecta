@@ -60,6 +60,11 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/bun.lock ./bun.lock
 COPY --from=builder /app/apps/server/dist/client ./apps/server/dist/client
 
+# ── Runtime system deps ──────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+
 # ── Agent CLIs (opt-in via build args) ────────────────────────────────
 ARG INSTALL_CODEX=false
 ARG INSTALL_CLAUDE=false
