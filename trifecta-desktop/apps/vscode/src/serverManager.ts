@@ -238,27 +238,44 @@ export class ServerManager {
 
   /**
    * Resolve the JavaScript runtime. Prefers bun but falls back to Node.js.
-   * The server supports both (Bun/Node code paths in server.ts).
+   * Tries common bun install locations since the Extension Host may not
+   * have ~/.bun/bin in its PATH.
    */
   private async resolveRuntime(): Promise<"bun" | "node"> {
-    // Check if bun is available
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const proc = spawn("bun", ["--version"], { stdio: "ignore" });
-        proc.on("close", (code) =>
-          code === 0 ? resolve() : reject(),
-        );
-        proc.on("error", reject);
-        setTimeout(() => {
-          proc.kill();
-          reject();
-        }, 2000);
-      });
-      return "bun";
-    } catch {
-      // Fall back to Node.js (the one VS Code uses)
-      return "node";
+    // Common bun binary locations
+    const bunCandidates = [
+      "bun",                                          // $PATH
+      path.join(os.homedir(), ".bun", "bin", "bun"),  // default install
+      "/usr/local/bin/bun",                            // Homebrew
+      "/opt/homebrew/bin/bun",                         // Apple Silicon Homebrew
+    ];
+
+    for (const bunPath of bunCandidates) {
+      if (fs.existsSync(bunPath)) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const proc = spawn(bunPath, ["--version"], {
+              stdio: "ignore",
+              env: { ...process.env, PATH: process.env.PATH },
+            });
+            proc.on("close", (code) =>
+              code === 0 ? resolve() : reject(),
+            );
+            proc.on("error", reject);
+            setTimeout(() => {
+              proc.kill();
+              reject(new Error("timeout"));
+            }, 3000);
+          });
+          return "bun";
+        } catch {
+          continue;
+        }
+      }
     }
+
+    // Fall back to Node.js (the one VS Code uses)
+    return "node";
   }
 
   /**
