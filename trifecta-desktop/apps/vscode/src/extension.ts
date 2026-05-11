@@ -96,31 +96,34 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       ],
     };
 
-    webviewView.webview.html = this.getChatHtml(webviewView.webview);
+    // Get the connection (may be null if server not ready yet)
+    const conn = this.serverManager.getConnection();
 
-    // When server is ready, send the wsUrl to the webview
-    this.serverManager.onReady((conn) => {
-      webviewView.webview.postMessage({
-        type: "connect",
-        wsUrl: conn.wsUrl,
-      });
-    });
-
-    const existing = this.serverManager.getConnection();
-    if (existing) {
-      webviewView.webview.postMessage({
-        type: "connect",
-        wsUrl: existing.wsUrl,
+    // If server isn't ready yet, register a callback and show loading state
+    if (!conn) {
+      this.serverManager.onReady((readyConn) => {
+        webviewView.webview.postMessage({
+          type: "connect",
+          wsUrl: readyConn.wsUrl,
+        });
       });
     }
 
+    // Embed wsUrl in HTML so the webview has it immediately if server is ready.
+    // Falls back to polling via postMessage if server starts later.
+    webviewView.webview.html = this.getChatHtml(
+      webviewView.webview,
+      conn?.wsUrl ?? null,
+    );
+
+    // Handle messages from webview (polling for connection)
     webviewView.webview.onDidReceiveMessage((message) => {
       if (message.type === "ready") {
-        const conn = this.serverManager.getConnection();
-        if (conn) {
+        const currentConn = this.serverManager.getConnection();
+        if (currentConn) {
           webviewView.webview.postMessage({
             type: "connect",
-            wsUrl: conn.wsUrl,
+            wsUrl: currentConn.wsUrl,
           });
         }
       }
@@ -132,7 +135,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: "focusInput" });
   }
 
-  private getChatHtml(webview: vscode.Webview): string {
+  private getChatHtml(webview: vscode.Webview, wsUrl: string | null): string {
+    // If server is ready, embed the wsUrl directly.
+    // Otherwise the webview polls via postMessage until it arrives.
+    const wsUrlJson = wsUrl ? JSON.stringify(wsUrl) : "null";
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -230,6 +236,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       const inputBox = document.getElementById('input-box');
       const sendBtn = document.getElementById('send-btn');
 
+      // If the server was already ready when the HTML was generated,
+      // wsUrl will be embedded directly — no postMessage race condition.
+      const EMBEDDED_WS_URL = ${wsUrlJson};
+
       function setStatus(s) {
         statusDot.className = s;
         const ok = s === 'connected';
@@ -313,8 +323,22 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
       document.getElementById('chat-form').addEventListener('submit', e => { e.preventDefault(); sendMessage(inputBox.value); });
       inputBox.addEventListener('input', () => { inputBox.style.height = 'auto'; inputBox.style.height = Math.min(inputBox.scrollHeight, 120) + 'px'; });
       inputBox.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(inputBox.value); } });
-      window.addEventListener('message', e => { if (e.data.type === 'connect') connect(e.data.wsUrl); if (e.data.type === 'focusInput') inputBox.focus(); });
-      vscode.postMessage({ type: 'ready' });
+      // ── Startup ─────────────────────────────
+      // Connect immediately if wsUrl was embedded in HTML (server already ready).
+      // Otherwise poll via postMessage until the extension sends the connect message.
+      if (EMBEDDED_WS_URL) {
+        connect(EMBEDDED_WS_URL);
+      } else {
+        vscode.postMessage({ type: 'ready' });
+        // Keep polling every 500ms until we get a connect message or 30s timeout
+        let pollCount = 0;
+        const pollInterval = setInterval(() => {
+          if (ws) { clearInterval(pollInterval); return; }
+          pollCount++;
+          if (pollCount > 60) { clearInterval(pollInterval); return; }
+          vscode.postMessage({ type: 'ready' });
+        }, 500);
+      }
     })();
   </script>
 </body>
