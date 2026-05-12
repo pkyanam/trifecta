@@ -590,10 +590,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
       category: "public.app-category.developer-tools",
-      x64ArchFiles: [
-        "Contents/Resources/app.asar.unpacked/node_modules/node-pty/prebuilds/darwin-*/*.node",
-        "node_modules/node-pty/prebuilds/darwin-*/*.node",
-      ],
+      x64ArchFiles: "**/*.node",
     };
   }
 
