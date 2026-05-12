@@ -1,6 +1,9 @@
 # t3 code original reference folder (development only)
 t3code-original/
 
+# reference repos (development only)
+_reference/
+
 # temporary local assets
 tempAssetsDoNotCommit/
 

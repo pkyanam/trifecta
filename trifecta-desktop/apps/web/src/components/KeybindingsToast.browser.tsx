@@ -130,6 +130,10 @@ function createBaseServerConfig(): ServerConfig {
           serverPassword: "",
           customModels: [],
         },
+        hermesAgent: {
+          enabled: true,
+          binaryPath: "",
+        },
       },
     },
   };
