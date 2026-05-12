@@ -22,6 +22,8 @@ export interface ServerConnection {
   wsUrl: string;
   port: number;
   pairingToken: string | null;
+  wsToken: string | null;
+  sessionToken: string | null;
 }
 
 type ReadyListener = (conn: ServerConnection) => void;
@@ -133,7 +135,14 @@ export class ServerManager {
     this.process.stdout?.on("data", (data: Buffer) => {
       const text = data.toString();
       this.stdoutBuffer += text;
-      this.outputChannel.append(text);
+      // Suppress the pairing URL log line — Cursor auto-detects URLs from
+      // the output channel and opens them, stealing the single-use token
+      // before the embedded iframe gets a chance to consume it.
+      const safe = text
+        .split("\n")
+        .filter((line) => !line.startsWith("Pairing URL:"))
+        .join("\n");
+      if (safe) this.outputChannel.append(safe);
     });
 
     this.process.stderr?.on("data", (data: Buffer) => {
@@ -161,30 +170,49 @@ export class ServerManager {
       `[trifecta] Server ready on http://127.0.0.1:${port}`,
     );
 
-    // Complete pairing flow: read token from stdout → bootstrap → get WS token
-    const pairingToken = this.parsePairingToken();
-    const wsToken = pairingToken
+    const pairingToken = await this.parsePairingToken();
+    this.outputChannel.appendLine(`[trifecta] Token: ${pairingToken ?? "none"}`);
+
+    // Pre-consume the pairing token via bearer bootstrap BEFORE the iframe loads.
+    // This prevents Cursor from stealing the single-use token and also
+    // gives us a session token to pass into the webview (since httpOnly
+    // cookies don't work in VS Code webviews).
+    const auth = pairingToken
       ? await this.bootstrapAuth(port, pairingToken)
       : null;
+    const wsToken = auth?.wsToken ?? null;
+    const sessionToken = auth?.sessionToken ?? null;
+    if (pairingToken && !wsToken) {
+      this.outputChannel.appendLine(
+        "[trifecta] Warning: failed to pre-consume pairing token",
+      );
+    }
 
-    const wsUrl = wsToken
-      ? `ws://127.0.0.1:${port}/ws?wsToken=${encodeURIComponent(wsToken)}`
-      : `ws://127.0.0.1:${port}`;
-
-    this.outputChannel.appendLine(
-      `[trifecta] WebSocket ready at ${wsUrl}`,
-    );
-
-    return { wsUrl, port, pairingToken };
+    return { port, pairingToken, wsToken, sessionToken, wsUrl: null as never };
   }
 
   /**
    * Parse the pairing token from the server's headless stdout.
    * The server prints: "Token: XXXX-XXXX-XXXX"
    */
-  private parsePairingToken(): string | null {
-    const match = this.stdoutBuffer.match(/Token:\s*(\S+)/);
-    return match ? match[1] : null;
+  private async parsePairingToken(): Promise<string | null> {
+    // The server may not have printed the token yet when waitForReady passes.
+    // Retry with sleep to allow the token line to arrive via stdout stream.
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      const matches = this.stdoutBuffer.match(/Token:\s*(\S+)/g);
+      if (matches && matches.length > 0) {
+        for (let i = matches.length - 1; i >= 0; i--) {
+          const m = matches[i].match(/Token:\s*(\S+)/);
+          const token = m ? m[1] : null;
+          if (token && token !== "none" && token.length >= 8) {
+            return token;
+          }
+        }
+      }
+      await new Promise<void>((r) => setTimeout(r, 500));
+    }
+    return null;
   }
 
   /**
@@ -192,12 +220,12 @@ export class ServerManager {
    *   1. POST /api/auth/bootstrap/bearer with pairing token
    *   2. Extract sessionToken from response
    *   3. POST /api/auth/ws-token with session token
-   *   4. Return wsToken
+   *   4. Return both tokens
    */
   private async bootstrapAuth(
     port: number,
     pairingToken: string,
-  ): Promise<string | null> {
+  ): Promise<{ wsToken: string; sessionToken: string } | null> {
     const base = `http://127.0.0.1:${port}`;
     try {
       // Step 1: Exchange pairing credential for session token
@@ -242,7 +270,15 @@ export class ServerManager {
       }
 
       const wsTokenData = await wsTokenResp.json();
-      return wsTokenData.token || null;
+      const wsToken = wsTokenData.token;
+      if (!wsToken) {
+        this.outputChannel.appendLine(
+          "[trifecta] No wsToken in response",
+        );
+        return null;
+      }
+
+      return { wsToken, sessionToken };
     } catch (err) {
       this.outputChannel.appendLine(
         `[trifecta] Auth error: ${err}`,

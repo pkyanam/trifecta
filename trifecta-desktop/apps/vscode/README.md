@@ -1,51 +1,76 @@
-# Trifecta VS Code Extension
+# Trifecta — AI Coding Agent Extension for VS Code / Cursor
 
-Universal coding agent interface for VS Code and Cursor.  
-Same backend as the desktop app — spawns Codex, Claude Code, OpenCode, or Cursor as child processes.
+Embed a full-featured AI coding agent chat sidebar directly into your IDE.
 
-## How It Works
+## What's Inside
+
+Trifecta is a universal coding agent interface — it wraps **OpenAI Codex**, **Claude Code**, **OpenCode**, and **Cursor** behind a single UI that lives in your editor's activity bar.
+
+## Architecture
 
 ```
-VS Code Extension          Trifecta Server (child process)
-┌─────────────────┐        ┌──────────────────────────────┐
-│  Chat Sidebar   │◄─WSS──│  Provider Orchestration       │
-│  Model Picker   │        │  ├─ Codex (JSON-RPC stdio)   │
-│  Message Input  │        │  ├─ Claude Code              │
-└─────────────────┘        │  ├─ OpenCode                 │
-                           │  └─ Cursor                   │
-                           └──────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  VS Code / Cursor (Extension Host)              │
+│  ┌──────────┐    spawns     ┌────────────────┐  │
+│  │ Extension│──────────────▶│ Trifecta Server│  │
+│  │ (sidebar)│◀── iframe ───│  (Node.js)     │  │
+│  │          │  + auth tokens│  + providers   │  │
+│  └──────────┘              └────────────────┘  │
+└─────────────────────────────────────────────────┘
 ```
 
-The extension is a thin UI shell. All provider logic lives in the server.
+The extension spawns a local Node.js server and embeds its web UI in a sidebar webview iframe. The pre-consumes the single-use pairing token before the iframe loads, so Cursor/Codex can't steal it. Auth tokens (session + WebSocket) are passed into the iframe via URL parameters — cookies don't work in VS Code webviews.
+
+## Quick Start
+
+### From a Monorepo Checkout
+
+```bash
+cd ~/projects/trifecta/trifecta-desktop
+bun install
+bun run build --filter=t3 --filter=trifecta-ide
+```
+
+Then open VS Code and run:
+- `Extensions: Install from VSIX...` → select the built `.vsix`
+- Or run the extension from the Debug view (`F5`)
+
+### Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `trifecta.autoStart` | `true` | Auto-start server on VS Code open |
+| `trifecta.serverPort` | `0` | Server port (`0` = random) |
 
 ## Development
 
 ```bash
-# From the monorepo root:
-cd trifecta-desktop
+# Watch mode for extension (rebundles on save)
+cd apps/vscode && npm run watch
 
-# Build the server first (the extension depends on it):
+# Build web app + server
 bun run build --filter=t3
 
-# Install extension deps and build:
-cd apps/vscode
-npm install
-npm run build
-
-# Press F5 in VS Code to launch Extension Development Host
+# Full rebuild
+bun run build
 ```
 
-## Configuration
+## Authentication Flow
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `trifecta.serverPath` | Auto-detected | Path to server `dist/bin.mjs` |
-| `trifecta.autoStart` | `true` | Start server automatically |
-| `trifecta.serverPort` | `0` (random) | Port for the server |
+1. Server starts and generates a single-use pairing token
+2. Extension reads the token from stdout and calls `/api/auth/bootstrap/bearer`
+3. Server returns a session token + WebSocket token
+4. Extension opens iframe at `/?wsToken=XXX&sessionToken=YYY`
+5. Web app captures tokens from URL, strips them via `replaceState`
+6. WebSocket connects with `?wsToken=`, HTTP requests use `?token=` (since cookies are blocked in webviews)
 
-## Architecture Notes
+## Commands
 
-- **Zero server code duplication** — uses the same `apps/server` as desktop/mobile
-- **Node.js or Bun** — server auto-detects bun, falls back to Node.js
-- **Localhost only** — server binds to `127.0.0.1`, no network exposure
-- **Provider auth pass-through** — inherits `~/.codex`, `~/.claude`, `~/.config/opencode` from host
+| Command | ID | Description |
+|---------|----|-------------|
+| Open Trifecta | `trifecta.openPanel` | Show the sidebar chat panel |
+| Focus Trifecta Chat | `trifecta.focusChat` | Focus into the chat input |
+
+## License
+
+MIT

@@ -63,20 +63,35 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken,
   ) {
     this._view = webviewView;
-    webviewView.webview.options = { enableScripts: true };
-
     const conn = this.serverManager.getConnection();
     if (conn) {
+      webviewView.webview.options = {
+        enableScripts: true,
+        portMapping: [{ extensionHostPort: conn.port, webviewPort: conn.port }],
+      };
       webviewView.webview.html = this.getChatHtml(conn);
     } else {
       this.serverManager.onReady((conn) => {
+        webviewView.webview.options = {
+          enableScripts: true,
+          portMapping: [{ extensionHostPort: conn.port, webviewPort: conn.port }],
+        };
         webviewView.webview.html = this.getChatHtml(conn);
       });
     }
   }
 
-  private getChatHtml(conn: { port: number }): string {
-    const appUrl = `http://127.0.0.1:${conn.port}`;
+  private getChatHtml(conn: { port: number; pairingToken: string | null; wsToken: string | null; sessionToken: string | null }): string {
+    const baseUrl = `http://127.0.0.1:${conn.port}`;
+    let iframeSrc: string;
+    if (conn.wsToken) {
+      iframeSrc = `${baseUrl}/?wsToken=${conn.wsToken}`;
+      if (conn.sessionToken) {
+        iframeSrc += `&sessionToken=${conn.sessionToken}`;
+      }
+    } else {
+      iframeSrc = `${baseUrl}/#token=${conn.pairingToken ?? ""}`;
+    }
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -89,7 +104,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   </style>
 </head>
 <body>
-  <iframe src="${appUrl}"></iframe>
+  <iframe id="t3-iframe" src="${iframeSrc}"></iframe>
 </body>
 </html>`;
   }
