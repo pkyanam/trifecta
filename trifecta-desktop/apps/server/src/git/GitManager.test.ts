@@ -2890,7 +2890,7 @@ it.layer(GitManagerTestLayer)("GitManager", (it) => {
             headRepositoryOwnerLogin: "binbandit",
           },
           repositoryCloneUrls: {
-            "binbandit/t3code": {
+            "binbandit/trifecta": {
               url: forkDir,
               sshUrl: forkDir,
             },
