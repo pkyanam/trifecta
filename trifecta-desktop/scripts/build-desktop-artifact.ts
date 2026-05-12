@@ -590,7 +590,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
       category: "public.app-category.developer-tools",
-      x64ArchFiles: "**/*.node",
+      x64ArchFiles: "**/node_modules/node-pty/**/*",
     };
   }
 
