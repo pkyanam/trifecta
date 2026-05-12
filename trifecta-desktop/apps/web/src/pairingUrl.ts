@@ -14,12 +14,24 @@ export function getPairingTokenFromUrl(url: URL): string | null {
   return searchToken.length > 0 ? searchToken : null;
 }
 
-export function getBearerTokenFromUrl(): string | null {
-  return new URL(window.location.href).searchParams.get("bearer")?.trim() ?? null;
+export function getBearerTokenFromUrl(
+  href: string = typeof window !== "undefined" ? window.location.href : "",
+): string | null {
+  try {
+    return new URL(href).searchParams.get("bearer")?.trim() ?? null;
+  } catch {
+    return null;
+  }
 }
 
-export function getWsTokenFromUrl(): string | null {
-  return new URL(window.location.href).searchParams.get("wsToken")?.trim() ?? null;
+export function getWsTokenFromUrl(
+  href: string = typeof window !== "undefined" ? window.location.href : "",
+): string | null {
+  try {
+    return new URL(href).searchParams.get("wsToken")?.trim() ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function stripPairingTokenFromUrl(url: URL): URL {
