@@ -590,6 +590,9 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
       category: "public.app-category.developer-tools",
+      // Tell electron-builder's universal packager to use the x64 copy for .node
+      // files that are identical (universal/fat) in both arch builds.
+      x64ArchFiles: ["**/*.node"],
     };
   }
 
