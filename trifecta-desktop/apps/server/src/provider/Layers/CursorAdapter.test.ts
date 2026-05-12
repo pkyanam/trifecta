@@ -141,7 +141,7 @@ const cursorAdapterTestLayer = it.layer(
     Layer.provideMerge(ServerSettingsService.layerTest()),
     Layer.provideMerge(
       ServerConfig.layerTest(process.cwd(), {
-        prefix: "trifecta-cursor-adapter-test-",
+        prefix: "t3code-cursor-adapter-test-",
       }),
     ),
     Layer.provideMerge(NodeServices.layer),
@@ -616,7 +616,7 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
             Layer.provideMerge(ServerSettingsService.layerTest()),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "trifecta-cursor-adapter-test-",
+                prefix: "t3code-cursor-adapter-test-",
               }),
             ),
             Layer.provideMerge(NodeServices.layer),
@@ -1251,7 +1251,7 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
         Layer.provideMerge(ServerSettingsService.layerTest()),
         Layer.provideMerge(
           ServerConfig.layerTest(process.cwd(), {
-            prefix: "trifecta-cursor-adapter-custom-instance-",
+            prefix: "t3code-cursor-adapter-custom-instance-",
           }),
         ),
         Layer.provideMerge(NodeServices.layer),

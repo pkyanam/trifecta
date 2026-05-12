@@ -13,9 +13,9 @@ const defaultInput = {
   platform: "darwin",
   processArch: "arm64",
   appVersion: "0.0.22",
-  appPath: "/Applications/Trifecta.app/Contents/Resources/app.asar",
+  appPath: "/Applications/T3 Code.app/Contents/Resources/app.asar",
   isPackaged: false,
-  resourcesPath: "/Applications/Trifecta.app/Contents/Resources",
+  resourcesPath: "/Applications/T3 Code.app/Contents/Resources",
   runningUnderArm64Translation: false,
 } satisfies DesktopEnvironment.MakeDesktopEnvironmentInput;
 
@@ -42,13 +42,13 @@ describe("DesktopEnvironment", () => {
       const environment = yield* makeEnvironment(
         {},
         {
-          TRIFECTA_HOME: " /tmp/t3 ",
-          TRIFECTA_COMMIT_HASH: " 0123456789abcdef ",
-          TRIFECTA_PORT: "4949",
+          T3CODE_HOME: " /tmp/t3 ",
+          T3CODE_COMMIT_HASH: " 0123456789abcdef ",
+          T3CODE_PORT: "4949",
           VITE_DEV_SERVER_URL: "http://localhost:5173",
-          TRIFECTA_DEV_REMOTE_T3_SERVER_ENTRY_PATH: " /remote/server.mjs ",
-          TRIFECTA_OTLP_TRACES_URL: " http://127.0.0.1:4318/v1/traces ",
-          TRIFECTA_OTLP_EXPORT_INTERVAL_MS: "2500",
+          T3CODE_DEV_REMOTE_T3_SERVER_ENTRY_PATH: " /remote/server.mjs ",
+          T3CODE_OTLP_TRACES_URL: " http://127.0.0.1:4318/v1/traces ",
+          T3CODE_OTLP_EXPORT_INTERVAL_MS: "2500",
         },
       );
 
@@ -65,8 +65,8 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.appRoot, "/repo");
       assert.equal(environment.backendEntryPath, "/repo/apps/server/dist/bin.mjs");
       assert.equal(environment.backendCwd, "/repo");
-      assert.equal(environment.appUserModelId, "com.trifecta.desktop.dev");
-      assert.equal(environment.linuxWmClass, "trifecta-dev");
+      assert.equal(environment.appUserModelId, "com.t3tools.t3code.dev");
+      assert.equal(environment.linuxWmClass, "t3code-dev");
       assert.deepEqual(
         Option.map(environment.devServerUrl, (url) => url.href),
         Option.some("http://localhost:5173/"),
@@ -84,7 +84,7 @@ describe("DesktopEnvironment", () => {
       const environment = yield* makeEnvironment(
         {},
         {
-          TRIFECTA_HOME: "/tmp/t3",
+          T3CODE_HOME: "/tmp/t3",
         },
       );
 

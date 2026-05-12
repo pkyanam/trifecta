@@ -59,7 +59,7 @@ function cleanupStaleDevApps() {
     return;
   }
 
-  spawnSync("pkill", ["-f", "--", `--trifecta-dev-root=${desktopDir}`], { stdio: "ignore" });
+  spawnSync("pkill", ["-f", "--", `--t3code-dev-root=${desktopDir}`], { stdio: "ignore" });
 }
 
 function startApp() {
@@ -69,7 +69,7 @@ function startApp() {
 
   const app = spawn(
     resolveElectronPath(),
-    [`--trifecta-dev-root=${desktopDir}`, "dist-electron/main.cjs"],
+    [`--t3code-dev-root=${desktopDir}`, "dist-electron/main.cjs"],
     {
       cwd: desktopDir,
       env: childEnv,

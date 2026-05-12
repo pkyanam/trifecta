@@ -1,42 +1,3 @@
-let injectedBearerToken: string | null = null;
-
-if (typeof window !== "undefined") {
-  // Check for an injected bearer token passed as a URL query parameter (?bearer=...)
-  // by the VS Code/Cursor extension. This avoids race conditions with postMessage.
-  const urlParams = new URLSearchParams(window.location.search);
-  const bearerFromUrl = urlParams.get("bearer");
-  if (bearerFromUrl) {
-    injectedBearerToken = bearerFromUrl;
-    // Clean up the URL so the token isn't visible in the address bar
-    urlParams.delete("bearer");
-    const newSearch = urlParams.toString();
-    const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "") + window.location.hash;
-    window.history.replaceState({}, document.title, newUrl);
-  }
-
-  // Check for inline script injection from the extension
-  const win = window as unknown as Record<string, unknown>;
-  if (typeof win.__TRIFECTA_SESSION_TOKEN__ === "string") {
-    injectedBearerToken = win.__TRIFECTA_SESSION_TOKEN__ as string;
-  }
-  // Listen for postMessage from extension
-  window.addEventListener("message", (event: MessageEvent) => {
-    if (
-      event.data &&
-      typeof event.data === "object" &&
-      "type" in event.data &&
-      event.data.type === "trifecta-session-token" &&
-      typeof event.data.token === "string"
-    ) {
-      injectedBearerToken = event.data.token;
-    }
-  });
-}
-
-export function getInjectedBearerToken(): string | null {
-  return injectedBearerToken;
-}
-
 import type {
   AuthBootstrapInput,
   AuthBootstrapResult,
@@ -266,106 +227,8 @@ function isTransientBootstrapError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-let capturedWsToken: string | null = null;
-let capturedSessionToken: string | null = null;
-
-export function getCapturedWsToken(): string | null {
-  return capturedWsToken;
-}
-
-export function getCapturedSessionToken(): string | null {
-  return capturedSessionToken;
-}
-
-function getWsTokenFromQueryParams(): string | null {
-  if (typeof window === "undefined") return null;
-  const params = new URLSearchParams(window.location.search);
-  return params.get("wsToken");
-}
-
-/** Capture the wsToken and sessionToken from URL before bootstrapServerAuth strips them. */
-function captureWsToken(): void {
-  if (capturedWsToken) return;
-  capturedWsToken = getWsTokenFromQueryParams();
-  // Also capture sessionToken passed by the extension for HTTP auth
-  if (typeof window !== "undefined") {
-    const params = new URLSearchParams(window.location.search);
-    const sessionTokenFromUrl = params.get("sessionToken");
-    if (sessionTokenFromUrl) {
-      capturedSessionToken = sessionTokenFromUrl;
-      // Expose to window for img tags and other non-JS requests
-      (window as unknown as Record<string, unknown>).__TRIFECTA_SESSION_TOKEN__ = sessionTokenFromUrl;
-    }
-  }
-}
-
-// Capture tokens from URL at module load time, before TanStack Router or auth logic
-// strips query params via replaceState.
-if (typeof window !== "undefined") {
-  const params = new URLSearchParams(window.location.search);
-  const wsTokenFromUrl = params.get("wsToken");
-  if (wsTokenFromUrl) {
-    capturedWsToken = wsTokenFromUrl;
-  }
-  const sessionTokenFromUrl = params.get("sessionToken");
-  if (sessionTokenFromUrl) {
-    capturedSessionToken = sessionTokenFromUrl;
-    // Expose to window for img tags and other non-JS requests
-    (window as unknown as Record<string, unknown>).__TRIFECTA_SESSION_TOKEN__ = sessionTokenFromUrl;
-  }
-}
-
 async function bootstrapServerAuth(): Promise<ServerAuthGateState> {
-  // The extension pre-consumed the pairing token and passed the wsToken
-  // as a URL query param (?wsToken=XXX). This proves the session is authenticated.
-  const wsTokenFromExt = getWsTokenFromQueryParams();
-  if (wsTokenFromExt) {
-    capturedWsToken = wsTokenFromExt;
-    // Also capture sessionToken if passed alongside wsToken
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const sessionTokenFromUrl = params.get("sessionToken");
-      if (sessionTokenFromUrl) {
-        capturedSessionToken = sessionTokenFromUrl;
-        (window as unknown as Record<string, unknown>).__TRIFECTA_SESSION_TOKEN__ = sessionTokenFromUrl;
-      }
-    }
-    // Clean up the URL so the token isn't visible
-    const urlParams = new URLSearchParams(window.location.search);
-    urlParams.delete("wsToken");
-    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-
-    return { status: "authenticated" };
-  }
-
-  // Check for a pre-injected bearer token from the extension (postMessage/inline script).
-  const bearerToken = getInjectedBearerToken();
-  if (bearerToken) {
-    try {
-      const headers: Record<string, string> = { Authorization: `Bearer ${bearerToken}` };
-      const response = await fetch(
-        resolvePrimaryEnvironmentHttpUrl("/api/auth/session"),
-        { headers },
-      );
-      if (response.ok) {
-        const session = (await response.json()) as AuthSessionState;
-        if (session.authenticated) {
-          injectedBearerToken = bearerToken;
-          return { status: "authenticated" };
-        }
-      }
-    } catch {
-      // Fall through to normal flow
-    }
-  }
-
-  let bootstrapCredential = getDesktopBootstrapCredential();
-
-  // Fallback: read pairing token from URL hash (#token=…) for desktop/extension embeds
-  if (!bootstrapCredential) {
-    bootstrapCredential = peekPairingTokenFromUrl();
-  }
-
+  const bootstrapCredential = getDesktopBootstrapCredential();
   const currentSession = await fetchSessionState();
   if (currentSession.authenticated) {
     return { status: "authenticated" };
@@ -381,8 +244,6 @@ async function bootstrapServerAuth(): Promise<ServerAuthGateState> {
   try {
     await exchangeBootstrapCredential(bootstrapCredential);
     await waitForAuthenticatedSessionAfterBootstrap();
-    // Clean up hash so token isn't reused on refresh
-    stripPairingTokenFromUrl();
     return { status: "authenticated" };
   } catch (error) {
     return {

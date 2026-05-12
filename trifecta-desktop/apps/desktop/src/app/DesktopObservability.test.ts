@@ -55,7 +55,7 @@ const makeEnvironmentLayer = (baseDir: string) =>
       Layer.mergeAll(
         NodeServices.layer,
         DesktopConfig.layerTest({
-          TRIFECTA_HOME: baseDir,
+          T3CODE_HOME: baseDir,
           VITE_DEV_SERVER_URL: "http://127.0.0.1:5733",
         }),
       ),

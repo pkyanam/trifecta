@@ -98,14 +98,7 @@ export const makeServerAuth = Effect.gen(function* () {
   const authenticateRequest = (request: HttpServerRequest.HttpServerRequest) => {
     const cookieToken = request.cookies[sessions.cookieName];
     const bearerToken = parseBearerToken(request);
-    // Fallback: accept session token via query param (?token=XXX) for
-    // iframe/webview contexts where Set-Cookie headers are stripped.
-    let queryToken: string | null = null;
-    const parsedUrl = HttpServerRequest.toURL(request);
-    if (Option.isSome(parsedUrl)) {
-      queryToken = parsedUrl.value.searchParams.get("token");
-    }
-    const credential = cookieToken ?? bearerToken ?? queryToken;
+    const credential = cookieToken ?? bearerToken;
     if (!credential) {
       return Effect.fail(
         new AuthError({

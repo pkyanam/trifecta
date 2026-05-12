@@ -50,7 +50,7 @@ layer("GitLabCli.layer", (it) => {
               source_project_id: 101,
               target_project_id: 100,
               source_project: {
-                path_with_namespace: "octocat/trifecta",
+                path_with_namespace: "octocat/t3code",
               },
             }),
           ),
@@ -73,7 +73,7 @@ layer("GitLabCli.layer", (it) => {
         headRefName: "feature/mr-threads",
         state: "open",
         isCrossRepository: true,
-        headRepositoryNameWithOwner: "octocat/trifecta",
+        headRepositoryNameWithOwner: "octocat/t3code",
         headRepositoryOwnerLogin: "octocat",
       });
       expect(mockedRun).toHaveBeenCalledWith(
@@ -159,10 +159,10 @@ layer("GitLabCli.layer", (it) => {
           processOutput(
             // @effect-diagnostics-next-line preferSchemaOverJson:off
             JSON.stringify({
-              path_with_namespace: "octocat/trifecta",
-              web_url: "https://gitlab.com/octocat/trifecta",
-              http_url_to_repo: "https://gitlab.com/octocat/trifecta.git",
-              ssh_url_to_repo: "git@gitlab.com:octocat/trifecta.git",
+              path_with_namespace: "octocat/t3code",
+              web_url: "https://gitlab.com/octocat/t3code",
+              http_url_to_repo: "https://gitlab.com/octocat/t3code.git",
+              ssh_url_to_repo: "git@gitlab.com:octocat/t3code.git",
             }),
           ),
         ),
@@ -172,14 +172,14 @@ layer("GitLabCli.layer", (it) => {
         const glab = yield* GitLabCli.GitLabCli;
         return yield* glab.getRepositoryCloneUrls({
           cwd: "/repo",
-          repository: "octocat/trifecta",
+          repository: "octocat/t3code",
         });
       });
 
       assert.deepStrictEqual(result, {
-        nameWithOwner: "octocat/trifecta",
-        url: "https://gitlab.com/octocat/trifecta",
-        sshUrl: "git@gitlab.com:octocat/trifecta.git",
+        nameWithOwner: "octocat/t3code",
+        url: "https://gitlab.com/octocat/t3code",
+        sshUrl: "git@gitlab.com:octocat/t3code.git",
       });
     }),
   );
@@ -237,10 +237,10 @@ layer("GitLabCli.layer", (it) => {
             processOutput(
               // @effect-diagnostics-next-line preferSchemaOverJson:off
               JSON.stringify({
-                path_with_namespace: "octocat/trifecta",
-                web_url: "https://gitlab.com/octocat/trifecta",
-                http_url_to_repo: "https://gitlab.com/octocat/trifecta.git",
-                ssh_url_to_repo: "git@gitlab.com:octocat/trifecta.git",
+                path_with_namespace: "octocat/t3code",
+                web_url: "https://gitlab.com/octocat/t3code",
+                http_url_to_repo: "https://gitlab.com/octocat/t3code.git",
+                ssh_url_to_repo: "git@gitlab.com:octocat/t3code.git",
               }),
             ),
           ),
@@ -249,14 +249,14 @@ layer("GitLabCli.layer", (it) => {
       const glab = yield* GitLabCli.GitLabCli;
       const result = yield* glab.createRepository({
         cwd: "/repo",
-        repository: "octocat/trifecta",
+        repository: "octocat/t3code",
         visibility: "public",
       });
 
       assert.deepStrictEqual(result, {
-        nameWithOwner: "octocat/trifecta",
-        url: "https://gitlab.com/octocat/trifecta",
-        sshUrl: "git@gitlab.com:octocat/trifecta.git",
+        nameWithOwner: "octocat/t3code",
+        url: "https://gitlab.com/octocat/t3code",
+        sshUrl: "git@gitlab.com:octocat/t3code.git",
       });
       expect(mockedRun).toHaveBeenNthCalledWith(
         1,
@@ -277,9 +277,9 @@ layer("GitLabCli.layer", (it) => {
             "POST",
             "projects",
             "--raw-field",
-            "path=trifecta",
+            "path=t3code",
             "--raw-field",
-            "name=trifecta",
+            "name=t3code",
             "--raw-field",
             "visibility=public",
             "--raw-field",

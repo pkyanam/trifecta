@@ -47,10 +47,10 @@ it.layer(NodeServices.layer)("AnalyticsService test", (it) => {
       const telemetryLayer = AnalyticsServiceLayerLive.pipe(Layer.provideMerge(serverConfigLayer));
       const configLayer = ConfigProvider.layer(
         ConfigProvider.fromUnknown({
-          TRIFECTA_TELEMETRY_ENABLED: true,
-          TRIFECTA_POSTHOG_KEY: "phc_test_key",
-          TRIFECTA_POSTHOG_HOST: "",
-          TRIFECTA_TELEMETRY_FLUSH_BATCH_SIZE: 20,
+          T3CODE_TELEMETRY_ENABLED: true,
+          T3CODE_POSTHOG_KEY: "phc_test_key",
+          T3CODE_POSTHOG_HOST: "",
+          T3CODE_TELEMETRY_FLUSH_BATCH_SIZE: 20,
         }),
       );
       const batchServerLayer = HttpServer.serve(

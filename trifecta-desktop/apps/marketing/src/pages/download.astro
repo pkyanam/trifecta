@@ -3,8 +3,8 @@ import Layout from "../layouts/Layout.astro";
 import { RELEASES_URL } from "../lib/releases";
 ---
 
-<Layout title="Download — Trifecta" description="Download Trifecta for macOS, Windows, or Linux.">
-  <h1 class="heading">Download Trifecta</h1>
+<Layout title="Download — T3 Code" description="Download T3 Code for macOS, Windows, or Linux.">
+  <h1 class="heading">Download T3 Code</h1>
   <p class="subheading">
     <span id="version-label">Loading latest release&hellip;</span>
     <a id="changelog-link" class="changelog-link" href="#" target="_blank" rel="noopener noreferrer" style="display:none">View changelog<span aria-hidden="true"> &#8599;</span></a>
@@ -18,8 +18,12 @@ import { RELEASES_URL } from "../lib/releases";
         <h2 class="platform-name">macOS</h2>
       </div>
       <div class="download-cards">
-        <a class="download-card" data-asset="universal.dmg" href={RELEASES_URL}>
-          <span class="card-arch">Universal</span>
+        <a class="download-card" data-asset="arm64.dmg" href={RELEASES_URL}>
+          <span class="card-arch">Apple Silicon (arm64)</span>
+          <span class="card-format">.dmg</span>
+        </a>
+        <a class="download-card" data-asset="x64.dmg" href={RELEASES_URL}>
+          <span class="card-arch">Intel (x64)</span>
           <span class="card-format">.dmg</span>
         </a>
       </div>
@@ -56,7 +60,7 @@ import { RELEASES_URL } from "../lib/releases";
 
   <p class="releases-link">
     Looking for older versions? Check the
-    <a href={RELEASES_URL} target="_blank" rel="noopener noreferrer">
+    <a href="https://github.com/pingdotgg/t3code/releases" target="_blank" rel="noopener noreferrer">
       GitHub releases page<span aria-hidden="true"> &#8599;</span>
     </a>
   </p>

@@ -1,14 +1,14 @@
 import { Debouncer } from "@tanstack/react-pacer";
 import { create } from "zustand";
 
-export const PERSISTED_STATE_KEY = "trifecta:ui-state:v1";
+export const PERSISTED_STATE_KEY = "t3code:ui-state:v1";
 const LEGACY_PERSISTED_STATE_KEYS = [
-  "trifecta:renderer-state:v8",
-  "trifecta:renderer-state:v7",
-  "trifecta:renderer-state:v6",
-  "trifecta:renderer-state:v5",
-  "trifecta:renderer-state:v4",
-  "trifecta:renderer-state:v3",
+  "t3code:renderer-state:v8",
+  "t3code:renderer-state:v7",
+  "t3code:renderer-state:v6",
+  "t3code:renderer-state:v5",
+  "t3code:renderer-state:v4",
+  "t3code:renderer-state:v3",
   "codething:renderer-state:v4",
   "codething:renderer-state:v3",
   "codething:renderer-state:v2",

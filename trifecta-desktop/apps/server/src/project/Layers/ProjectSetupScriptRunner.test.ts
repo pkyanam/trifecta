@@ -36,6 +36,7 @@ const makeProjectionSnapshotQueryLayer = (project: OrchestrationProject) =>
       Effect.succeed(projectId === project.id ? Option.some(project) : Option.none()),
     getFirstActiveThreadIdByProjectId: () => Effect.die("unused"),
     getThreadCheckpointContext: () => Effect.die("unused"),
+    getFullThreadDiffContext: () => Effect.die("unused"),
     getThreadShellById: () => Effect.die("unused"),
     getThreadDetailById: () => Effect.die("unused"),
   });
@@ -146,8 +147,8 @@ describe("ProjectSetupScriptRunner", () => {
       cwd: "/repo/worktrees/a",
       worktreePath: "/repo/worktrees/a",
       env: {
-        TRIFECTA_PROJECT_ROOT: "/repo/project",
-        TRIFECTA_WORKTREE_PATH: "/repo/worktrees/a",
+        T3CODE_PROJECT_ROOT: "/repo/project",
+        T3CODE_WORKTREE_PATH: "/repo/worktrees/a",
       },
     });
     expect(write).toHaveBeenCalledWith({

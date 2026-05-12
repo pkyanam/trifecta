@@ -1577,7 +1577,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
   );
 
   it.effect(
-    "accepts session tokens via query parameters on authenticated HTTP routes",
+    "does not accept session tokens via query parameters on authenticated HTTP routes",
     () =>
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
@@ -1591,17 +1591,11 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         assert.isDefined(cookie);
         const sessionToken = extractSessionTokenFromSetCookie(cookie ?? "");
 
-        // First verify cookie-based auth works
-        const cookieResponse = yield* HttpClient.get(
-          `/api/project-favicon?cwd=${encodeURIComponent(projectDir)}`,
-        );
-        assert.equal(cookieResponse.status, 200);
-
-        // Then verify query param auth also works (used by iframe/webview mode)
-        const queryResponse = yield* HttpClient.get(
+        const response = yield* HttpClient.get(
           `/api/project-favicon?cwd=${encodeURIComponent(projectDir)}&token=${encodeURIComponent(sessionToken)}`,
         );
-        assert.equal(queryResponse.status, 200);
+
+        assert.equal(response.status, 401);
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
@@ -3333,16 +3327,16 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
   it.effect("enriches replayed project events with repository identity metadata", () =>
     Effect.gen(function* () {
       const repositoryIdentity = {
-        canonicalKey: "github.com/belweave/trifecta",
+        canonicalKey: "github.com/t3tools/t3code",
         locator: {
           source: "git-remote" as const,
           remoteName: "origin",
-          remoteUrl: "git@github.com:Belweave/trifecta.git",
+          remoteUrl: "git@github.com:T3Tools/t3code.git",
         },
-        displayName: "Belweave/trifecta",
+        displayName: "T3Tools/t3code",
         provider: "github",
-        owner: "Belweave",
-        name: "trifecta",
+        owner: "T3Tools",
+        name: "t3code",
       };
 
       yield* buildAppUnderTest({
@@ -3824,7 +3818,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             isRepo: true,
             hasPrimaryRemote: true,
             isDefaultRef: false,
-            refName: "trifecta/bootstrap-refName",
+            refName: "t3code/bootstrap-refName",
             hasWorkingTreeChanges: false,
             workingTree: {
               files: [],
@@ -3841,7 +3835,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           (_: Parameters<GitVcsDriver.GitVcsDriverShape["createWorktree"]>[0]) =>
             Effect.succeed({
               worktree: {
-                refName: "trifecta/bootstrap-refName",
+                refName: "t3code/bootstrap-refName",
                 path: "/tmp/bootstrap-worktree",
               },
             }),
@@ -3910,7 +3904,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                 prepareWorktree: {
                   projectCwd: "/tmp/project",
                   baseBranch: "main",
-                  branch: "trifecta/bootstrap-refName",
+                  branch: "t3code/bootstrap-refName",
                 },
                 runSetupScript: true,
               },
@@ -3933,7 +3927,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         assert.deepEqual(createWorktree.mock.calls[0]?.[0], {
           cwd: "/tmp/project",
           refName: "main",
-          newRefName: "trifecta/bootstrap-refName",
+          newRefName: "t3code/bootstrap-refName",
           path: null,
         });
         assert.deepEqual(runForThread.mock.calls[0]?.[0], {
@@ -3967,7 +3961,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         (_: Parameters<GitVcsDriver.GitVcsDriverShape["createWorktree"]>[0]) =>
           Effect.succeed({
             worktree: {
-              refName: "trifecta/bootstrap-refName",
+              refName: "t3code/bootstrap-refName",
               path: "/tmp/bootstrap-worktree",
             },
           }),
@@ -4027,7 +4021,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               prepareWorktree: {
                 projectCwd: "/tmp/project",
                 baseBranch: "main",
-                branch: "trifecta/bootstrap-refName",
+                branch: "t3code/bootstrap-refName",
               },
               runSetupScript: true,
             },
@@ -4061,7 +4055,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         (_: Parameters<GitVcsDriver.GitVcsDriverShape["createWorktree"]>[0]) =>
           Effect.succeed({
             worktree: {
-              refName: "trifecta/bootstrap-refName",
+              refName: "t3code/bootstrap-refName",
               path: "/tmp/bootstrap-worktree",
             },
           }),
@@ -4144,7 +4138,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               prepareWorktree: {
                 projectCwd: "/tmp/project",
                 baseBranch: "main",
-                branch: "trifecta/bootstrap-refName",
+                branch: "t3code/bootstrap-refName",
               },
               runSetupScript: true,
             },
@@ -4228,7 +4222,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               prepareWorktree: {
                 projectCwd: "/tmp/project",
                 baseBranch: "main",
-                branch: "trifecta/bootstrap-refName",
+                branch: "t3code/bootstrap-refName",
               },
               runSetupScript: false,
             },

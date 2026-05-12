@@ -168,7 +168,7 @@ export const layer = Layer.succeed(
           return;
         }
         yield* electronApp.relaunch({
-          execPath: process.env.APPIMAGE ?? process.execPath,
+          execPath: process.execPath,
           args: process.argv.slice(1),
         });
         yield* electronApp.exit(0);

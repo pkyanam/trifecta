@@ -78,12 +78,12 @@ describe("TerminalOpenInput", () => {
       cols: 100,
       rows: 24,
       env: {
-        TRIFECTA_PROJECT_ROOT: "/tmp/project",
+        T3CODE_PROJECT_ROOT: "/tmp/project",
         CUSTOM_FLAG: "1",
       },
     });
     expect(parsed.env).toMatchObject({
-      TRIFECTA_PROJECT_ROOT: "/tmp/project",
+      T3CODE_PROJECT_ROOT: "/tmp/project",
       CUSTOM_FLAG: "1",
     });
     expect(parsed.worktreePath).toBe("/tmp/project/.t3/worktrees/feature-a");

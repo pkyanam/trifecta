@@ -21,7 +21,7 @@ const makeServerSettingsLayer = () =>
     Layer.provideMerge(
       Layer.fresh(
         ServerConfig.layerTest(process.cwd(), {
-          prefix: "trifecta-server-settings-test-",
+          prefix: "t3code-server-settings-test-",
         }),
       ),
     ),

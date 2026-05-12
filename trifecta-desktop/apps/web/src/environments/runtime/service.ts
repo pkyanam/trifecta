@@ -31,7 +31,6 @@ import { deriveOrchestrationBatchEffects } from "~/orchestrationEventEffects";
 import { projectQueryKeys } from "~/lib/projectReactQuery";
 import { providerQueryKeys } from "~/lib/providerReactQuery";
 import { getPrimaryKnownEnvironment } from "../primary";
-import { getCapturedWsToken, getInjectedBearerToken } from "../primary/auth";
 import {
   bootstrapRemoteBearerSession,
   fetchRemoteEnvironmentDescriptor,
@@ -1133,20 +1132,8 @@ function createPrimaryEnvironmentClient(
   }
   const connectionLabel = knownEnvironment?.label ?? null;
 
-  // If the extension injected a wsToken via URL query param, use it directly for auth.
-  // Otherwise fall back to the static wsBaseUrl (cookie-based auth).
-  const wsTokenFromExtension = getCapturedWsToken();
-  const wsUrlProvider =
-    wsTokenFromExtension
-      ? () => {
-          const url = new URL(wsBaseUrl, window.location.origin);
-          url.searchParams.set("wsToken", wsTokenFromExtension);
-          return Promise.resolve(url.toString());
-        }
-      : wsBaseUrl;
-
   return createWsRpcClient(
-    new WsTransport(wsUrlProvider, {
+    new WsTransport(wsBaseUrl, {
       getConnectionLabel: () => connectionLabel,
       getVersionMismatchHint: () =>
         resolveServerConfigVersionMismatch(getServerConfig())?.hint ?? null,

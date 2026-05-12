@@ -112,7 +112,7 @@ export const Route = createFileRoute("/_chat")({
       context.authGateState.status !== "authenticated" &&
       context.authGateState.status !== "hosted-static"
     ) {
-      throw redirect({ to: "/pair", replace: true, hash: window.location.hash });
+      throw redirect({ to: "/pair", replace: true });
     }
   },
   component: ChatRouteLayout,

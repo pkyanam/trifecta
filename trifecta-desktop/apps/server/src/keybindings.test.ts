@@ -34,7 +34,7 @@ const makeKeybindingsLayer = () => {
     Layer.provideMerge(
       Layer.fresh(
         ServerConfig.layerTest(process.cwd(), {
-          prefix: "trifecta-keybindings-test-",
+          prefix: "t3code-keybindings-test-",
         }),
       ),
     ),

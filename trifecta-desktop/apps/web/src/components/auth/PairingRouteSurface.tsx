@@ -51,18 +51,6 @@ export function PairingRouteSurface({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const autoSubmitAttemptedRef = useRef(false);
 
-  // Listen for session token from extension parent window (postMessage)
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const token = event.data?.token ?? event.data?.pairingToken;
-      setCredential(token);
-      autoSubmitAttemptedRef.current = true;
-      void submitCredential(token);
-    };
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps -- submitCredential stable via useCallback below
-
   const submitCredential = useCallback(
     async (nextCredential: string) => {
       setIsSubmitting(true);

@@ -13,9 +13,9 @@ const textEncoder = new TextEncoder();
 function envOutput(values: Readonly<Record<string, string>>): string {
   return Object.entries(values)
     .flatMap(([name, value]) => [
-      `__TRIFECTA_ENV_${name}_START__`,
+      `__T3CODE_ENV_${name}_START__`,
       value,
-      `__TRIFECTA_ENV_${name}_END__`,
+      `__T3CODE_ENV_${name}_END__`,
     ])
     .join("\n");
 }

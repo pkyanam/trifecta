@@ -1,6 +1,3 @@
-import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as Effect from "effect/Effect";
-import * as FileSystem from "effect/FileSystem";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,18 +9,6 @@ import {
 } from "./brand-assets.ts";
 
 describe("brand-assets", () => {
-  const resolveRepoPath = (relativePath: string) => `${import.meta.dirname}/../../${relativePath}`;
-
-  const expectPngHasAlpha = (relativePath: string) =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const png = yield* fs.readFile(resolveRepoPath(relativePath));
-      expect(Array.from(png.subarray(1, 4))).toEqual([80, 78, 71]);
-
-      const colorType = png[25];
-      expect([4, 6]).toContain(colorType);
-    });
-
   it("maps server publish web assets to production icons", () => {
     expect(PUBLISH_ICON_OVERRIDES).toEqual([
       {
@@ -70,11 +55,4 @@ describe("brand-assets", () => {
     expect(resolveWebAssetBrandForChannel("latest")).toBe("production");
     expect(resolveWebAssetBrandForChannel("nightly")).toBe("nightly");
   });
-
-  it("keeps macOS desktop icons transparent outside the rounded app shape", () =>
-    Effect.gen(function* () {
-      yield* expectPngHasAlpha(BRAND_ASSET_PATHS.productionMacIconPng);
-      yield* expectPngHasAlpha(BRAND_ASSET_PATHS.nightlyMacIconPng);
-      yield* expectPngHasAlpha(BRAND_ASSET_PATHS.developmentDesktopIconPng);
-    }).pipe(Effect.provide(NodeServices.layer), Effect.runPromise));
 });
