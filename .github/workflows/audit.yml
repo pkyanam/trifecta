@@ -12,6 +12,7 @@ on:
       - "**/package.json"
   schedule:
     - cron: "0 9 * * 1"  # Every Monday at 9am UTC
+  workflow_dispatch:  # Manual trigger from Actions tab
 
 jobs:
   audit:
