@@ -1,0 +1,93 @@
+{
+  "name": "trifecta-ide",
+  "displayName": "Trifecta — AI Coding Agent",
+  "description": "Universal coding agent interface for Codex, Claude Code, OpenCode, and Cursor — directly inside your IDE.",
+  "version": "0.1.0",
+  "publisher": "pkyanam",
+  "license": "MIT",
+  "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pkyanam/trifecta"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Chat",
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "coding agent",
+    "codex",
+    "claude",
+    "opencode",
+    "cursor",
+    "copilot"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "trifecta.openPanel",
+        "title": "Open Trifecta",
+        "icon": "$(hubot)"
+      },
+      {
+        "command": "trifecta.focusChat",
+        "title": "Focus Trifecta Chat"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "trifecta",
+          "title": "Trifecta",
+          "icon": "assets/activity-bar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "trifecta": [
+        {
+          "type": "webview",
+          "id": "trifecta.chat",
+          "name": "Chat"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Trifecta",
+      "properties": {
+        "trifecta.serverPort": {
+          "type": "number",
+          "default": 0,
+          "description": "Port for the Trifecta server (0 = random available port)."
+        },
+        "trifecta.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start the Trifecta server when VS Code opens."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'lint ok'",
+    "test": "echo 'no tests yet'"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -55,7 +55,15 @@ export function configureClientTracing(config: ClientTracingConfig = {}): Promis
 }
 
 async function applyClientTracingConfig(config: ClientTracingConfig): Promise<void> {
-  const otlpTracesUrl = resolvePrimaryEnvironmentHttpUrl("/api/observability/v1/traces");
+  let otlpTracesUrl = resolvePrimaryEnvironmentHttpUrl("/api/observability/v1/traces");
+  // In iframe/webview mode, cookies are blocked — pass session token as query param
+  const win = typeof window !== "undefined" ? (window as unknown as Record<string, unknown>) : {};
+  const sessionToken = typeof win.__TRIFECTA_SESSION_TOKEN__ === "string"
+    ? (win.__TRIFECTA_SESSION_TOKEN__ as string)
+    : null;
+  if (sessionToken) {
+    otlpTracesUrl += `?token=${encodeURIComponent(sessionToken)}`;
+  }
   const exportIntervalMs = Math.max(10, config.exportIntervalMs ?? DEFAULT_EXPORT_INTERVAL_MS);
   const nextConfigKey = `${otlpTracesUrl}|${exportIntervalMs}`;
 

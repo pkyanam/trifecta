@@ -1577,7 +1577,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
   );
 
   it.effect(
-    "does not accept session tokens via query parameters on authenticated HTTP routes",
+    "accepts session tokens via query parameters on authenticated HTTP routes",
     () =>
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
@@ -1591,11 +1591,17 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         assert.isDefined(cookie);
         const sessionToken = extractSessionTokenFromSetCookie(cookie ?? "");
 
-        const response = yield* HttpClient.get(
+        // First verify cookie-based auth works
+        const cookieResponse = yield* HttpClient.get(
+          `/api/project-favicon?cwd=${encodeURIComponent(projectDir)}`,
+        );
+        assert.equal(cookieResponse.status, 200);
+
+        // Then verify query param auth also works (used by iframe/webview mode)
+        const queryResponse = yield* HttpClient.get(
           `/api/project-favicon?cwd=${encodeURIComponent(projectDir)}&token=${encodeURIComponent(sessionToken)}`,
         );
-
-        assert.equal(response.status, 401);
+        assert.equal(queryResponse.status, 200);
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
