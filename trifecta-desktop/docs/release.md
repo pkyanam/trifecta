@@ -45,20 +45,20 @@ Required GitHub Actions secrets:
 Optional GitHub Actions variables:
 
 - `VERCEL_TEAM_SLUG`: overrides the Vercel CLI scope when the team slug is preferred over the `VERCEL_ORG_ID` secret.
-- `T3CODE_WEB_ROUTER_URL`: defaults to `https://app.t3.codes`.
-- `T3CODE_WEB_LATEST_DOMAIN`: defaults to `latest.app.t3.codes`.
-- `T3CODE_WEB_NIGHTLY_DOMAIN`: defaults to `nightly.app.t3.codes`.
+- `T3CODE_WEB_ROUTER_URL`: defaults to `https://app.trifecta.belweave.ai`.
+- `T3CODE_WEB_LATEST_DOMAIN`: defaults to `latest.app.trifecta.belweave.ai`.
+- `T3CODE_WEB_NIGHTLY_DOMAIN`: defaults to `nightly.app.trifecta.belweave.ai`.
 
 Required Vercel domains:
 
-- `app.t3.codes`: the router domain users open, updated by stable releases.
-- `latest.app.t3.codes`: channel alias updated by stable releases.
-- `nightly.app.t3.codes`: channel alias updated by nightly releases.
+- `app.trifecta.belweave.ai`: the router domain users open, updated by stable releases.
+- `latest.app.trifecta.belweave.ai`: channel alias updated by stable releases.
+- `nightly.app.trifecta.belweave.ai`: channel alias updated by nightly releases.
 
 The router domain uses `apps/web/vercel.ts` routes. Users opt into a channel by
 visiting `/__t3code/channel?channel=latest` or
 `/__t3code/channel?channel=nightly`; the router stores the
-`t3code_web_channel` cookie and rewrites future requests on `app.t3.codes` to
+`t3code_web_channel` cookie and rewrites future requests on `app.trifecta.belweave.ai` to
 the matching channel alias.
 
 The release deploy job rewrites release package versions before upload so the
@@ -78,7 +78,7 @@ One-time Vercel dashboard setup:
    `vercel.ts` setting is the source-of-truth, but disconnecting Git in the
    dashboard is also safe.
 4. Run one stable release deployment, or manually alias the current stable
-   deployment, so `app.t3.codes` points at a deployment containing the router
+   deployment, so `app.trifecta.belweave.ai` points at a deployment containing the router
    rules in `apps/web/vercel.ts`. Future stable releases keep this alias current.
 
 ## Nightly builds
