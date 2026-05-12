@@ -44,6 +44,8 @@ import { readEnvironmentApi } from "../environmentApi";
 import { isElectron } from "../env";
 import { readLocalApi } from "../localApi";
 import { parseDiffRouteSearch, stripDiffSearchParams } from "../diffRouteSearch";
+import { stripBrowserSearchParams } from "../browserRouteSearch";
+import { parseBrowserRouteSearch } from "../browserRouteSearch";
 import {
   collapseExpandedComposerCursor,
   parseStandaloneComposerSlashCommand,
@@ -642,6 +644,10 @@ export default function ChatView(props: ChatViewProps) {
     strict: false,
     select: (params) => parseDiffRouteSearch(params),
   });
+  const browserSearch = useSearch({
+    strict: false,
+    select: (params) => parseBrowserRouteSearch(params),
+  });
   const { resolvedTheme } = useTheme();
   // Granular store selectors — avoid subscribing to prompt changes.
   const composerRuntimeMode = useComposerDraftStore(
@@ -813,6 +819,7 @@ export default function ChatView(props: ChatViewProps) {
   const isLocalDraftThread = !isServerThread && localDraftThread !== undefined;
   const canCheckoutPullRequestIntoThread = isLocalDraftThread;
   const diffOpen = rawSearch.diff === "1";
+  const browserOpen = browserSearch.browser === "1";
   const activeThreadId = activeThread?.id ?? null;
   const activeThreadRef = useMemo(
     () => (activeThread ? scopeThreadRef(activeThread.environmentId, activeThread.id) : null),
@@ -1698,6 +1705,10 @@ export default function ChatView(props: ChatViewProps) {
     () => shortcutLabelForCommand(keybindings, "diff.toggle", nonTerminalShortcutLabelOptions),
     [keybindings, nonTerminalShortcutLabelOptions],
   );
+  const browserPanelShortcutLabel = useMemo(
+    () => shortcutLabelForCommand(keybindings, "browser.toggle", nonTerminalShortcutLabelOptions),
+    [keybindings, nonTerminalShortcutLabelOptions],
+  );
   const onToggleDiff = useCallback(() => {
     if (!isServerThread) {
       return;
@@ -1718,6 +1729,24 @@ export default function ChatView(props: ChatViewProps) {
       },
     });
   }, [diffOpen, environmentId, isServerThread, navigate, onDiffPanelOpen, threadId]);
+
+  const onToggleBrowser = useCallback(() => {
+    if (!isServerThread) {
+      return;
+    }
+    void navigate({
+      to: "/$environmentId/$threadId",
+      params: {
+        environmentId,
+        threadId,
+      },
+      replace: true,
+      search: (previous) => {
+        const rest = stripBrowserSearchParams(previous);
+        return browserOpen ? { ...rest, browser: undefined } : { ...rest, browser: "1" };
+      },
+    });
+  }, [browserOpen, environmentId, isServerThread, navigate, threadId]);
 
   const envLocked = Boolean(
     activeThread &&
@@ -2517,6 +2546,13 @@ export default function ChatView(props: ChatViewProps) {
         return;
       }
 
+      if (command === "browser.toggle") {
+        event.preventDefault();
+        event.stopPropagation();
+        onToggleBrowser();
+        return;
+      }
+
       if (command === "modelPicker.toggle") {
         event.preventDefault();
         event.stopPropagation();
@@ -2546,6 +2582,7 @@ export default function ChatView(props: ChatViewProps) {
     splitTerminal,
     keybindings,
     onToggleDiff,
+    onToggleBrowser,
     toggleTerminalVisibility,
   ]);
 
@@ -3529,14 +3566,17 @@ export default function ChatView(props: ChatViewProps) {
           terminalOpen={terminalState.terminalOpen}
           terminalToggleShortcutLabel={terminalToggleShortcutLabel}
           diffToggleShortcutLabel={diffPanelShortcutLabel}
+          browserToggleShortcutLabel={browserPanelShortcutLabel}
           gitCwd={gitCwd}
           diffOpen={diffOpen}
+          browserOpen={browserOpen}
           onRunProjectScript={runProjectScript}
           onAddProjectScript={saveProjectScript}
           onUpdateProjectScript={updateProjectScript}
           onDeleteProjectScript={deleteProjectScript}
           onToggleTerminal={toggleTerminalVisibility}
           onToggleDiff={onToggleDiff}
+          onToggleBrowser={onToggleBrowser}
         />
       </header>
 
