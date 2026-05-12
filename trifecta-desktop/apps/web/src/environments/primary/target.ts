@@ -12,8 +12,19 @@ function getDesktopLocalEnvironmentBootstrap(): DesktopEnvironmentBootstrap | nu
   return window.desktopBridge?.getLocalEnvironmentBootstrap() ?? null;
 }
 
+import { getWsTokenFromUrl } from "../../pairingUrl";
+
 function normalizeBaseUrl(rawValue: string): string {
   return new URL(rawValue, window.location.origin).toString();
+}
+
+function normalizeWsBaseUrl(rawValue: string): string {
+  const normalized = normalizeBaseUrl(rawValue);
+  const wsToken = getWsTokenFromUrl();
+  if (!wsToken) return normalized;
+  const url = new URL(normalized);
+  url.searchParams.set("wsToken", wsToken);
+  return url.toString();
 }
 
 function swapBaseUrlProtocol(
@@ -85,7 +96,7 @@ function resolveConfiguredPrimaryTarget(): PrimaryEnvironmentTarget | null {
     source: "configured",
     target: {
       httpBaseUrl: normalizeBaseUrl(resolvedHttpBaseUrl),
-      wsBaseUrl: normalizeBaseUrl(resolvedWsBaseUrl),
+      wsBaseUrl: normalizeWsBaseUrl(resolvedWsBaseUrl),
     },
   };
 }
@@ -104,7 +115,7 @@ function resolveWindowOriginPrimaryTarget(): PrimaryEnvironmentTarget {
     source: "window-origin",
     target: {
       httpBaseUrl,
-      wsBaseUrl: url.toString(),
+      wsBaseUrl: normalizeWsBaseUrl(url.toString()),
     },
   };
 }
@@ -127,7 +138,7 @@ function resolveDesktopPrimaryTarget(): PrimaryEnvironmentTarget | null {
     source: "desktop-managed",
     target: {
       httpBaseUrl: normalizeBaseUrl(desktopBootstrap.httpBaseUrl),
-      wsBaseUrl: normalizeBaseUrl(desktopBootstrap.wsBaseUrl),
+      wsBaseUrl: normalizeWsBaseUrl(desktopBootstrap.wsBaseUrl),
     },
   };
 }

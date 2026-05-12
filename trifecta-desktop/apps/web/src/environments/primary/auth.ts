@@ -13,6 +13,7 @@ import type {
 import {
   getPairingTokenFromUrl,
   stripPairingTokenFromUrl as stripPairingTokenUrl,
+  getBearerTokenFromUrl,
 } from "../../pairingUrl";
 
 import { resolvePrimaryEnvironmentHttpUrl } from "./target";
@@ -91,10 +92,11 @@ function getDesktopBootstrapCredential(): string | null {
     : null;
 }
 
-export async function fetchSessionState(): Promise<AuthSessionState> {
+export async function fetchSessionState(bearerToken?: string): Promise<AuthSessionState> {
   return retryTransientBootstrap(async () => {
     const response = await fetch(resolvePrimaryEnvironmentHttpUrl("/api/auth/session"), {
       credentials: "include",
+      ...(bearerToken ? { headers: { authorization: `Bearer ${bearerToken}` } } : {}),
     });
     if (!response.ok) {
       throw new BootstrapHttpError({
@@ -228,8 +230,9 @@ function isTransientBootstrapError(error: unknown): boolean {
 }
 
 async function bootstrapServerAuth(): Promise<ServerAuthGateState> {
+  const bearerToken = getBearerTokenFromUrl();
   const bootstrapCredential = getDesktopBootstrapCredential();
-  const currentSession = await fetchSessionState();
+  const currentSession = await fetchSessionState(bearerToken ?? undefined);
   if (currentSession.authenticated) {
     return { status: "authenticated" };
   }
