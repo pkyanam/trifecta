@@ -244,7 +244,7 @@ export class ServerManager {
         return null;
       }
 
-      const bootstrap = await bootstrapResp.json();
+      const bootstrap = (await bootstrapResp.json()) as { sessionToken?: string };
       const sessionToken = bootstrap.sessionToken;
       if (!sessionToken) {
         this.outputChannel.appendLine(
@@ -269,7 +269,7 @@ export class ServerManager {
         return null;
       }
 
-      const wsTokenData = await wsTokenResp.json();
+      const wsTokenData = (await wsTokenResp.json()) as { token?: string };
       const wsToken = wsTokenData.token;
       if (!wsToken) {
         this.outputChannel.appendLine(
