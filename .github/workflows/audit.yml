@@ -1,0 +1,29 @@
+name: Dependency Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bun.lock"
+      - "**/package.json"
+  pull_request:
+    paths:
+      - "bun.lock"
+      - "**/package.json"
+  schedule:
+    - cron: "0 9 * * 1"  # Every Monday at 9am UTC
+
+jobs:
+  audit:
+    name: bun audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Run dependency audit
+        run: bun audit
+        working-directory: trifecta-desktop
