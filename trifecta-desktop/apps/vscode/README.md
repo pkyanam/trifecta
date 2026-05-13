@@ -1,6 +1,6 @@
 # Trifecta — AI Coding Agent Extension for VS Code / Cursor
 
-Embed a full-featured AI coding agent chat sidebar directly into your IDE.
+Embed a full-featured AI coding agent chat sidebar directly into your IDE. Companion mobile apps available for <a href="../../trifecta-ios/">iOS</a> and <a href="../../trifecta-android/">Android</a> — compatible with both Trifecta Desktop and <a href="https://t3.gg">T3 Code by Theo (t3.gg)</a>.
 
 ## What's Inside
 
