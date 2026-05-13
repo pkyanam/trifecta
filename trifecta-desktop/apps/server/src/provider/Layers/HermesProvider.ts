@@ -7,6 +7,7 @@
  *
  * @module provider/Layers/HermesProvider
  */
+import * as Data from "effect/Data";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -19,6 +20,7 @@ import type { HermesSettings, ServerProvider, ServerProviderModel } from "@t3too
 import { ServerSettingsError } from "@t3tools/contracts";
 
 import * as AcpClient from "effect-acp/client";
+import { AGENT_METHODS } from "effect-acp/schema";
 
 import {
   AUTH_PROBE_TIMEOUT_MS,
@@ -26,11 +28,19 @@ import {
   isCommandMissingCause,
   type ServerProviderDraft,
 } from "../providerSnapshot.ts";
+import {
+  decodeHermesInitializeResponse,
+  decodeHermesNewSessionResponse,
+} from "../hermes/HermesAcpWire.ts";
 import packageJson from "../../../package.json" with { type: "json" };
 
 const HERMES_PRESENTATION = {
   displayName: "Hermes",
 } as const;
+
+class HermesAcpProbeError extends Data.TaggedError("HermesAcpProbeError")<{
+  readonly message: string;
+}> {}
 
 export interface HermesProviderSnapshot {
   readonly models: ReadonlyArray<ServerProviderModel>;
@@ -41,22 +51,39 @@ const probeHermesProvider = Effect.fn("probeHermesProvider")(function* (input: {
   readonly binaryPath: string;
   readonly cwd: string;
   readonly environment?: NodeJS.ProcessEnv;
-}): Effect.fn.Return<HermesProviderSnapshot, Error, ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> {
+}): Effect.fn.Return<
+  HermesProviderSnapshot,
+  HermesAcpProbeError,
+  ChildProcessSpawner.ChildProcessSpawner | Scope.Scope
+> {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const command = ChildProcess.make(input.binaryPath || "hermes", ["acp"], {
     cwd: input.cwd,
     env: input.environment ?? process.env,
     shell: process.platform === "win32",
   });
-  const handle = yield* spawner.spawn(command);
+  const handle = yield* spawner.spawn(command).pipe(
+    Effect.mapError(
+      (e) =>
+        new HermesAcpProbeError({
+          message:
+            typeof e === "object" &&
+            e !== null &&
+            "message" in e &&
+            typeof (e as { message: unknown }).message === "string"
+              ? `Failed to spawn hermes acp: ${(e as { message: string }).message}`
+              : `Failed to spawn hermes acp: ${String(e)}`,
+        }),
+    ),
+  );
 
   const acpLayer = AcpClient.layerChildProcess(handle);
 
   return yield* Effect.gen(function* () {
     const acp = yield* AcpClient.AcpClient;
 
-    const initialized = yield* acp.agent.initialize({
-      protocolVersion: 1,
+    const rawInit = yield* acp.raw.request(AGENT_METHODS.initialize, {
+      protocolVersion: 1 as const,
       clientCapabilities: {
         fs: { readTextFile: false, writeTextFile: false },
         terminal: false,
@@ -65,12 +92,44 @@ const probeHermesProvider = Effect.fn("probeHermesProvider")(function* (input: {
         name: "trifecta-desktop",
         version: packageJson.version,
       },
-    });
+    }).pipe(
+      Effect.mapError(
+        (e) =>
+          new HermesAcpProbeError({
+            message: `ACP initialize transport failed: ${String((e as { message?: string }).message ?? e)}`,
+          }),
+      ),
+    );
 
-    const session = yield* acp.agent.createSession({
+    const initialized = yield* decodeHermesInitializeResponse(rawInit).pipe(
+      Effect.mapError(
+        (e) =>
+          new HermesAcpProbeError({
+            message: `ACP initialize response decode failed: ${e.message}`,
+          }),
+      ),
+    );
+
+    const rawSession = yield* acp.raw.request(AGENT_METHODS.session_new, {
       cwd: input.cwd,
       mcpServers: [],
-    });
+    }).pipe(
+      Effect.mapError(
+        (e) =>
+          new HermesAcpProbeError({
+            message: `ACP session/new transport failed: ${String((e as { message?: string }).message ?? e)}`,
+          }),
+      ),
+    );
+
+    const session = yield* decodeHermesNewSessionResponse(rawSession).pipe(
+      Effect.mapError(
+        (e) =>
+          new HermesAcpProbeError({
+            message: `ACP session/new response decode failed: ${e.message}`,
+          }),
+      ),
+    );
 
     const availableModels = session.models?.availableModels ?? [];
     const models: ServerProviderModel[] = availableModels.map((m) => ({

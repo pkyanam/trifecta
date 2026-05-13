@@ -47,6 +47,7 @@ import {
 
 import * as AcpClient from "effect-acp/client";
 import type * as AcpSchema from "effect-acp/schema";
+import { AGENT_METHODS } from "effect-acp/schema";
 
 import {
   ProviderAdapterProcessError,
@@ -55,6 +56,10 @@ import {
   ProviderAdapterValidationError,
   type ProviderAdapterError,
 } from "../Errors.ts";
+import {
+  decodeHermesInitializeResponse,
+  decodeHermesNewSessionResponse,
+} from "../hermes/HermesAcpWire.ts";
 import type { ProviderAdapterShape, ProviderThreadSnapshot } from "../Services/ProviderAdapter.ts";
 
 const PROVIDER = ProviderDriverKind.make("hermesAgent");
@@ -347,9 +352,9 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
         );
         const acpClient = Context.get(acpContext, AcpClient.AcpClient);
 
-        yield* acpClient.agent
-          .initialize({
-            protocolVersion: 1,
+        const rawInitialize = yield* acpClient.raw
+          .request(AGENT_METHODS.initialize, {
+            protocolVersion: 1 as const,
             clientCapabilities: {
               fs: { readTextFile: false, writeTextFile: false },
               terminal: false,
@@ -362,28 +367,52 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
                 new ProviderAdapterProcessError({
                   provider: PROVIDER,
                   threadId: input.threadId,
-                  detail: `ACP initialize failed: ${cause.message ?? String(cause)}`,
+                  detail: `ACP initialize transport failed: ${cause.message ?? String(cause)}`,
                   cause: new Error(String(cause)),
                 }),
             ),
           );
 
-        const sessionResponse = yield* acpClient.agent
-          .createSession({
-            cwd: input.cwd ?? process.cwd(),
-            mcpServers: [],
-          })
-          .pipe(
-            Effect.mapError(
-              (cause) =>
-                new ProviderAdapterProcessError({
-                  provider: PROVIDER,
-                  threadId: input.threadId,
-                  detail: `ACP session/new failed: ${cause.message ?? String(cause)}`,
-                  cause: new Error(String(cause)),
-                }),
-            ),
-          );
+        yield* decodeHermesInitializeResponse(rawInitialize).pipe(
+          Effect.mapError(
+            (e) =>
+              new ProviderAdapterProcessError({
+                provider: PROVIDER,
+                threadId: input.threadId,
+                detail: `ACP initialize response decode failed: ${e.message}`,
+                cause: new Error(e.message),
+              }),
+          ),
+        );
+
+        const createPayload = {
+          cwd: input.cwd ?? process.cwd(),
+          mcpServers: [],
+        } satisfies AcpSchema.NewSessionRequest;
+
+        const rawSession = yield* acpClient.raw.request(AGENT_METHODS.session_new, createPayload).pipe(
+          Effect.mapError(
+            (cause) =>
+              new ProviderAdapterProcessError({
+                provider: PROVIDER,
+                threadId: input.threadId,
+                detail: `ACP session/new transport failed: ${cause.message ?? String(cause)}`,
+                cause: new Error(String(cause)),
+              }),
+          ),
+        );
+
+        const sessionResponse = yield* decodeHermesNewSessionResponse(rawSession).pipe(
+          Effect.mapError(
+            (e) =>
+              new ProviderAdapterProcessError({
+                provider: PROVIDER,
+                threadId: input.threadId,
+                detail: `ACP session/new response decode failed: ${e.message}`,
+                cause: new Error(e.message),
+              }),
+          ),
+        );
 
         const session: HermesAdapterSession = {
           threadId: input.threadId,
