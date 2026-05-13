@@ -18,12 +18,13 @@ export const makeClaudeEnvironment = Effect.fn("makeClaudeEnvironment")(function
   config: Pick<ClaudeSettings, "homePath">,
   baseEnv: NodeJS.ProcessEnv = process.env,
 ): Effect.fn.Return<NodeJS.ProcessEnv, never, Path.Path> {
-  const homePath = config.homePath.trim();
-  if (homePath.length === 0) return baseEnv;
   const resolvedHomePath = yield* resolveClaudeHomePath(config);
   return {
     ...baseEnv,
     HOME: resolvedHomePath,
+    // Windows: USERPROFILE is not always mirrored to HOME by child processes.
+    // Set both so the Claude Agent SDK can find auth config on Windows.
+    ...(process.platform === "win32" ? { USERPROFILE: resolvedHomePath } : {}),
   };
 });
 
