@@ -85,12 +85,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     const baseUrl = `http://127.0.0.1:${conn.port}`;
     let iframeSrc: string;
     if (conn.wsToken) {
-      iframeSrc = `${baseUrl}/?wsToken=${conn.wsToken}`;
-      if (conn.sessionToken) {
-        iframeSrc += `&sessionToken=${conn.sessionToken}`;
-      }
+      iframeSrc = `${baseUrl}/?bearer=${conn.sessionToken}&wsToken=${conn.wsToken}`;
     } else {
-      iframeSrc = `${baseUrl}/#token=${conn.pairingToken ?? ""}`;
+      iframeSrc = `${baseUrl}/#token=${conn.pairingToken}`;
     }
     return `<!DOCTYPE html>
 <html lang="en">
