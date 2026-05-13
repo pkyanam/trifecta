@@ -20,7 +20,12 @@ it.layer(NodeServices.layer)("ClaudeHome", (it) => {
         const resolved = path.resolve(NodeOS.homedir());
 
         expect(yield* resolveClaudeHomePath({ homePath: "" })).toBe(resolved);
-        expect(yield* makeClaudeEnvironment({ homePath: "" })).toBe(process.env);
+        const env = yield* makeClaudeEnvironment({ homePath: "" });
+        expect(env.HOME).toBe(resolved);
+        // All existing process.env entries should still be present
+        for (const [key, value] of Object.entries(process.env)) {
+          expect(env[key]).toBe(value);
+        }
       }),
     );
 
