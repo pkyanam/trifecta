@@ -2,7 +2,7 @@
 
 Trifecta is a cross-platform coding agent platform. It consists of a desktop server that runs AI coding agents, plus native mobile clients for iOS and Android that let you chat with your agent, review changes, and manage your development workflow from anywhere.
 
-The mobile apps are also designed to be compatible with the official Trifecta desktop server.
+The mobile apps are also designed to be compatible with the official <strong>T3 Code by Theo (t3.gg)</strong> desktop server, not just Trifecta Desktop.
 
 ## What's in this repo
 
@@ -10,7 +10,8 @@ The mobile apps are also designed to be compatible with the official Trifecta de
 trifecta/
 ├── trifecta-ios/        Native iOS client (SwiftUI)
 ├── trifecta-android/    Native Android client (Jetpack Compose)
-└── trifecta-desktop/    Desktop server + web UI (React, Node.js)
+├── trifecta-desktop/    Desktop server + web UI + VS Code extension (React, Node.js)
+└── trifecta-www/        Marketing website (Next.js)
 ```
 
 ---
@@ -52,7 +53,7 @@ See [trifecta-desktop/README.md](trifecta-desktop/README.md) for full details.
 
 ## Trifecta for iOS
 
-Native iOS client written in SwiftUI. Connects to the Trifecta desktop server to give you mobile access to your coding agent. Also compatible with the official Trifecta desktop server.
+Native iOS client written in SwiftUI. Connects to a Trifecta or <strong>T3 Code by Theo (t3.gg)</strong> desktop server to give you mobile access to your coding agent. Works with both Trifecta Desktop and the official T3 Code desktop server.
 
 ### Features
 
@@ -80,7 +81,7 @@ See [trifecta-ios/README.md](trifecta-ios/README.md) for the full engineering gu
 
 ## Trifecta for Android
 
-Native Android client written in Kotlin and Jetpack Compose. Mirrors the iOS feature set for a consistent cross-platform experience. Also compatible with the official Trifecta desktop server.
+Native Android client written in Kotlin and Jetpack Compose. Mirrors the iOS feature set for a consistent cross-platform experience. Works with both Trifecta Desktop and the official <strong>T3 Code by Theo (t3.gg)</strong> desktop server.
 
 ### Features
 

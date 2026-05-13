@@ -2,6 +2,8 @@
 
 Native iOS client for the Trifecta coding agent platform. Chat with your AI coding assistant, review changes, approve actions, and manage development threads from your iPhone or iPad.
 
+**Compatible with both Trifecta Desktop and the official <a href="https://t3.gg">T3 Code by Theo (t3.gg)</a> desktop server.**
+
 
 ## Features
 
@@ -19,7 +21,7 @@ Native iOS client for the Trifecta coding agent platform. Chat with your AI codi
 - iOS 18.0+
 - Xcode 16+
 - Swift 5.10+
-- A Trifecta desktop server to pair with
+- A Trifecta Desktop or <a href="https://t3.gg">T3 Code by Theo (t3.gg)</a> desktop server to pair with
 
 ## Project Structure
 

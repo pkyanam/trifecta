@@ -20,7 +20,12 @@ import { TextGenerationError } from "@t3tools/contracts";
 import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@t3tools/shared/git";
 
 import * as AcpClient from "effect-acp/client";
+import { AGENT_METHODS } from "effect-acp/schema";
 
+import {
+  decodeHermesInitializeResponse,
+  decodeHermesNewSessionResponse,
+} from "../provider/hermes/HermesAcpWire.ts";
 import type { TextGenerationShape } from "./TextGeneration.ts";
 import {
   buildBranchNamePrompt,
@@ -84,36 +89,54 @@ const runHermesPrompt = Effect.fn("runHermesPrompt")(function* (
     );
     const acp = Context.get(acpContext, AcpClient.AcpClient);
 
-    yield* acp.agent
-      .initialize({
-        protocolVersion: 1,
-        clientCapabilities: {
-          fs: { readTextFile: false, writeTextFile: false },
-          terminal: false,
-        },
-        clientInfo: { name: "trifecta-desktop", version: "1.0.0" },
-      })
+    const rawInit = yield* acp.raw.request(AGENT_METHODS.initialize, {
+      protocolVersion: 1 as const,
+      clientCapabilities: {
+        fs: { readTextFile: false, writeTextFile: false },
+        terminal: false,
+      },
+      clientInfo: { name: "trifecta-desktop", version: "1.0.0" },
+    }).pipe(
+      Effect.mapError(
+        (err) =>
+          new TextGenerationError({
+            operation: "generateText",
+            detail: `ACP initialize transport failed: ${String(err)}`,
+          }),
+      ),
+    );
+
+    yield* decodeHermesInitializeResponse(rawInit).pipe(
+      Effect.mapError(
+        (err) =>
+          new TextGenerationError({
+            operation: "generateText",
+            detail: `ACP initialize response decode failed: ${err.message}`,
+          }),
+      ),
+    );
+
+    const rawSession = yield* acp.raw
+      .request(AGENT_METHODS.session_new, { cwd, mcpServers: [] })
       .pipe(
         Effect.mapError(
           (err) =>
             new TextGenerationError({
               operation: "generateText",
-              detail: `ACP initialize failed: ${String(err)}`,
+              detail: `ACP session/new transport failed: ${String(err)}`,
             }),
         ),
       );
 
-    const session = yield* acp.agent
-      .createSession({ cwd, mcpServers: [] })
-      .pipe(
-        Effect.mapError(
-          (err) =>
-            new TextGenerationError({
-              operation: "generateText",
-              detail: `ACP session/new failed: ${String(err)}`,
-            }),
-        ),
-      );
+    const session = yield* decodeHermesNewSessionResponse(rawSession).pipe(
+      Effect.mapError(
+        (err) =>
+          new TextGenerationError({
+            operation: "generateText",
+            detail: `ACP session/new response decode failed: ${err.message}`,
+          }),
+      ),
+    );
 
     let collected = "";
     yield* acp.handleSessionUpdate((notification) =>

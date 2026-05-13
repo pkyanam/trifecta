@@ -214,6 +214,7 @@ interface StagePackageJson {
   readonly private: true;
   readonly description: string;
   readonly author: string;
+  readonly homepage: string;
   readonly main: string;
   readonly build: Record<string, unknown>;
   readonly dependencies: Record<string, unknown>;
@@ -783,7 +784,8 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     t3codeCommitHash: commitHash,
     private: true,
     description: "Trifecta desktop build",
-    author: "T3 Tools",
+    author: "Preetham Kyanam <kyanam.preetham@gmail.com>",
+    homepage: "https://trifecta.belweave.ai",
     main: "apps/desktop/dist-electron/main.cjs",
     build: yield* createBuildConfig(
       options.platform,

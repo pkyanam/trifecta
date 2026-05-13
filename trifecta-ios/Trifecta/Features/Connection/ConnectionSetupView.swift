@@ -66,7 +66,7 @@ struct ConnectionSetupView: View {
             T3Style.Card {
                 VStack(alignment: .leading, spacing: T3Spacing.md) {
                     fieldGroup(label: "Server URL") {
-                        TextField("https://t3code-review.belweave.com", text: $serverURL)
+                        TextField("", text: $serverURL)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)

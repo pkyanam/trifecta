@@ -2,6 +2,8 @@
 
 Trifecta is a minimal web GUI for coding agents (currently Codex, Claude, and OpenCode, more coming soon).
 
+Companion mobile apps for <a href="../trifecta-ios/">iOS</a> and <a href="../trifecta-android/">Android</a> are also available — they work with both Trifecta Desktop and the official <strong><a href="https://t3.gg">T3 Code by Theo (t3.gg)</a></strong> desktop server.
+
 ## Installation
 
 > [!WARNING]
