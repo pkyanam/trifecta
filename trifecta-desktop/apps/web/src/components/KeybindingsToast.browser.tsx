@@ -134,6 +134,10 @@ function createBaseServerConfig(): ServerConfig {
           enabled: true,
           binaryPath: "",
         },
+        devinAgent: {
+          enabled: true,
+          binaryPath: "",
+        },
       },
     },
   };

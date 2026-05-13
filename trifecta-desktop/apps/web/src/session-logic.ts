@@ -45,6 +45,17 @@ export const PROVIDER_OPTIONS: Array<{
     available: true,
     pickerSidebarBadge: "new",
   },
+  {
+    value: ProviderDriverKind.make("hermesAgent"),
+    label: "Hermes",
+    available: true,
+  },
+  {
+    value: ProviderDriverKind.make("devinAgent"),
+    label: "Devin",
+    available: true,
+    pickerSidebarBadge: "new",
+  },
 ];
 
 export interface WorkLogEntry {
