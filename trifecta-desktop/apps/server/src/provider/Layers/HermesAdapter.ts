@@ -64,6 +64,18 @@ import type { ProviderAdapterShape, ProviderThreadSnapshot } from "../Services/P
 
 const PROVIDER = ProviderDriverKind.make("hermesAgent");
 
+/** `session/set_model` via transport `raw.request`: avoids RpcClient success/error decoding that can defect on Hermes. */
+function bestEffortHermesSetSessionModel(
+  client: AcpClient.AcpClientShape,
+  sessionId: string,
+  modelId: string,
+): Effect.Effect<void, never> {
+  return client.raw.request(AGENT_METHODS.session_set_model, {
+    sessionId,
+    modelId,
+  }).pipe(Effect.ignoreCause);
+}
+
 export interface HermesAdapterOptions {
   readonly instanceId?: ProviderInstanceId;
   readonly environment?: NodeJS.ProcessEnv;
@@ -485,12 +497,11 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
 
         // Apply model selection if provided
         if (input.modelSelection?.model) {
-          yield* acpClient.agent
-            .setSessionModel({
-              sessionId: session.sessionId,
-              modelId: input.modelSelection.model,
-            })
-            .pipe(Effect.ignore);
+          yield* bestEffortHermesSetSessionModel(
+            acpClient,
+            session.sessionId,
+            input.modelSelection.model,
+          );
         }
 
         sessions.set(input.threadId, session);
@@ -533,12 +544,11 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
 
       // Apply model switch if requested
       if (input.modelSelection?.model) {
-        yield* session.client.agent
-          .setSessionModel({
-            sessionId: session.sessionId,
-            modelId: input.modelSelection.model,
-          })
-          .pipe(Effect.ignore);
+        yield* bestEffortHermesSetSessionModel(
+          session.client,
+          session.sessionId,
+          input.modelSelection.model,
+        );
       }
 
       const promptContent: ReadonlyArray<AcpSchema.ContentBlock> = input.input
@@ -561,6 +571,16 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
                   cause: new Error(String(cause)),
                 }),
             ),
+            Effect.catchDefect((defect: unknown) =>
+              Effect.fail(
+                new ProviderAdapterRequestError({
+                  provider: PROVIDER,
+                  method: "session/prompt",
+                  detail: defect instanceof Error ? defect.message : String(defect),
+                  cause: defect instanceof Error ? defect : new Error(String(defect)),
+                }),
+              ),
+            ),
           );
 
         const turnState =
@@ -577,7 +597,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
           payload: { state: turnState },
         });
       }).pipe(
-        Effect.mapError((err) =>
+        Effect.mapError((err: ProviderAdapterError) =>
           Effect.gen(function* () {
             const errBase = yield* makeEventBase(session, turnId);
             yield* Queue.offer(runtimeEventQueue, {
@@ -590,7 +610,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
             });
           }),
         ),
-        Effect.ignore,
+        Effect.ignoreCause,
         Effect.forkDetach,
       );
 
@@ -613,9 +633,9 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
         Effect.gen(function* () {
           yield* session.client.agent
             .cancel({ sessionId: session.sessionId })
-            .pipe(Effect.ignore);
+            .pipe(Effect.ignoreCause);
           if (session.activeTurnFiber) {
-            yield* Fiber.interrupt(session.activeTurnFiber).pipe(Effect.ignore);
+            yield* Fiber.interrupt(session.activeTurnFiber).pipe(Effect.ignoreCause);
             session.activeTurnFiber = undefined;
           }
         }),
