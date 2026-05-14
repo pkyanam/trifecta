@@ -57,11 +57,13 @@ import type { ProviderSnapshotSource } from "../builtInProviderCatalog.ts";
 
 const GEMINI_KIND = ProviderDriverKind.make("gemini");
 const HERMES_KIND = ProviderDriverKind.make("hermesAgent");
+const DEVIN_KIND = ProviderDriverKind.make("devinAgent");
 const ACP_REGISTRY_KIND = ProviderDriverKind.make("acpRegistry");
 
 const shouldStaggerAcpBootProbe = (instance: ProviderInstance): boolean =>
   instance.driverKind === GEMINI_KIND ||
   instance.driverKind === HERMES_KIND ||
+  instance.driverKind === DEVIN_KIND ||
   instance.driverKind === ACP_REGISTRY_KIND;
 
 const loadProviders = (
