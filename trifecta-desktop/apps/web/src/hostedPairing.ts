@@ -31,6 +31,28 @@ function originFromUrl(value: string): string | null {
   }
 }
 
+function isHostedDomain(url: URL, hostedUrl: string): boolean {
+  try {
+    const hosted = new URL(hostedUrl);
+
+    // Exact match (for custom preview / configured URLs)
+    if (url.hostname === hosted.hostname) {
+      return true;
+    }
+
+    // Canonical trifecta.belweave.* domains: allow any TLD and channel subdomains
+    const canonicalPattern = /^([a-z0-9-]+\.)?app\.trifecta\.belweave\.[a-z]+$/i;
+    if (canonicalPattern.test(url.hostname) && canonicalPattern.test(hosted.hostname)) {
+      return true;
+    }
+
+    // Subdomain match for custom domains (e.g. preview.example.com vs app.example.com)
+    return url.hostname.endsWith("." + hosted.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function isHostedStaticApp(url: URL = new URL(window.location.href)): boolean {
   if (configuredBackendUrl()) {
     return false;
@@ -40,8 +62,7 @@ export function isHostedStaticApp(url: URL = new URL(window.location.href)): boo
     return true;
   }
 
-  const hostedOrigin = originFromUrl(configuredHostedAppUrl());
-  return hostedOrigin !== null && url.origin === hostedOrigin;
+  return isHostedDomain(url, configuredHostedAppUrl());
 }
 
 export function readHostedPairingRequest(url: URL = new URL(window.location.href)) {

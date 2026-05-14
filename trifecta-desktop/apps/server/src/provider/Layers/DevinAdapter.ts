@@ -1,7 +1,7 @@
 /**
- * HermesAdapter — ACP stdio adapter for the Hermes provider.
+ * DevinAdapter — ACP stdio adapter for the Devin provider.
  *
- * Each session spawns a dedicated `hermes acp` subprocess. ACP `session/update`
+ * Each session spawns a dedicated `devin acp` subprocess. ACP `session/update`
  * notifications are mapped to canonical `ProviderRuntimeEvent`s and pushed onto
  * a shared queue consumed by `streamEvents`.
  *
@@ -9,7 +9,7 @@
  * flow: incoming `session/request_permission` pushes a `request.opened` event and
  * suspends until `respondToRequest` resolves the accompanying `Deferred`.
  *
- * @module provider/Layers/HermesAdapter
+ * @module provider/Layers/DevinAdapter
  */
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -28,7 +28,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import {
   type ApprovalRequestId,
   type CanonicalItemType,
-  type HermesSettings,
+  type DevinSettings,
   type ProviderApprovalDecision,
   type ProviderRuntimeEvent,
   type ProviderSession,
@@ -57,15 +57,15 @@ import {
   type ProviderAdapterError,
 } from "../Errors.ts";
 import {
-  decodeHermesInitializeResponse,
-  decodeHermesNewSessionResponse,
-} from "../hermes/HermesAcpWire.ts";
+  decodeDevinInitializeResponse,
+  decodeDevinNewSessionResponse,
+} from "../devin/DevinAcpWire.ts";
 import type { ProviderAdapterShape, ProviderThreadSnapshot } from "../Services/ProviderAdapter.ts";
 
-const PROVIDER = ProviderDriverKind.make("hermesAgent");
+const PROVIDER = ProviderDriverKind.make("devinAgent");
 
-/** `session/set_model` via transport `raw.request`: avoids RpcClient success/error decoding that can defect on Hermes. */
-function bestEffortHermesSetSessionModel(
+/** `session/set_model` via transport `raw.request`: avoids RpcClient success/error decoding that can defect on Devin. */
+function bestEffortDevinSetSessionModel(
   client: AcpClient.AcpClientShape,
   sessionId: string,
   modelId: string,
@@ -76,12 +76,12 @@ function bestEffortHermesSetSessionModel(
   }).pipe(Effect.ignoreCause);
 }
 
-export interface HermesAdapterOptions {
+export interface DevinAdapterOptions {
   readonly instanceId?: ProviderInstanceId;
   readonly environment?: NodeJS.ProcessEnv;
 }
 
-interface HermesAdapterSession {
+interface DevinAdapterSession {
   readonly threadId: ThreadId;
   readonly sessionId: string;
   readonly scope: Scope.Closeable;
@@ -99,13 +99,13 @@ interface HermesAdapterSession {
 const makeEventId = Effect.gen(function* () {
   const ms = yield* Clock.currentTimeMillis;
   const uuid = yield* Random.nextUUIDv4;
-  return EventId.make(`hermes-${ms}-${uuid.slice(0, 8)}`);
+  return EventId.make(`devin-${ms}-${uuid.slice(0, 8)}`);
 });
 
 const makeIsoNow = Effect.map(DateTime.now, DateTime.formatIso);
 
 const makeEventBase = Effect.fn("makeEventBase")(function* (
-  session: HermesAdapterSession,
+  session: DevinAdapterSession,
   turnId?: TurnId,
   itemId?: string,
   requestId?: string,
@@ -143,7 +143,7 @@ function toolCallKindToItemType(kind: string | undefined): CanonicalItemType {
 
 function mapAcpUpdate(
   notification: AcpSchema.SessionNotification,
-  session: HermesAdapterSession,
+  session: DevinAdapterSession,
   queue: Queue.Queue<ProviderRuntimeEvent>,
 ): Effect.Effect<void> {
   const turnId = session.currentTurnId;
@@ -266,15 +266,15 @@ function mapAcpUpdate(
   return Effect.void;
 }
 
-export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
-  hermesConfig: HermesSettings,
-  options?: HermesAdapterOptions,
+export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
+  devinConfig: DevinSettings,
+  options?: DevinAdapterOptions,
 ) {
-  const boundInstanceId = options?.instanceId ?? ProviderInstanceId.make("hermesAgent");
+  const boundInstanceId = options?.instanceId ?? ProviderInstanceId.make("devinAgent");
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const runtimeEventQueue = yield* Queue.unbounded<ProviderRuntimeEvent>();
-  const sessions = new Map<ThreadId, HermesAdapterSession>();
-  const binaryPath = hermesConfig.binaryPath || "hermes";
+  const sessions = new Map<ThreadId, DevinAdapterSession>();
+  const binaryPath = devinConfig.binaryPath || "devin";
   const processEnv = options?.environment ?? process.env;
 
   const requireSession = Effect.fn("requireSession")(function* (threadId: ThreadId) {
@@ -289,7 +289,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
   });
 
   const stopSessionInternal = Effect.fn("stopSessionInternal")(function* (
-    session: HermesAdapterSession,
+    session: DevinAdapterSession,
   ) {
     if (session.stopped) return;
     session.stopped = true;
@@ -343,7 +343,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
                 new ProviderAdapterProcessError({
                   provider: PROVIDER,
                   threadId: input.threadId,
-                  detail: `Failed to spawn hermes acp: ${cause.message}`,
+                  detail: `Failed to spawn devin acp: ${cause.message}`,
                   cause,
                 }),
             ),
@@ -385,7 +385,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
             ),
           );
 
-        yield* decodeHermesInitializeResponse(rawInitialize).pipe(
+        yield* decodeDevinInitializeResponse(rawInitialize).pipe(
           Effect.mapError(
             (e) =>
               new ProviderAdapterProcessError({
@@ -414,7 +414,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
           ),
         );
 
-        const sessionResponse = yield* decodeHermesNewSessionResponse(rawSession).pipe(
+        const sessionResponse = yield* decodeDevinNewSessionResponse(rawSession).pipe(
           Effect.mapError(
             (e) =>
               new ProviderAdapterProcessError({
@@ -426,7 +426,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
           ),
         );
 
-        const session: HermesAdapterSession = {
+        const session: DevinAdapterSession = {
           threadId: input.threadId,
           sessionId: sessionResponse.sessionId,
           scope: sessionScope,
@@ -449,7 +449,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
             const ms = yield* Clock.currentTimeMillis;
             const uuid = yield* Random.nextUUIDv4;
             const reqId = ApprovalRequestIdSchema.make(
-              `hermes-req-${ms}-${uuid.slice(0, 8)}`,
+              `devin-req-${ms}-${uuid.slice(0, 8)}`,
             );
             const deferred = yield* Deferred.make<ProviderApprovalDecision, never>();
             session.pendingRequests.set(reqId, deferred);
@@ -497,7 +497,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
 
         // Apply model selection if provided
         if (input.modelSelection?.model) {
-          yield* bestEffortHermesSetSessionModel(
+          yield* bestEffortDevinSetSessionModel(
             acpClient,
             session.sessionId,
             input.modelSelection.model,
@@ -532,7 +532,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
       const session = yield* requireSession(input.threadId);
       const ms = yield* Clock.currentTimeMillis;
       const uuid = yield* Random.nextUUIDv4;
-      const turnId = TurnIdSchema.make(`hermes-turn-${ms}-${uuid.slice(0, 8)}`);
+      const turnId = TurnIdSchema.make(`devin-turn-${ms}-${uuid.slice(0, 8)}`);
       session.currentTurnId = turnId;
 
       const startedBase = yield* makeEventBase(session, turnId);
@@ -544,7 +544,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
 
       // Apply model switch if requested
       if (input.modelSelection?.model) {
-        yield* bestEffortHermesSetSessionModel(
+        yield* bestEffortDevinSetSessionModel(
           session.client,
           session.sessionId,
           input.modelSelection.model,
@@ -604,7 +604,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
               ...errBase,
               type: "runtime.error",
               payload: {
-                message: err.message ?? "Hermes ACP turn error",
+                message: err.message ?? "Devin ACP turn error",
                 class: "provider_error" as const,
               },
             });

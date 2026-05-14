@@ -55,6 +55,15 @@ import type { ProviderInstance } from "../ProviderDriver.ts";
 import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMaintenance.ts";
 import type { ProviderSnapshotSource } from "../builtInProviderCatalog.ts";
 
+const GEMINI_KIND = ProviderDriverKind.make("gemini");
+const HERMES_KIND = ProviderDriverKind.make("hermesAgent");
+const ACP_REGISTRY_KIND = ProviderDriverKind.make("acpRegistry");
+
+const shouldStaggerAcpBootProbe = (instance: ProviderInstance): boolean =>
+  instance.driverKind === GEMINI_KIND ||
+  instance.driverKind === HERMES_KIND ||
+  instance.driverKind === ACP_REGISTRY_KIND;
+
 const loadProviders = (
   providerSources: ReadonlyArray<ProviderSnapshotSource>,
 ): Effect.Effect<ReadonlyArray<ServerProvider>> =>
@@ -77,6 +86,35 @@ const makeManualProviderMaintenanceCapabilities = (provider: ProviderDriverKind)
 
 const hasModelCapabilities = (model: ServerProvider["models"][number]): boolean =>
   (model.capabilities?.optionDescriptors?.length ?? 0) > 0;
+
+const isUncheckedPendingSnapshot = (provider: ServerProvider): boolean =>
+  provider.enabled &&
+  provider.status === "warning" &&
+  (provider.message?.includes("has not been checked in this session yet") ?? false);
+
+const isTransientRefreshFailure = (provider: ServerProvider): boolean =>
+  provider.enabled &&
+  provider.status === "error" &&
+  (provider.message?.toLowerCase().includes("timed out") ?? false);
+
+const preservePreviousProbeResult = (
+  previousProvider: ServerProvider,
+  nextProvider: ServerProvider,
+): ServerProvider => {
+  const { message: _nextMessage, ...nextWithoutMessage } = nextProvider;
+  const preserved: ServerProvider = {
+    ...nextWithoutMessage,
+    installed: previousProvider.installed,
+    version: previousProvider.version,
+    status: previousProvider.status,
+    auth: previousProvider.auth,
+    checkedAt: nextProvider.checkedAt,
+    models: mergeProviderModels(previousProvider.models, nextProvider.models),
+    slashCommands: previousProvider.slashCommands,
+    skills: previousProvider.skills,
+  };
+  return previousProvider.message ? { ...preserved, message: previousProvider.message } : preserved;
+};
 
 const mergeProviderModels = (
   previousModels: ReadonlyArray<ServerProvider["models"][number]>,
@@ -107,6 +145,10 @@ export const mergeProviderSnapshot = (
 ): ServerProvider =>
   !previousProvider
     ? nextProvider
+    : previousProvider.enabled === nextProvider.enabled &&
+        (isUncheckedPendingSnapshot(nextProvider) ||
+          (previousProvider.status === "ready" && isTransientRefreshFailure(nextProvider)))
+      ? preservePreviousProbeResult(previousProvider, nextProvider)
     : {
         ...nextProvider,
         models: mergeProviderModels(previousProvider.models, nextProvider.models),
@@ -442,7 +484,7 @@ export const ProviderRegistryLive = Layer.effect(
     const refreshAll = Effect.fn("refreshAll")(function* () {
       const sources = yield* getLiveSources;
       return yield* Effect.forEach(sources, (source) => refreshOneSource(source), {
-        concurrency: "unbounded",
+        concurrency: 2,
         discard: true,
       }).pipe(Effect.andThen(Ref.get(providersRef)));
     });
@@ -543,10 +585,9 @@ export const ProviderRegistryLive = Layer.effect(
         }
 
         // Fork long-lived subscriptions to each new/rebuilt instance's
-        // change stream BEFORE kicking off refreshes — if the driver's
-        // own initial probe (line 140 in `makeManagedServerProvider`)
-        // wins the refreshSemaphore race, its PubSub publish must land
-        // in an active subscriber or the result is dropped.
+        // change stream BEFORE kicking off refreshes — if a driver publishes
+        // via `streamChanges` before `refreshOneSource` returns, that update
+        // must land in an active subscriber.
         for (const [, instance] of newlyAdded) {
           const source = buildSnapshotSource(instance);
           yield* Stream.runForEach(source.streamChanges, (provider) =>
@@ -554,16 +595,24 @@ export const ProviderRegistryLive = Layer.effect(
           ).pipe(Effect.forkScoped);
         }
 
-        // Force-refresh every new/rebuilt instance in parallel and wait
-        // for them all to complete. The refresh's result is piped
-        // directly into `syncProvider`, so `providersRef` is populated
-        // deterministically by the time this block returns — regardless
-        // of PubSub subscription timing. Failures are logged and
-        // swallowed so one bad driver can't wedge the whole registry.
+        // Force-refresh every new/rebuilt instance in the background.
+        // Slow CLI probes must not block server readiness; pending/cached
+        // fallback snapshots are already in providersRef and refreshes publish
+        // their results through syncProvider when they finish.
+        //
+        // Stagger slow ACP agent probes (stdio handshakes, cold CLIs) so they do
+        // not contend with the whole provider set at desktop boot — that
+        // contention was routinely tripping Gemini/Hermes timeouts and left
+        // the UI on "not checked yet" until a manual Settings refresh.
         yield* Effect.forEach(
           newlyAdded,
           ([, instance]) =>
-            refreshOneSource(buildSnapshotSource(instance)).pipe(Effect.ignoreCause({ log: true })),
+            Effect.gen(function* () {
+              if (shouldStaggerAcpBootProbe(instance)) {
+                yield* Effect.sleep("4 seconds");
+              }
+              yield* refreshOneSource(buildSnapshotSource(instance));
+            }).pipe(Effect.ignoreCause({ log: true }), Effect.forkScoped),
           { concurrency: "unbounded", discard: true },
         );
         yield* upsertProviders(unavailableProviders, {

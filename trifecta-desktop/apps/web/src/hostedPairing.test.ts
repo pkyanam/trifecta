@@ -91,4 +91,16 @@ describe("hostedPairing", () => {
     vi.stubEnv("VITE_HTTP_URL", "https://backend.example.com");
     expect(isHostedStaticApp(new URL("https://nightly.app.trifecta.belweave.ai/"))).toBe(false);
   });
+
+  it("detects any TLD for canonical trifecta domains (e.g. .com and .ai)", () => {
+    vi.stubEnv("VITE_HOSTED_APP_URL", "");
+    vi.stubEnv("VITE_HTTP_URL", "");
+    vi.stubEnv("VITE_WS_URL", "");
+
+    expect(isHostedStaticApp(new URL("https://app.trifecta.belweave.ai/"))).toBe(true);
+    expect(isHostedStaticApp(new URL("https://app.trifecta.belweave.com/"))).toBe(true);
+    expect(isHostedStaticApp(new URL("https://latest.app.trifecta.belweave.com/"))).toBe(true);
+    expect(isHostedStaticApp(new URL("https://nightly.app.trifecta.belweave.ai/"))).toBe(true);
+    expect(isHostedStaticApp(new URL("https://backend.example.com/"))).toBe(false);
+  });
 });

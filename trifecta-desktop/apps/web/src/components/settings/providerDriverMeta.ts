@@ -1,12 +1,16 @@
 import {
+  AcpRegistrySettings,
   ClaudeSettings,
   CodexSettings,
   CursorSettings,
+  DevinSettings,
+  GeminiSettings,
+  HermesSettings,
   OpenCodeSettings,
   ProviderDriverKind,
 } from "@t3tools/contracts";
 import type * as Schema from "effect/Schema";
-import { ClaudeAI, CursorIcon, type Icon, OpenAI, OpenCodeIcon } from "../Icons";
+import { ACPRegistryIcon, ClaudeAI, CursorIcon, DevinIcon, Gemini, HermesIcon, type Icon, OpenAI, OpenCodeIcon } from "../Icons";
 
 type ProviderSettingsSchema = {
   readonly fields: Readonly<Record<string, Schema.Top>>;
@@ -58,6 +62,30 @@ export const PROVIDER_CLIENT_DEFINITIONS: readonly ProviderClientDefinition[] = 
     label: "OpenCode",
     icon: OpenCodeIcon,
     settingsSchema: OpenCodeSettings,
+  },
+  {
+    value: ProviderDriverKind.make("hermesAgent"),
+    label: "Hermes",
+    icon: HermesIcon,
+    settingsSchema: HermesSettings,
+  },
+  {
+    value: ProviderDriverKind.make("devinAgent"),
+    label: "Devin",
+    icon: DevinIcon,
+    settingsSchema: DevinSettings,
+  },
+  {
+    value: ProviderDriverKind.make("gemini"),
+    label: "Gemini",
+    icon: Gemini,
+    settingsSchema: GeminiSettings,
+  },
+  {
+    value: ProviderDriverKind.make("acpRegistry"),
+    label: "ACP Registry",
+    icon: ACPRegistryIcon,
+    settingsSchema: AcpRegistrySettings,
   },
 ];
 

@@ -695,3 +695,14 @@ export const HermesIcon: Icon = ({ className, ...props }) => (
     <image href="/hermes-logo.jpg" x="0" y="0" width="100" height="100" />
   </svg>
 );
+
+export const DevinIcon: Icon = ({ className, ...props }) => (
+  <svg
+    {...props}
+    className={cn("overflow-hidden rounded-sm", className)}
+    viewBox="0 0 100 100"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <image href="/DevinLogoSquare.png" x="0" y="0" width="100" height="100" />
+  </svg>
+);
