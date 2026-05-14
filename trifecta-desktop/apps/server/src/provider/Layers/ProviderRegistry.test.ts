@@ -42,6 +42,7 @@ import {
   ProviderRegistryLive,
   selectProvidersByKind,
 } from "./ProviderRegistry.ts";
+import { ProviderSessionDirectoryNoopLive } from "./ProviderSessionDirectoryNoop.ts";
 import { ServerConfig } from "../../config.ts";
 import { ServerSettingsService, type ServerSettingsShape } from "../../serverSettings.ts";
 import { readProviderStatusCache, resolveProviderStatusCachePath } from "../providerStatusCache.ts";
@@ -298,7 +299,14 @@ function makeMutableServerSettingsService(
   });
 }
 
-it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), TestHttpClientLive))(
+it.layer(
+  Layer.mergeAll(
+    NodeServices.layer,
+    ServerSettingsService.layerTest(),
+    TestHttpClientLive,
+    ProviderSessionDirectoryNoopLive,
+  ),
+)(
   "ProviderRegistry",
   (it) => {
     describe("checkCodexProviderStatus", () => {
@@ -545,6 +553,74 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
         ]);
       });
 
+      it("keeps a ready provider snapshot when a refresh times out", () => {
+        const previousProvider = {
+          instanceId: ProviderInstanceId.make("gemini"),
+          driver: ProviderDriverKind.make("gemini"),
+          status: "ready",
+          enabled: true,
+          installed: true,
+          auth: { status: "authenticated" },
+          checkedAt: "2026-04-14T00:00:00.000Z",
+          version: "0.42.0",
+          models: [
+            {
+              slug: "gemini-3-flash-preview",
+              name: "gemini-3-flash-preview",
+              isCustom: false,
+              capabilities: null,
+            },
+          ],
+          slashCommands: [],
+          skills: [],
+        } as const satisfies ServerProvider;
+        const timedOutProvider = {
+          ...previousProvider,
+          status: "error",
+          auth: { status: "unknown" },
+          checkedAt: "2026-04-14T00:01:00.000Z",
+          version: null,
+          message: "Timed out while checking Gemini ACP provider status.",
+          models: [],
+        } satisfies ServerProvider;
+
+        const merged = mergeProviderSnapshot(previousProvider, timedOutProvider);
+        assert.strictEqual(merged.status, "ready");
+        assert.strictEqual(merged.version, "0.42.0");
+        assert.deepStrictEqual(merged.models, previousProvider.models);
+        assert.strictEqual(merged.checkedAt, timedOutProvider.checkedAt);
+      });
+
+      it("keeps a cached provider snapshot when startup fallback is still pending", () => {
+        const previousProvider = {
+          instanceId: ProviderInstanceId.make("gemini"),
+          driver: ProviderDriverKind.make("gemini"),
+          status: "ready",
+          enabled: true,
+          installed: true,
+          auth: { status: "authenticated" },
+          checkedAt: "2026-04-14T00:00:00.000Z",
+          version: "0.42.0",
+          models: [],
+          slashCommands: [],
+          skills: [],
+        } as const satisfies ServerProvider;
+        const pendingProvider = {
+          ...previousProvider,
+          status: "warning",
+          installed: false,
+          auth: { status: "unknown" },
+          checkedAt: "2026-04-14T00:01:00.000Z",
+          version: null,
+          message: "Gemini provider status has not been checked in this session yet.",
+        } satisfies ServerProvider;
+
+        const merged = mergeProviderSnapshot(previousProvider, pendingProvider);
+        assert.strictEqual(merged.status, "ready");
+        assert.strictEqual(merged.version, "0.42.0");
+        assert.strictEqual(merged.checkedAt, pendingProvider.checkedAt);
+      });
+
       it("fills missing capabilities from the previous provider snapshot", () => {
         const previousProvider = {
           instanceId: ProviderInstanceId.make("cursor"),
@@ -729,6 +805,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
           yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
           const runtimeServices = yield* Layer.build(
             ProviderRegistryLive.pipe(
+            Layer.provideMerge(ProviderSessionDirectoryNoopLive),
               Layer.provideMerge(instanceRegistryLayer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
@@ -823,6 +900,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
           yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
           const runtimeServices = yield* Layer.build(
             ProviderRegistryLive.pipe(
+            Layer.provideMerge(ProviderSessionDirectoryNoopLive),
               Layer.provideMerge(instanceRegistryLayer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
@@ -927,6 +1005,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
           yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
           const runtimeServices = yield* Layer.build(
             ProviderRegistryLive.pipe(
+            Layer.provideMerge(ProviderSessionDirectoryNoopLive),
               Layer.provideMerge(instanceRegistryLayer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
@@ -1019,6 +1098,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
           const scope = yield* Scope.make();
           yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
           const providerRegistryLayer = ProviderRegistryLive.pipe(
+            Layer.provideMerge(ProviderSessionDirectoryNoopLive),
             Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
             Layer.provideMerge(Layer.succeed(ServerSettingsService, serverSettings)),
             Layer.provideMerge(
@@ -1041,10 +1121,16 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
 
           yield* Effect.gen(function* () {
             const registry = yield* ProviderRegistry;
-            const providers = yield* registry.getProviders;
-            const codexPersonal = providers.find(
+            let providers = yield* registry.getProviders;
+            let codexPersonal = providers.find(
               (provider) => provider.instanceId === "codex_personal",
             );
+            for (let attempt = 0; attempt < 120 && codexPersonal?.status === "warning"; attempt += 1) {
+              yield* TestClock.adjust("50 millis");
+              yield* Effect.yieldNow;
+              providers = yield* registry.getProviders;
+              codexPersonal = providers.find((provider) => provider.instanceId === "codex_personal");
+            }
             assert.notStrictEqual(
               codexPersonal,
               undefined,
@@ -1094,6 +1180,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
           const scope = yield* Scope.make();
           yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
           const providerRegistryLayer = ProviderRegistryLive.pipe(
+            Layer.provideMerge(ProviderSessionDirectoryNoopLive),
             Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
             Layer.provideMerge(Layer.succeed(ServerSettingsService, serverSettings)),
             Layer.provideMerge(
@@ -1116,16 +1203,21 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
 
           yield* Effect.gen(function* () {
             const registry = yield* ProviderRegistry;
-            // Boot-time probe: the default codex instance is enabled with
-            // `firstMissing`, so the real spawner yields ENOENT and the
-            // snapshot should be `status: "error"`. What *distinguishes*
-            // the two probe runs is `checkedAt` — each probe stamps a
-            // fresh DateTime, so we capture it and assert it advances
-            // after the settings mutation.
-            const initialProviders = yield* registry.getProviders;
-            const initialCodex = initialProviders.find(
-              (provider) => provider.instanceId === "codex",
-            );
+            // Boot-time probe runs in a background fibre; poll until we leave the
+            // pending snapshot (warning / not checked yet) or time out.
+            const initialCodex = yield* Effect.gen(function* () {
+              for (let attempts = 0; attempts < 120; attempts += 1) {
+                const providers = yield* registry.getProviders;
+                const codex = providers.find((provider) => provider.instanceId === "codex");
+                if (codex !== undefined && codex.status !== "warning") {
+                  return codex;
+                }
+                yield* TestClock.adjust("50 millis");
+                yield* Effect.yieldNow;
+              }
+              const providers = yield* registry.getProviders;
+              return providers.find((provider) => provider.instanceId === "codex");
+            });
             assert.strictEqual(initialCodex?.status, "error");
             assert.strictEqual(initialCodex?.installed, false);
             const initialCheckedAt = initialCodex?.checkedAt;
@@ -1197,6 +1289,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
           const scope = yield* Scope.make();
           yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
           const providerRegistryLayer = ProviderRegistryLive.pipe(
+            Layer.provideMerge(ProviderSessionDirectoryNoopLive),
             Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
             Layer.provideMerge(Layer.succeed(ServerSettingsService, serverSettings)),
             Layer.provideMerge(
@@ -1248,6 +1341,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
             const scope = yield* Scope.make();
             yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
             const providerRegistryLayer = ProviderRegistryLive.pipe(
+            Layer.provideMerge(ProviderSessionDirectoryNoopLive),
               Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
               Layer.provideMerge(Layer.succeed(ServerSettingsService, serverSettings)),
               Layer.provideMerge(
@@ -1297,13 +1391,15 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest(), T
               );
 
               assert.deepStrictEqual(providers.map((provider) => provider.instanceId).toSorted(), [
+                "acpRegistry",
                 "claudeAgent",
                 "codex",
                 "cursor",
                 "devinAgent",
+                "gemini",
                 "hermesAgent",
                 "opencode",
-              ]);
+              ].toSorted());
               assert.strictEqual(cursorProvider?.enabled, false);
               assert.strictEqual(cursorProvider?.status, "disabled");
               assert.strictEqual(

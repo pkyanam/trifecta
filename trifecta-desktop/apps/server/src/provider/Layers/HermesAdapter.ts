@@ -524,7 +524,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
           createdAt: now,
           updatedAt: now,
         } satisfies ProviderSession;
-      }),
+      }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)),
     );
 
   const sendTurn: ProviderAdapterShape<ProviderAdapterError>["sendTurn"] = Effect.fn("sendTurn")(

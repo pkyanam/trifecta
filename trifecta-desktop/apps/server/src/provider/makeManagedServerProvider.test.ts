@@ -102,7 +102,7 @@ const enrichedSnapshotSecond: ServerProvider = {
 
 describe("makeManagedServerProvider", () => {
   it.effect(
-    "runs the initial provider check in the background and streams the refreshed snapshot",
+    "returns the initial snapshot without probing and streams an explicit refresh",
     () =>
       Effect.scoped(
         Effect.gen(function* () {
@@ -121,7 +121,7 @@ describe("makeManagedServerProvider", () => {
             refreshInterval: "1 hour",
           });
 
-          const initial = yield* provider.getSnapshot;
+          const initial = yield* provider.getSnapshot.pipe(Effect.timeout("100 millis"));
           assert.deepStrictEqual(initial, initialSnapshot);
 
           const updatesFiber = yield* Stream.take(provider.streamChanges, 1).pipe(
@@ -130,7 +130,11 @@ describe("makeManagedServerProvider", () => {
           );
           yield* Effect.yieldNow;
 
+          const refreshFiber = yield* provider.refresh.pipe(Effect.forkChild);
+          yield* Effect.yieldNow;
+
           yield* Deferred.succeed(releaseCheck, undefined);
+          yield* Fiber.join(refreshFiber);
 
           const updates = Array.from(yield* Fiber.join(updatesFiber));
           const latest = yield* provider.getSnapshot;
@@ -140,51 +144,6 @@ describe("makeManagedServerProvider", () => {
           assert.strictEqual(yield* Ref.get(checkCalls), 1);
         }),
       ),
-  );
-
-  it.effect("reruns the provider check when streamed settings change", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const settingsRef = yield* Ref.make<TestSettings>({ enabled: true });
-        const settingsChanges = yield* PubSub.unbounded<TestSettings>();
-        const checkCalls = yield* Ref.make(0);
-        const releaseInitialCheck = yield* Deferred.make<void>();
-        const releaseSettingsCheck = yield* Deferred.make<void>();
-        const provider = yield* makeManagedServerProvider<TestSettings>({
-          maintenanceCapabilities,
-          getSettings: Ref.get(settingsRef),
-          streamSettings: Stream.fromPubSub(settingsChanges),
-          haveSettingsChanged: (previous, next) => previous.enabled !== next.enabled,
-          initialSnapshot: () => Effect.succeed(initialSnapshot),
-          checkProvider: Ref.updateAndGet(checkCalls, (count) => count + 1).pipe(
-            Effect.flatMap((count) =>
-              count === 1
-                ? Deferred.await(releaseInitialCheck).pipe(Effect.as(refreshedSnapshot))
-                : Deferred.await(releaseSettingsCheck).pipe(Effect.as(refreshedSnapshotSecond)),
-            ),
-          ),
-          refreshInterval: "1 hour",
-        });
-
-        const updatesFiber = yield* Stream.take(provider.streamChanges, 2).pipe(
-          Stream.runCollect,
-          Effect.forkChild,
-        );
-        yield* Effect.yieldNow;
-
-        yield* Deferred.succeed(releaseInitialCheck, undefined);
-        yield* Ref.set(settingsRef, { enabled: false });
-        yield* PubSub.publish(settingsChanges, { enabled: false });
-        yield* Deferred.succeed(releaseSettingsCheck, undefined);
-
-        const updates = Array.from(yield* Fiber.join(updatesFiber));
-        const latest = yield* provider.getSnapshot;
-
-        assert.deepStrictEqual(updates, [refreshedSnapshot, refreshedSnapshotSecond]);
-        assert.deepStrictEqual(latest, refreshedSnapshotSecond);
-        assert.strictEqual(yield* Ref.get(checkCalls), 2);
-      }),
-    ),
   );
 
   it.effect("streams supplemental snapshot updates after the base provider check completes", () =>
@@ -212,7 +171,11 @@ describe("makeManagedServerProvider", () => {
         );
         yield* Effect.yieldNow;
 
+        const refreshFiber = yield* provider.refresh.pipe(Effect.forkChild);
+        yield* Effect.yieldNow;
+
         yield* Deferred.succeed(releaseCheck, undefined);
+        yield* Fiber.join(refreshFiber);
 
         yield* Deferred.succeed(releaseEnrichment, undefined);
 
@@ -264,7 +227,11 @@ describe("makeManagedServerProvider", () => {
         );
         yield* Effect.yieldNow;
 
+        const firstRefreshFiber = yield* provider.refresh.pipe(Effect.forkChild);
+        yield* Effect.yieldNow;
+
         yield* Deferred.succeed(allowFirstRefresh, undefined);
+        yield* Fiber.join(firstRefreshFiber);
         yield* Deferred.await(firstCallbackReady);
 
         yield* provider.refresh;

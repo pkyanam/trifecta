@@ -26,6 +26,8 @@ import { CursorDriver, type CursorDriverEnv } from "./Drivers/CursorDriver.ts";
 import { HermesDriver, type HermesDriverEnv } from "./Drivers/HermesDriver.ts";
 import { DevinDriver, type DevinDriverEnv } from "./Drivers/DevinDriver.ts";
 import { OpenCodeDriver, type OpenCodeDriverEnv } from "./Drivers/OpenCodeDriver.ts";
+import { AcpRegistryDriver, type AcpRegistryDriverEnv } from "./Drivers/AcpRegistryDriver.ts";
+import { GeminiDriver, type GeminiDriverEnv } from "./Drivers/GeminiDriver.ts";
 import type { AnyProviderDriver } from "./ProviderDriver.ts";
 
 /**
@@ -39,7 +41,9 @@ export type BuiltInDriversEnv =
   | CursorDriverEnv
   | HermesDriverEnv
   | DevinDriverEnv
-  | OpenCodeDriverEnv;
+  | OpenCodeDriverEnv
+  | AcpRegistryDriverEnv
+  | GeminiDriverEnv;
 
 /**
  * Ordered list of built-in drivers. Order matters only for tie-breaking in
@@ -49,8 +53,10 @@ export type BuiltInDriversEnv =
 export const BUILT_IN_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv>> = [
   CodexDriver,
   ClaudeDriver,
+  GeminiDriver,
   CursorDriver,
   HermesDriver,
   DevinDriver,
   OpenCodeDriver,
+  AcpRegistryDriver,
 ];

@@ -377,6 +377,90 @@ export const DevinSettings = makeProviderSettingsSchema(
 );
 export type DevinSettings = typeof DevinSettings.Type;
 
+export const GeminiSettings = makeProviderSettingsSchema(
+  {
+    enabled: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(false)),
+      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
+    ),
+    binaryPath: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Gemini CLI path",
+        description:
+          "Optional override. By default Trifecta runs the `gemini` CLI on your PATH (e.g. `brew install gemini` or `npm i -g @google/gemini-cli`). With **Headless prompts** off, Trifecta uses `gemini --acp` (ACP stdio). With **Headless prompts** on, Trifecta uses `gemini -p …` instead. Set this to an absolute path or another executable name if your install is not on PATH.",
+        providerSettingsForm: {
+          control: "text",
+          placeholder: "/opt/homebrew/bin/gemini",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+    apiKey: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "API key",
+        description:
+          "Optional Gemini API key (sets GEMINI_API_KEY). Leave blank so the CLI uses its default credentials (browser OAuth, existing `gemini` login, etc.).",
+        providerSettingsForm: {
+          control: "password",
+          placeholder: "AIza…",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+    useHeadlessPromptTransport: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(true)),
+      Schema.annotateKey({
+        title: "Headless prompts (-p)",
+        description:
+          "Run the Gemini CLI in headless mode (`gemini -p …`). This is the default because Gemini's ACP prompt transport can fail on follow-up turns. Trifecta starts each chat with a stable session id (`--session-id`), resolves that UUID with `gemini --list-sessions`, and continues with Gemini CLI's documented numeric resume form. Streaming is coarser (one reply blob per turn) and tools behave like the CLI, not Trifecta’s ACP path.",
+        providerSettingsForm: {
+          control: "switch",
+        },
+      }),
+    ),
+  },
+  { order: ["useHeadlessPromptTransport", "binaryPath", "apiKey"] },
+);
+export type GeminiSettings = typeof GeminiSettings.Type;
+
+export const AcpRegistrySettings = makeProviderSettingsSchema(
+  {
+    enabled: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(false)),
+      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
+    ),
+    agentId: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Agent ID",
+        description: "Registry agent identifier (e.g. cline, amp-acp). Used for display only.",
+        providerSettingsForm: { placeholder: "cline", clearWhenEmpty: "omit" },
+      }),
+    ),
+    command: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Command",
+        description:
+          "Executable to launch the agent (e.g. `gemini`, `uvx`, full path to a CLI, or `npx` for package runners).",
+        providerSettingsForm: { placeholder: "gemini", clearWhenEmpty: "omit" },
+      }),
+    ),
+    commandArgs: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Arguments",
+        description: "Space-separated arguments passed to the command.",
+        providerSettingsForm: { placeholder: "cline@latest --acp", clearWhenEmpty: "omit" },
+      }),
+    ),
+  },
+  { order: ["agentId", "command", "commandArgs"] },
+);
+export type AcpRegistrySettings = typeof AcpRegistrySettings.Type;
+
 export const ObservabilitySettings = Schema.Struct({
   otlpTracesUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   otlpMetricsUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
@@ -418,6 +502,8 @@ export const ServerSettings = Schema.Struct({
     opencode: OpenCodeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     hermesAgent: HermesSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     devinAgent: DevinSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+    gemini: GeminiSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+    acpRegistry: AcpRegistrySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   }).pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   // New driver-agnostic instance map. Keyed by `ProviderInstanceId`; values
   // are `ProviderInstanceConfig` envelopes. The driver-specific config blob
@@ -503,6 +589,20 @@ const DevinSettingsPatch = Schema.Struct({
   binaryPath: Schema.optionalKey(TrimmedString),
 });
 
+const GeminiSettingsPatch = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  binaryPath: Schema.optionalKey(TrimmedString),
+  apiKey: Schema.optionalKey(TrimmedString),
+  useHeadlessPromptTransport: Schema.optionalKey(Schema.Boolean),
+});
+
+const AcpRegistrySettingsPatch = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  agentId: Schema.optionalKey(TrimmedString),
+  command: Schema.optionalKey(TrimmedString),
+  commandArgs: Schema.optionalKey(TrimmedString),
+});
+
 export const ServerSettingsPatch = Schema.Struct({
   // Server settings
   enableAssistantStreaming: Schema.optionalKey(Schema.Boolean),
@@ -524,6 +624,8 @@ export const ServerSettingsPatch = Schema.Struct({
       opencode: Schema.optionalKey(OpenCodeSettingsPatch),
       hermesAgent: Schema.optionalKey(HermesSettingsPatch),
       devinAgent: Schema.optionalKey(DevinSettingsPatch),
+      gemini: Schema.optionalKey(GeminiSettingsPatch),
+      acpRegistry: Schema.optionalKey(AcpRegistrySettingsPatch),
     }),
   ),
   // Whole-map replacement for the new instance config. Patching individual

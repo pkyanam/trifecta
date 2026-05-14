@@ -143,7 +143,7 @@ export const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderDriverKind, strin
   [CURSOR_DRIVER_KIND]: "auto",
   [OPENCODE_DRIVER_KIND]: "openai/gpt-5",
   [HERMES_DRIVER_KIND]: "hermes",
-  [DEVIN_DRIVER_KIND]: "devin",
+  [DEVIN_DRIVER_KIND]: "swe-1-6-slow",
 };
 
 /** Per-provider text generation model defaults. */
@@ -205,4 +205,5 @@ export const PROVIDER_DISPLAY_NAMES: Partial<Record<ProviderDriverKind, string>>
   [CURSOR_DRIVER_KIND]: "Cursor",
   [OPENCODE_DRIVER_KIND]: "OpenCode",
   [HERMES_DRIVER_KIND]: "Hermes",
+  [DEVIN_DRIVER_KIND]: "Devin",
 };

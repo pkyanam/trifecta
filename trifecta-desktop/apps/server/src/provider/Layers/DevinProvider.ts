@@ -5,6 +5,11 @@
  * and extracting the model list from the session response. The subprocess is
  * killed when the probe scope closes.
  *
+ * Devin reports models inside `configOptions` rather than the standard ACP
+ * `models.availableModels` field, so DevinAcpWire.ts normalizes that first.
+ * Version is also fixed: Devin ACP returns "0.0.0-dev" for agentInfo.version,
+ * so we fall back to `devin version` via a short-lived subprocess.
+ *
  * @module provider/Layers/DevinProvider
  */
 import * as Data from "effect/Data";
@@ -21,6 +26,8 @@ import { ServerSettingsError } from "@t3tools/contracts";
 
 import * as AcpClient from "effect-acp/client";
 import { AGENT_METHODS } from "effect-acp/schema";
+
+import { collectUint8StreamText } from "../../stream/collectUint8StreamText.ts";
 
 import {
   AUTH_PROBE_TIMEOUT_MS,
@@ -41,6 +48,11 @@ const DEVIN_PRESENTATION = {
 class DevinAcpProbeError extends Data.TaggedError("DevinAcpProbeError")<{
   readonly message: string;
 }> {}
+
+function parseDevinVersionLine(output: string): string | undefined {
+  const match = output.trim().match(/^devin\s+([\w.\-+]+)/);
+  return match?.[1];
+}
 
 export interface DevinProviderSnapshot {
   readonly models: ReadonlyArray<ServerProviderModel>;
@@ -139,7 +151,42 @@ const probeDevinProvider = Effect.fn("probeDevinProvider")(function* (input: {
       capabilities: null,
     }));
 
-    const version = initialized.agentInfo?.version ?? undefined;
+    // Devin ACP hardcodes agentInfo.version to "0.0.0-dev".
+    // Fall back to `devin version` via a short-lived subprocess for the real version.
+    let version = initialized.agentInfo?.version ?? undefined;
+    if (!version || version === "0.0.0-dev") {
+      version = yield* Effect.gen(function* () {
+        const child = yield* spawner.spawn(
+          ChildProcess.make(input.binaryPath || "devin", ["version"], {
+            cwd: input.cwd,
+            env: input.environment ?? process.env,
+            shell: process.platform === "win32",
+          }),
+        );
+        const [stdout] = yield* Effect.all(
+          [
+            collectUint8StreamText({
+              stream: child.stdout,
+              maxBytes: 4096,
+              truncatedMarker: "",
+            }),
+            collectUint8StreamText({
+              stream: child.stderr,
+              maxBytes: 1024,
+              truncatedMarker: "",
+            }),
+            child.exitCode,
+          ],
+          { concurrency: "unbounded" },
+        );
+        return parseDevinVersionLine(stdout.text);
+      }).pipe(
+        Effect.scoped,
+        Effect.timeout(5_000),
+        Effect.orElseSucceed(() => undefined),
+      );
+    }
+
     return { models, version };
   }).pipe(Effect.provide(acpLayer));
 });

@@ -138,6 +138,18 @@ function createBaseServerConfig(): ServerConfig {
           enabled: true,
           binaryPath: "",
         },
+        gemini: {
+          enabled: true,
+          binaryPath: "",
+          apiKey: "",
+          useHeadlessPromptTransport: true,
+        },
+        acpRegistry: {
+          enabled: true,
+          agentId: "",
+          command: "",
+          commandArgs: "",
+        },
       },
     },
   };

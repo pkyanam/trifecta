@@ -13,7 +13,7 @@ import { useSettings, useUpdateSettings } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { normalizeProviderAccentColor } from "../../providerInstances";
 import { Button } from "../ui/button";
-import { ACPRegistryIcon, Gemini, GithubCopilotIcon, PiAgentIcon, type Icon } from "../Icons";
+import { GithubCopilotIcon, PiAgentIcon, type Icon } from "../Icons";
 import {
   Dialog,
   DialogDescription,
@@ -28,6 +28,7 @@ import { RadioGroup } from "../ui/radio-group";
 import { toastManager } from "../ui/toast";
 import { DRIVER_OPTION_BY_VALUE, DRIVER_OPTIONS } from "./providerDriverMeta";
 import { ProviderSettingsForm, deriveProviderSettingsFields } from "./ProviderSettingsForm";
+import { AcpRegistryAgentPicker } from "./AcpRegistryAgentPicker";
 import { AnimatedHeight } from "../AnimatedHeight";
 
 const PROVIDER_ACCENT_SWATCHES = [
@@ -75,16 +76,6 @@ const COMING_SOON_DRIVER_OPTIONS: readonly ComingSoonDriverOption[] = [
     value: ProviderDriverKind.make("githubCopilot"),
     label: "Github Copilot",
     icon: GithubCopilotIcon,
-  },
-  {
-    value: ProviderDriverKind.make("gemini"),
-    label: "Gemini",
-    icon: Gemini,
-  },
-  {
-    value: ProviderDriverKind.make("acpRegistry"),
-    label: "ACP Registry",
-    icon: ACPRegistryIcon,
   },
   {
     value: ProviderDriverKind.make("piAgent"),
@@ -442,6 +433,23 @@ export function AddProviderInstanceDialog({ open, onOpenChange }: AddProviderIns
 
               {driverSettingsFields.length > 0 ? (
                 <div className={cn("grid gap-4", wizardStep !== 2 && "hidden")}>
+                  {driver === ProviderDriverKind.make("acpRegistry") ? (
+                    <AcpRegistryAgentPicker
+                      selectedAgentId={
+                        typeof configDraft["agentId"] === "string"
+                          ? configDraft["agentId"]
+                          : undefined
+                      }
+                      onSelect={(selection) => {
+                        setConfigDraft({
+                          ...configDraft,
+                          agentId: selection.agentId,
+                          command: selection.command,
+                          commandArgs: selection.commandArgs,
+                        });
+                      }}
+                    />
+                  ) : null}
                   <ProviderSettingsForm
                     definition={driverOption}
                     value={configDraft}
