@@ -15,8 +15,8 @@
  *
  * @module provider/Drivers/GeminiDriver
  */
-import { GeminiSettings, ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
-import type { AcpRegistrySettings } from "@t3tools/contracts";
+import { GeminiSettings, ProviderDriverKind, type ServerProvider } from "@belweave/contracts";
+import type { AcpRegistrySettings } from "@belweave/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";

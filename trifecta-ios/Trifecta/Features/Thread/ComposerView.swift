@@ -73,6 +73,7 @@ private enum ComposerMenuRow: Identifiable, Hashable {
 
 struct ComposerView: View {
     @Environment(AppEnvironment.self) private var env
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var store: ThreadStore
     @State private var draft: String = ""
     @State private var selectionEndUTF16: Int = 0
@@ -85,38 +86,53 @@ struct ComposerView: View {
     @State private var pathSearchTask: Task<Void, Never>?
     @AppStorage("composerSize") private var composerSizeRaw: String = ComposerSize.comfortable.rawValue
     @AppStorage("accent") private var accentRaw: String = AppAccent.blue.rawValue
+    @AppStorage("userBubbleColor") private var userBubbleColorRaw: String = UserBubbleColor.accent.rawValue
 
     private let maxChars = 120_000
     private let maxAttachments = 8
 
     var body: some View {
-        VStack(spacing: T3Spacing.sm) {
-            if !attachments.isEmpty {
-                attachmentRow
-            }
+        VStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
+                if !attachments.isEmpty {
+                    attachmentRow
+                        .padding(.top, T3Spacing.sm)
+                }
 
-            VStack(alignment: .leading, spacing: T3Spacing.sm) {
+                textField
+                    .padding(.horizontal, 16)
+                    .padding(.top, attachments.isEmpty ? 14 : 8)
+                    .padding(.bottom, 8)
+
+                controlRow
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 7)
+            }
+            .t3Glass(radius: 26,
+                     tint: composerFocused ? accentColor.opacity(0.12) : T3Color.surfaceElevated.opacity(0.62),
+                     stroke: composerFocused ? accentColor.opacity(0.44) : T3Color.separator)
+            .overlay(
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(.white.opacity(colorScheme == .dark ? 0.06 : 0.45), lineWidth: 0.5)
+            )
+            .overlay(alignment: .topLeading) {
                 if !menuRows.isEmpty {
                     composerMenu
+                        .padding(.horizontal, 8)
+                        .offset(y: -214)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
-                textField
-                controlRow
             }
-            .padding(.horizontal, T3Spacing.md)
-            .padding(.top, T3Spacing.md)
-            .padding(.bottom, T3Spacing.sm)
-            .background(T3Color.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: T3Radius.xl, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: T3Radius.xl, style: .continuous)
-                    .stroke(composerFocused ? accentColor.opacity(0.55) : T3Color.separator,
-                            lineWidth: composerFocused ? 1 : 0.5)
-            )
+            .zIndex(2)
+
+            composerMetaBar
         }
-        .padding(.horizontal, T3Spacing.lg)
-        .padding(.top, T3Spacing.sm)
-        .padding(.bottom, T3Spacing.sm)
-        .background(T3Color.surfaceGrouped)
+        .padding(.horizontal, 12)
+        .padding(.top, 4)
+        .padding(.bottom, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.easeInOut(duration: 0.18), value: composerFocused)
+        .animation(.spring(response: 0.28, dampingFraction: 0.84), value: menuRows.count)
         .onChange(of: pickerItems) { _, items in
             Task { await loadAttachments(items) }
         }
@@ -160,12 +176,8 @@ struct ComposerView: View {
             }
         }
         .frame(maxHeight: 200)
-        .background(T3Color.surfaceGrouped.opacity(0.98))
-        .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                .stroke(T3Color.separator, lineWidth: 0.5)
-        )
+        .t3Glass(radius: 18, tint: T3Color.surface.opacity(0.78))
+        .shadow(color: .black.opacity(0.16), radius: 18, x: 0, y: 8)
     }
 
     private func rowIcon(_ row: ComposerMenuRow) -> String {
@@ -182,12 +194,13 @@ struct ComposerView: View {
     private var textField: some View {
         ZStack(alignment: .topLeading) {
             if draft.isEmpty {
-                Text("Ask anything, @tag files/folders, $skills,\nor / for commands")
+                Text("Ask anything, @tag files/folders, $skills, or / for commands")
                     .foregroundStyle(T3Color.textTertiary)
                     .font(T3Typography.callout)
-                    .padding(.top, 8)
-                    .padding(.leading, 5)
+                    .padding(.top, 7)
+                    .padding(.leading, 4)
                     .allowsHitTesting(false)
+                    .lineLimit(2)
             }
             ComposerBackedTextView(
                 text: $draft,
@@ -210,67 +223,120 @@ struct ComposerView: View {
     // MARK: - Bottom control row
 
     private var controlRow: some View {
-        HStack(spacing: T3Spacing.sm) {
-            modelChip
-
-            Spacer(minLength: 0)
+        HStack(spacing: 12) {
+            composerPlusMenu
 
             PhotosPicker(selection: $pickerItems,
                          maxSelectionCount: maxAttachments,
                          matching: .images) {
-                Image(systemName: "paperclip")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(attachments.count >= maxAttachments
-                                     ? T3Color.textTertiary
-                                     : T3Color.textSecondary)
-                    .frame(width: 34, height: 34)
-                    .background(T3Color.surfaceElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                            .stroke(T3Color.separator, lineWidth: 0.5)
-                    )
+                Image(systemName: "photo")
+                    .font(metaSymbolFont)
+                    .foregroundStyle(attachments.count >= maxAttachments ? T3Color.textTertiary : T3Color.textSecondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .disabled(attachments.count >= maxAttachments)
 
+            modelChip
+
+            if store.detail?.interactionMode == .plan {
+                planModeIndicator
+            }
+
+            Spacer(minLength: 0)
+
+            runtimeChip
+
+            Image(systemName: "mic")
+                .font(metaSymbolFont)
+                .foregroundStyle(T3Color.textSecondary)
+                .frame(width: 24, height: 24)
+                .contentShape(Circle())
+                .accessibilityHidden(true)
+
             sendOrStopButton
         }
+    }
+
+    private var composerPlusMenu: some View {
+        Menu {
+            Button {
+                HapticFeedback.selection()
+                Task { await store.setInteractionMode(.plan) }
+            } label: {
+                Label("Plan mode", systemImage: store.detail?.interactionMode == .plan ? "checkmark" : "checklist")
+            }
+
+            Button {
+                HapticFeedback.selection()
+                Task { await store.setInteractionMode(.default) }
+            } label: {
+                Label("Build mode", systemImage: store.detail?.interactionMode == .default ? "checkmark" : "hammer")
+            }
+
+            Section("Access") {
+                Button {
+                    Task { await store.setRuntimeMode(.approvalRequired) }
+                } label: {
+                    Label("Ask before edits", systemImage: runtimeMode == .approvalRequired ? "checkmark" : "checkmark.shield")
+                }
+                Button {
+                    Task { await store.setRuntimeMode(.autoAcceptEdits) }
+                } label: {
+                    Label("Auto-accept edits", systemImage: runtimeMode == .autoAcceptEdits ? "checkmark" : "wand.and.stars")
+                }
+                Button {
+                    Task { await store.setRuntimeMode(.fullAccess) }
+                } label: {
+                    Label("Full access", systemImage: runtimeMode == .fullAccess ? "checkmark" : "lock.open")
+                }
+            }
+
+            Button {
+                showModelPicker = true
+            } label: {
+                Label("Change model", systemImage: "sparkles")
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(metaTextFont)
+                .foregroundStyle(T3Color.textSecondary)
+                .frame(width: 24, height: 24)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(store.isSending)
+        .accessibilityLabel("Composer options")
     }
 
     @ViewBuilder
     private var sendOrStopButton: some View {
         if isTurnRunning {
             Button {
+                HapticFeedback.impact(.medium)
                 Task { await store.interruptTurn() }
             } label: {
                 Image(systemName: "stop.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 34, height: 34)
-                    .foregroundStyle(T3Color.danger)
-                    .background(T3Color.surfaceElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                            .stroke(T3Color.separator, lineWidth: 0.5)
-                    )
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(selectedBubbleForeground)
+                    .frame(width: 32, height: 32)
+                    .background(selectedBubbleColor, in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(T3ScaleButtonStyle())
             .accessibilityLabel("Stop turn")
         } else {
             Button(action: send) {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 34, height: 34)
-                    .foregroundStyle(canSend ? accentColor : T3Color.textTertiary)
-                    .background(T3Color.surfaceElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                            .stroke(T3Color.separator, lineWidth: 0.5)
+                    .foregroundStyle(canSend ? selectedBubbleForeground : T3Color.textTertiary)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        canSend ? selectedBubbleColor : Color(.systemGray5),
+                        in: Circle()
                     )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(T3ScaleButtonStyle())
             .disabled(!canSend)
             .accessibilityLabel("Send message")
         }
@@ -298,21 +364,61 @@ struct ComposerView: View {
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(T3Color.textTertiary)
             }
-            .padding(.horizontal, T3Spacing.sm)
+            .padding(.horizontal, 4)
             .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                    .fill(T3Color.surfaceElevated)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                    .stroke(T3Color.separator, lineWidth: 0.5)
-            )
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $showModelPicker) {
             modelPickerSheet
         }
+    }
+
+    private var runtimeChip: some View {
+        Menu {
+            Button {
+                Task { await store.setRuntimeMode(.approvalRequired) }
+            } label: {
+                Label("Ask before edits", systemImage: runtimeMode == .approvalRequired ? "checkmark" : "checkmark.shield")
+            }
+            Button {
+                Task { await store.setRuntimeMode(.autoAcceptEdits) }
+            } label: {
+                Label("Auto-accept edits", systemImage: runtimeMode == .autoAcceptEdits ? "checkmark" : "wand.and.stars")
+            }
+            Button {
+                Task { await store.setRuntimeMode(.fullAccess) }
+            } label: {
+                Label("Full access", systemImage: runtimeMode == .fullAccess ? "checkmark" : "lock.open")
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: runtimeModeIcon)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(runtimeModeLabel)
+                    .font(metaTextFont)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(runtimeModeTint)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 4)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var planModeIndicator: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "checklist")
+                .font(metaSymbolFont)
+            Text("Plan")
+                .font(metaTextFont)
+                .lineLimit(1)
+        }
+        .foregroundStyle(T3Color.warning)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
+        .contentShape(Capsule())
     }
 
     private var currentProviderDriver: String? {
@@ -342,15 +448,18 @@ struct ComposerView: View {
 
     private var attachmentRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: T3Spacing.sm) {
+            HStack(alignment: .top, spacing: 8) {
                 ForEach(attachments) { attachment in
                     AttachmentChip(attachment: attachment) {
                         attachments.removeAll { $0.id == attachment.id }
                     }
                 }
             }
-            .padding(.horizontal, T3Spacing.md)
+            .padding(.horizontal, 16)
+            .padding(.top, 2)
+            .padding(.bottom, 2)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Composer triggers & menu
@@ -521,6 +630,73 @@ struct ComposerView: View {
         AppAccent.color(for: accentRaw)
     }
 
+    private var metaTextFont: Font {
+        .system(size: 13, weight: .regular)
+    }
+
+    private var metaSymbolFont: Font {
+        .system(size: 14, weight: .regular)
+    }
+
+    private var selectedBubbleColor: Color {
+        (UserBubbleColor(rawValue: userBubbleColorRaw) ?? .accent).color(accentRaw: accentRaw)
+    }
+
+    private var selectedBubbleForeground: Color {
+        colorScheme == .dark ? .black : .white
+    }
+
+    private var runtimeMode: RuntimeMode {
+        store.detail?.runtimeMode ?? .fullAccess
+    }
+
+    private var runtimeModeLabel: String {
+        switch runtimeMode {
+        case .approvalRequired: "Ask"
+        case .autoAcceptEdits: "Auto"
+        case .fullAccess: "Full"
+        }
+    }
+
+    private var runtimeModeIcon: String {
+        switch runtimeMode {
+        case .approvalRequired: "checkmark.shield"
+        case .autoAcceptEdits: "wand.and.stars"
+        case .fullAccess: "lock.open"
+        }
+    }
+
+    private var runtimeModeTint: Color {
+        switch runtimeMode {
+        case .approvalRequired: T3Color.textSecondary
+        case .autoAcceptEdits: T3Color.success
+        case .fullAccess: T3Color.warning
+        }
+    }
+
+    private var characterUsageLabel: String? {
+        guard draft.count > 10_000 else { return nil }
+        return "\(draft.count.formatted())/\(maxChars.formatted())"
+    }
+
+    private var composerMetaBar: some View {
+        HStack(spacing: T3Spacing.sm) {
+            if let usage = characterUsageLabel {
+                Text(usage)
+                    .font(T3Typography.caption)
+                    .foregroundStyle(draft.count > maxChars ? T3Color.danger : T3Color.textTertiary)
+            }
+            Spacer(minLength: 0)
+            if !attachments.isEmpty {
+                Text("\(attachments.count)/\(maxAttachments) images")
+                    .font(T3Typography.caption)
+                    .foregroundStyle(T3Color.textTertiary)
+            }
+        }
+        .padding(.horizontal, 18)
+        .frame(height: 14)
+    }
+
     private var canSend: Bool {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         return (!text.isEmpty || !attachments.isEmpty)
@@ -529,6 +705,7 @@ struct ComposerView: View {
     }
 
     private func send() {
+        HapticFeedback.impact(.light)
         let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if attachments.isEmpty {
@@ -596,25 +773,43 @@ struct AttachmentChip: View {
     let attachment: LocalAttachment
     let onRemove: () -> Void
 
+    private let side: CGFloat = 62
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            if let image = UIImage(data: attachment.preview) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 56, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: T3Radius.sm, style: .continuous))
-            } else {
-                RoundedRectangle(cornerRadius: T3Radius.sm)
-                    .fill(T3Color.surfaceMuted)
-                    .frame(width: 56, height: 56)
+            Group {
+                if let image = UIImage(data: attachment.preview) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(T3Color.surfaceMuted)
+                        .overlay(
+                            Image(systemName: "photo")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(T3Color.textSecondary)
+                        )
+                }
             }
+            .frame(width: side, height: side)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(.white.opacity(0.16), lineWidth: 0.5)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(T3Color.separator, lineWidth: 0.5)
+            )
+
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.white, .black.opacity(0.6))
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white, .black.opacity(0.68))
             }
-            .offset(x: 6, y: -6)
+            .offset(x: 7, y: -7)
+            .accessibilityLabel("Remove image")
         }
     }
 }

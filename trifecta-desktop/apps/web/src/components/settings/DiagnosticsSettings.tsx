@@ -8,7 +8,7 @@ import {
   RefreshCwIcon,
 } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import type { ServerProcessDiagnosticsEntry, ServerProcessSignal } from "@t3tools/contracts";
+import type { ServerProcessDiagnosticsEntry, ServerProcessSignal } from "@belweave/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 
@@ -614,7 +614,7 @@ export function DiagnosticsSettingsPanel() {
                 type: "info",
                 title: "Process already exited",
                 description:
-                  "The process is not a child of the T3 Server. It might already have exited.",
+                  "The process is not a child of the Belweave Server. It might already have exited.",
               });
               return;
             }

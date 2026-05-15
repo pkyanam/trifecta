@@ -19,10 +19,10 @@ import type {
   ModelCapabilities,
   ServerProviderModel,
   ServerProviderSkill,
-} from "@t3tools/contracts";
-import { ServerSettingsError } from "@t3tools/contracts";
+} from "@belweave/contracts";
+import { ServerSettingsError } from "@belweave/contracts";
 
-import { createModelCapabilities } from "@t3tools/shared/model";
+import { createModelCapabilities } from "@belweave/shared/model";
 import {
   AUTH_PROBE_TIMEOUT_MS,
   buildServerProvider,
@@ -238,7 +238,7 @@ const requestAllCodexModels = Effect.fn("requestAllCodexModels")(function* (
 export function buildCodexInitializeParams(): CodexSchema.V1InitializeParams {
   return {
     clientInfo: {
-      name: "t3code_desktop",
+      name: "belweave_desktop",
       title: "Trifecta Desktop",
       version: packageJson.version,
     },
@@ -277,7 +277,7 @@ const probeCodexAppServerProvider = Effect.fn("probeCodexAppServerProvider")(fun
 
   const initialize = yield* client.request("initialize", {
     clientInfo: {
-      name: "t3code_desktop",
+      name: "belweave_desktop",
       title: "Trifecta Desktop",
       version: "0.1.0",
     },

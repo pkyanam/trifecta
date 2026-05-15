@@ -43,7 +43,7 @@ import {
   RuntimeItemId,
   RuntimeRequestId,
   TurnId as TurnIdSchema,
-} from "@t3tools/contracts";
+} from "@belweave/contracts";
 
 import * as AcpClient from "effect-acp/client";
 import type * as AcpSchema from "effect-acp/schema";

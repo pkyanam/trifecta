@@ -40,7 +40,13 @@ struct MarkdownText: View {
             paragraphText(text, font: headingFont(for: level), bold: true)
                 .padding(.top, level <= 2 ? T3Spacing.xs : 0)
         case .code(let code, let language):
-            CodeBlockView(code: code, language: language)
+            if language?.lowercased() == "mermaid" {
+                MermaidBlockView(code: code)
+            } else {
+                CodeBlockView(code: code, language: language)
+            }
+        case .thinking(let text):
+            ThinkingBlockView(content: text)
         case .bullet(let items):
             ListBlockView(items: items,
                           ordered: false,
@@ -92,6 +98,7 @@ struct MarkdownText: View {
         case paragraph(String)
         case heading(Int, String)
         case code(String, String?)
+        case thinking(String)
         case bullet([ListItem])
         case numbered([ListItem])
         case quote([String])
@@ -196,6 +203,16 @@ private struct QuoteBlockView: View {
 
 private enum MarkdownBlockParser {
     static func parse(_ source: String) -> [MarkdownText.Block] {
+        let segments = ThinkingSegmentParser.segments(from: source)
+        if segments.count > 1 || segments.contains(where: { $0.isThinking }) {
+            return segments.flatMap { segment in
+                segment.isThinking ? [.thinking(segment.text)] : parsePlain(segment.text)
+            }
+        }
+        return parsePlain(source)
+    }
+
+    private static func parsePlain(_ source: String) -> [MarkdownText.Block] {
         var blocks: [MarkdownText.Block] = []
         let lines = source.components(separatedBy: "\n")
         var i = 0
@@ -478,5 +495,51 @@ private enum MarkdownBlockParser {
             return true
         }
         return false
+    }
+}
+
+private enum ThinkingSegmentParser {
+    struct Segment {
+        let text: String
+        let isThinking: Bool
+    }
+
+    static func segments(from source: String) -> [Segment] {
+        let pattern = #"(?is)<(think|thinking|reasoning)\b[^>]*>(.*?)</\1>"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return [Segment(text: source, isThinking: false)]
+        }
+
+        let nsSource = source as NSString
+        let fullRange = NSRange(location: 0, length: nsSource.length)
+        let matches = regex.matches(in: source, range: fullRange)
+        guard !matches.isEmpty else {
+            return [Segment(text: source, isThinking: false)]
+        }
+
+        var segments: [Segment] = []
+        var cursor = 0
+        for match in matches {
+            if match.range.location > cursor {
+                let text = nsSource.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+                append(text, isThinking: false, to: &segments)
+            }
+            let thinkingText = nsSource.substring(with: match.range(at: 2))
+            append(thinkingText, isThinking: true, to: &segments)
+            cursor = match.range.location + match.range.length
+        }
+
+        if cursor < nsSource.length {
+            let text = nsSource.substring(with: NSRange(location: cursor, length: nsSource.length - cursor))
+            append(text, isThinking: false, to: &segments)
+        }
+
+        return segments
+    }
+
+    private static func append(_ text: String, isThinking: Bool, to segments: inout [Segment]) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        segments.append(.init(text: trimmed, isThinking: isThinking))
     }
 }

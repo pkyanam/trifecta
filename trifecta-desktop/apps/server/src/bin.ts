@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { Command } from "effect/unstable/cli";
 
-import * as NetService from "@t3tools/shared/Net";
+import * as NetService from "@belweave/shared/Net";
 import packageJson from "../package.json" with { type: "json" };
 import { ProviderSessionDirectoryNoopLive } from "./provider/Layers/ProviderSessionDirectoryNoop.ts";
 import { authCommand } from "./cli/auth.ts";
@@ -18,7 +18,7 @@ const CliRuntimeLayer = Layer.mergeAll(
   ProviderSessionDirectoryNoopLive,
 );
 
-export const cli = Command.make("t3", { ...sharedServerCommandFlags }).pipe(
+export const cli = Command.make("trifecta", { ...sharedServerCommandFlags }).pipe(
   Command.withDescription("Run the Trifecta server."),
   Command.withHandler((flags) => runServerCommand(flags)),
   Command.withSubcommands([startCommand, serveCommand, authCommand, projectCommand]),

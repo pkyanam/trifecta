@@ -94,16 +94,23 @@ struct ThreadsListView: View {
             Spacer()
 
             VStack(spacing: T3Spacing.md) {
-                Image(systemName: "terminal")
-                    .font(.system(size: 26, weight: .medium))
-                    .foregroundStyle(accentColor)
-                    .frame(width: 56, height: 56)
-                    .background(T3Color.surfaceElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                            .stroke(T3Color.separator, lineWidth: 0.5)
-                    )
+                ZStack {
+                    if env.connectionStatus == .connecting {
+                        Circle()
+                            .fill(accentColor.opacity(0.12))
+                            .frame(width: 72, height: 72)
+                    }
+                    Image(systemName: "terminal")
+                        .font(.system(size: 26, weight: .medium))
+                        .foregroundStyle(accentColor)
+                        .frame(width: 56, height: 56)
+                        .background(T3Color.surfaceElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
+                                .stroke(T3Color.separator, lineWidth: 0.5)
+                        )
+                }
                 Text("No Threads")
                     .font(T3Typography.title)
                 Text(env.connectionStatus == .connected
@@ -164,6 +171,9 @@ struct ThreadsListView: View {
                 .padding(.bottom, T3Spacing.xxxl)
             }
             .scrollIndicators(.hidden)
+            .refreshable {
+                await env.refreshServerConfig()
+            }
         }
         .background(T3Color.surfaceGrouped)
     }
@@ -322,7 +332,8 @@ struct ThreadsListView: View {
         return VStack(alignment: .leading, spacing: 0) {
             // Project header
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                HapticFeedback.selection()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
                     if isCollapsed {
                         collapsedProjects.remove(project.id)
                     } else {
@@ -331,9 +342,11 @@ struct ThreadsListView: View {
                 }
             } label: {
                 HStack(spacing: T3Spacing.sm) {
-                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                    Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(T3Color.textTertiary)
+                        .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+                        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isCollapsed)
                         .frame(width: 16)
 
                     Image(systemName: "folder")
@@ -361,7 +374,8 @@ struct ThreadsListView: View {
                 // Show more
                 if hasMore {
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        HapticFeedback.impact(.light)
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
                             expandedThreadCounts[project.id] = (expandedThreadCounts[project.id] ?? defaultVisibleThreadCount) + defaultVisibleThreadCount
                         }
                     } label: {
@@ -415,11 +429,13 @@ struct ThreadsListView: View {
         .buttonStyle(.plain)
         .contextMenu {
             Button {
+                HapticFeedback.impact(.light)
                 archive(thread: thread)
             } label: {
                 Label("Archive", systemImage: "archivebox")
             }
             Button(role: .destructive) {
+                HapticFeedback.notification(.warning)
                 pendingDeleteThread = thread
             } label: {
                 Label("Delete", systemImage: "trash")

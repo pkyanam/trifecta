@@ -22,6 +22,10 @@ struct ProviderIcon: View {
                 GeminiMark()
             case .copilot:
                 CopilotMark()
+            case .hermes:
+                AssetProviderMark(name: "hermes-logo", invertInDarkMode: true)
+            case .devin:
+                AssetProviderMark(name: "DevinLogoSquare", invertInDarkMode: false)
             case .other:
                 Image(systemName: "cpu.fill")
                     .resizable()
@@ -34,7 +38,7 @@ struct ProviderIcon: View {
 }
 
 enum ProviderIconKind {
-    case claude, openai, opencode, cursor, gemini, copilot, other
+    case claude, openai, opencode, cursor, gemini, copilot, hermes, devin, other
 
     static func from(driver: String) -> ProviderIconKind {
         switch driver {
@@ -50,8 +54,37 @@ enum ProviderIconKind {
             return .gemini
         case "copilot", "githubCopilot", "githubcopilot", "github_copilot":
             return .copilot
+        case "hermesAgent", "hermes":
+            return .hermes
+        case "devinAgent", "devin":
+            return .devin
         default:
             return .other
+        }
+    }
+}
+
+private struct AssetProviderMark: View {
+    @Environment(\.colorScheme) private var scheme
+    let name: String
+    let invertInDarkMode: Bool
+
+    var body: some View {
+        Image(name)
+            .resizable()
+            .scaledToFit()
+            .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+            .colorInvertIf(invertInDarkMode && scheme == .dark)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func colorInvertIf(_ condition: Bool) -> some View {
+        if condition {
+            colorInvert()
+        } else {
+            self
         }
     }
 }

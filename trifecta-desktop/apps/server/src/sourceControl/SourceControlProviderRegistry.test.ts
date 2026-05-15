@@ -67,7 +67,7 @@ function makeRegistry(input: {
         Layer.mock(GitHubCli.GitHubCli)({}),
         Layer.mock(GitLabCli.GitLabCli)({}),
         Layer.mock(VcsProcess.VcsProcess)({}),
-        ServerConfig.layerTest(process.cwd(), { prefix: "t3-source-control-registry-test-" }).pipe(
+        ServerConfig.layerTest(process.cwd(), { prefix: "belweave-source-control-registry-test-" }).pipe(
           Layer.provide(NodeServices.layer),
         ),
       ),

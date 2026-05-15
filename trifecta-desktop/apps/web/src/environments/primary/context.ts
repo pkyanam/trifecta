@@ -2,15 +2,15 @@ import {
   attachEnvironmentDescriptor,
   createKnownEnvironment,
   type KnownEnvironment,
-} from "@t3tools/client-runtime";
-import type { EnvironmentId, ExecutionEnvironmentDescriptor } from "@t3tools/contracts";
+} from "@belweave/client-runtime";
+import type { EnvironmentId, ExecutionEnvironmentDescriptor } from "@belweave/contracts";
 import { create } from "zustand";
 
 import { BootstrapHttpError, retryTransientBootstrap } from "./auth";
 
 import { readPrimaryEnvironmentTarget, resolvePrimaryEnvironmentHttpUrl } from "./target";
 
-const SERVER_ENVIRONMENT_DESCRIPTOR_PATH = "/.well-known/t3/environment";
+const SERVER_ENVIRONMENT_DESCRIPTOR_PATH = "/.well-known/belweave/environment";
 
 interface PrimaryEnvironmentBootstrapState {
   readonly descriptor: ExecutionEnvironmentDescriptor | null;

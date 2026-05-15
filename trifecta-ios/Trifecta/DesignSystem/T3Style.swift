@@ -86,10 +86,66 @@ enum T3Style {
                             .stroke(T3Color.separator, lineWidth: 0.5)
                     )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(T3ScaleButtonStyle())
         }
     }
 }
+
+// MARK: - Liquid glass fallback
+
+struct T3Glass: ViewModifier {
+    var radius: CGFloat = T3Radius.lg
+    var tint: Color = T3Color.surfaceElevated.opacity(0.72)
+    var stroke: Color = T3Color.separator
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+
+        if #available(iOS 26.0, *) {
+            content
+                .background(tint, in: shape)
+                .glassEffect(.regular, in: shape)
+                .overlay(shape.stroke(stroke, lineWidth: 0.5))
+        } else {
+            content
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(shape.fill(tint))
+                .overlay(shape.stroke(stroke, lineWidth: 0.5))
+        }
+    }
+}
+
+extension View {
+    func t3Glass(radius: CGFloat = T3Radius.lg,
+                 tint: Color = T3Color.surfaceElevated.opacity(0.72),
+                 stroke: Color = T3Color.separator) -> some View {
+        modifier(T3Glass(radius: radius, tint: tint, stroke: stroke))
+    }
+}
+
+// MARK: - Sidebar navigation actions
+
+private struct T3SidebarActionKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
+private struct T3NavigateHomeActionKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var t3OpenSidebar: (() -> Void)? {
+        get { self[T3SidebarActionKey.self] }
+        set { self[T3SidebarActionKey.self] = newValue }
+    }
+
+    var t3NavigateHome: (() -> Void)? {
+        get { self[T3NavigateHomeActionKey.self] }
+        set { self[T3NavigateHomeActionKey.self] = newValue }
+    }
+}
+
+// MARK: - Wordmark label
 
 // Renders a label like "Trifecta  ALPHA" used in headers across the app.
 struct T3WordmarkLabel: View {

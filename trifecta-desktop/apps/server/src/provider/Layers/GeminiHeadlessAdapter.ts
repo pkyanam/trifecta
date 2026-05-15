@@ -43,7 +43,7 @@ import {
   type ProviderSessionStartInput,
   type ThreadId,
   type TurnId,
-} from "@t3tools/contracts";
+} from "@belweave/contracts";
 
 import {
   type ProviderAdapterError,

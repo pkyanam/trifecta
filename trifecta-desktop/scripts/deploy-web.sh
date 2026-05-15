@@ -8,7 +8,7 @@ DIST_DIR="$REPO_DIR/apps/web/dist"
 
 echo "==> Building web app..."
 cd "$REPO_DIR"
-bun run build --filter=@t3tools/web
+bun run build --filter=@belweave/web
 
 echo "==> Deploying to Vercel..."
 cd "$DIST_DIR"

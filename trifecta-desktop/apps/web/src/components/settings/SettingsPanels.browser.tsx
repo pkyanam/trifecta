@@ -15,7 +15,7 @@ import {
   type ServerConfig,
   type ServerProvider,
   type SourceControlDiscoveryResult,
-} from "@t3tools/contracts";
+} from "@belweave/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { page } from "vitest/browser";
@@ -217,16 +217,16 @@ function createBaseServerConfig(): ServerConfig {
       policy: "loopback-browser",
       bootstrapMethods: ["one-time-token"],
       sessionMethods: ["browser-session-cookie", "bearer-session-token"],
-      sessionCookieName: "t3_session",
+      sessionCookieName: "belweave_session",
     },
     cwd: "/repo/project",
-    keybindingsConfigPath: "/repo/project/.t3code-keybindings.json",
+    keybindingsConfigPath: "/repo/project/.belweave-keybindings.json",
     keybindings: [],
     issues: [],
     providers: [],
     availableEditors: ["cursor"],
     observability: {
-      logsDirectoryPath: "/repo/project/.t3/logs",
+      logsDirectoryPath: "/repo/project/.belweave/logs",
       localTracingEnabled: true,
       otlpTracesUrl: "http://localhost:4318/v1/traces",
       otlpTracesEnabled: true,
@@ -388,7 +388,7 @@ const createDesktopBridgeStub = (overrides?: {
         policy: "remote-reachable",
         bootstrapMethods: ["one-time-token"],
         sessionMethods: ["browser-session-cookie", "bearer-session-token"],
-        sessionCookieName: "t3_session",
+        sessionCookieName: "belweave_session",
       },
       role: "owner",
       sessionMethod: "bearer-session-token",
@@ -1063,8 +1063,8 @@ describe("GeneralSettingsPanel observability", () => {
           error: Option.none(),
         }),
         getTraceDiagnostics: vi.fn().mockResolvedValue({
-          traceFilePath: "/repo/project/.t3/traces.jsonl",
-          scannedFilePaths: ["/repo/project/.t3/traces.jsonl"],
+          traceFilePath: "/repo/project/.belweave/traces.jsonl",
+          scannedFilePaths: ["/repo/project/.belweave/traces.jsonl"],
           readAt: makeUtc("2036-04-07T00:00:00.000Z"),
           recordCount: 0,
           parseErrorCount: 0,
@@ -1097,7 +1097,7 @@ describe("GeneralSettingsPanel observability", () => {
     const openLogsButton = page.getByLabelText("Open logs folder");
     await openLogsButton.click();
 
-    expect(openInEditor).toHaveBeenCalledWith("/repo/project/.t3/logs", "cursor");
+    expect(openInEditor).toHaveBeenCalledWith("/repo/project/.belweave/logs", "cursor");
   });
 
   it("shows an OpenCode server URL field in provider settings", async () => {

@@ -17,8 +17,8 @@ import type {
   VcsStatusRemoteResult,
   VcsStatusResult,
   VcsStatusStreamEvent,
-} from "@t3tools/contracts";
-import { mergeGitStatusParts } from "@t3tools/shared/git";
+} from "@belweave/contracts";
+import { mergeGitStatusParts } from "@belweave/shared/git";
 
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 
@@ -65,7 +65,7 @@ export interface VcsStatusBroadcasterShape {
 export class VcsStatusBroadcaster extends Context.Service<
   VcsStatusBroadcaster,
   VcsStatusBroadcasterShape
->()("t3/vcs/VcsStatusBroadcaster") {}
+>()("belweave/vcs/VcsStatusBroadcaster") {}
 
 function fingerprintStatusPart(status: unknown): string {
   return JSON.stringify(status);

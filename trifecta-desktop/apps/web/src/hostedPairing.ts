@@ -104,7 +104,7 @@ export function buildHostedPairingUrl(input: {
 export function buildHostedChannelSelectionUrl(input: {
   readonly channel: HostedAppChannel;
 }): string {
-  const url = new URL("/__t3code/channel", configuredHostedAppUrl());
+  const url = new URL("/__belweave/channel", configuredHostedAppUrl());
   url.searchParams.set("channel", input.channel);
   return url.toString();
 }

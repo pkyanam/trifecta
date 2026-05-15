@@ -10,7 +10,7 @@
  *
  * @module provider/Drivers/HermesDriver
  */
-import { HermesSettings, ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
+import { HermesSettings, ProviderDriverKind, type ServerProvider } from "@belweave/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";

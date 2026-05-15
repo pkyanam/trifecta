@@ -2,23 +2,42 @@
 
 Trifecta is a cross-platform coding agent platform. It consists of a desktop server that runs AI coding agents, plus native mobile clients for iOS and Android that let you chat with your agent, review changes, and manage your development workflow from anywhere.
 
-The mobile apps are also designed to be compatible with the official <strong>T3 Code by Theo (t3.gg)</strong> desktop server, not just Trifecta Desktop.
+The mobile apps are also designed to be compatible with the official **Belweave** desktop server, not just Trifecta Desktop.
 
 ## What's in this repo
 
 ```
 trifecta/
+├── trifecta-desktop/    Desktop server + web UI (Electron, React, Node.js)
 ├── trifecta-ios/        Native iOS client (SwiftUI)
 ├── trifecta-android/    Native Android client (Jetpack Compose)
-├── trifecta-desktop/    Desktop server + web UI + VS Code extension (React, Node.js)
-└── trifecta-www/        Marketing website (Next.js)
+├── trifecta-www/        Marketing website (Next.js)
+├── docs/                Architecture documentation
+└── _reference/          Reference repos (Hermes Agent)
 ```
+
+---
+
+## Supported Agents
+
+Trifecta wraps multiple coding agents behind a single unified interface:
+
+| Agent | Protocol | Install |
+|-------|----------|---------|
+| **Codex** | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) — `codex login` |
+| **Claude Code** | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) — `claude auth login` |
+| **OpenCode** | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) — `opencode auth login` |
+| **Gemini** | Headless CLI | [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm i -g @google/gemini-cli`, set `GEMINI_API_KEY` |
+| **Cursor** | ACP (stdio) | [Cursor](https://cursor.sh) — comes with the Cursor IDE |
+| **Hermes** | ACP (stdio) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) — `hermes setup` |
+| **Devin** | ACP (stdio) | [Devin](https://devin.ai) — `devin acp` |
+| **ACP Registry** | ACP (stdio) | Any [ACP](https://agentclientprotocol.com)-compatible agent (configurable) |
 
 ---
 
 ## Trifecta Desktop
 
-The desktop app is the heart of the platform. It wraps coding agents like Codex, Claude, and OpenCode, exposing them through a WebSocket server that the mobile clients connect to.
+The desktop app is the heart of the platform. It wraps coding agents and exposes them through a WebSocket server that the mobile clients connect to.
 
 ### What it does
 
@@ -28,15 +47,17 @@ The desktop app is the heart of the platform. It wraps coding agents like Codex,
 - **Project management** — Organizes work into projects and threads
 - **Git integration** — Tracks branch status, diffs, and supports pull/commit/push
 - **Model catalog** — Exposes all configured providers and models to mobile clients
+- **SSH & Tailscale** — Remote environment access via SSH tunnels or Tailscale
 
 ### Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Server | Node.js, WebSocket |
-| Web UI | React, Vite, TypeScript |
-| Protocol | Custom Effect-style RPC over WebSocket |
-| Agents | Codex, Claude, OpenCode |
+| Server | Node.js, Effect-TS, WebSocket |
+| Web UI | React 19, Vite 8, Tailwind CSS 4, TypeScript |
+| Desktop | Electron 41, Effect-TS |
+| Protocol | Effect-style RPC over WebSocket |
+| Agents | Codex, Claude, Gemini, Cursor, Hermes, Devin, OpenCode, ACP Registry |
 
 ### Running the desktop app
 
@@ -53,7 +74,7 @@ See [trifecta-desktop/README.md](trifecta-desktop/README.md) for full details.
 
 ## Trifecta for iOS
 
-Native iOS client written in SwiftUI. Connects to a Trifecta or <strong>T3 Code by Theo (t3.gg)</strong> desktop server to give you mobile access to your coding agent. Works with both Trifecta Desktop and the official T3 Code desktop server.
+Native iOS client written in SwiftUI. Connects to a Trifecta or **Belweave** desktop server to give you mobile access to your coding agent. Works with both Trifecta Desktop and the official Belweave desktop server.
 
 ### Features
 
@@ -81,7 +102,7 @@ See [trifecta-ios/README.md](trifecta-ios/README.md) for the full engineering gu
 
 ## Trifecta for Android
 
-Native Android client written in Kotlin and Jetpack Compose. Mirrors the iOS feature set for a consistent cross-platform experience. Works with both Trifecta Desktop and the official <strong>T3 Code by Theo (t3.gg)</strong> desktop server.
+Native Android client written in Kotlin and Jetpack Compose. Mirrors the iOS feature set for a consistent cross-platform experience. Works with both Trifecta Desktop and the official **Belweave** desktop server.
 
 ### Features
 
@@ -118,8 +139,9 @@ See [trifecta-android/README.md](trifecta-android/README.md) for full details.
 └─────────────┘   Streaming events └────────┬────────┘
                                             │
                                    ┌────────▼────────┐
-                                   │  Codex / Claude /
-                                   │  OpenCode agents
+                                   │  Codex / Claude / Gemini /
+                                   │  Cursor / Hermes / Devin /
+                                   │  OpenCode / ACP agents
                                    └─────────────────┘
 ```
 

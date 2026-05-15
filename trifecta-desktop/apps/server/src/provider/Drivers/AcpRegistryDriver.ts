@@ -12,7 +12,7 @@
  *
  * @module provider/Drivers/AcpRegistryDriver
  */
-import { AcpRegistrySettings, ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
+import { AcpRegistrySettings, ProviderDriverKind, type ServerProvider } from "@belweave/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";

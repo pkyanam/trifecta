@@ -3,6 +3,7 @@ import SwiftUI
 struct ThreadView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.t3NavigateHome) private var navigateHome
     @State private var store: ThreadStore
     @State private var isImplementingPlan: Bool = false
     @State private var showRenameSheet: Bool = false
@@ -32,14 +33,8 @@ struct ThreadView: View {
             ThreadHeaderView(thread: resolvedThread,
                              project: env.threadList.project(id: threadShell.projectId),
                              session: store.session,
-                             onBack: { dismiss() },
+                             onBack: { goBack() },
                              onRename: { showRenameSheet = true },
-                             onSetInteractionMode: { mode in
-                                 Task { await store.setInteractionMode(mode) }
-                             },
-                             onSetRuntimeMode: { mode in
-                                 Task { await store.setRuntimeMode(mode) }
-                             },
                              onViewDiffs: { showDiffSheet = true },
                              onArchive: archiveThread,
                              onUnarchive: unarchiveThread,
@@ -77,6 +72,14 @@ struct ThreadView: View {
         }
         .sheet(isPresented: $showGitSheet) {
             gitSheet
+        }
+    }
+
+    private func goBack() {
+        if let navigateHome {
+            navigateHome()
+        } else {
+            dismiss()
         }
     }
 
@@ -536,7 +539,7 @@ struct ThreadView: View {
         Task {
             do {
                 try await client.archiveThread(threadId: threadShell.id)
-                await MainActor.run { dismiss() }
+                await MainActor.run { goBack() }
             } catch {
                 await MainActor.run { store.lastError = error.localizedDescription }
             }
@@ -669,7 +672,7 @@ struct ThreadView: View {
         Task {
             do {
                 try await client.deleteThread(threadId: threadShell.id)
-                await MainActor.run { dismiss() }
+                await MainActor.run { goBack() }
             } catch {
                 await MainActor.run { store.lastError = error.localizedDescription }
             }
@@ -707,8 +710,6 @@ struct ThreadHeaderView: View {
     let session: OrchestrationSession?
     let onBack: () -> Void
     let onRename: () -> Void
-    let onSetInteractionMode: (ProviderInteractionMode) -> Void
-    let onSetRuntimeMode: (RuntimeMode) -> Void
     let onViewDiffs: () -> Void
     let onArchive: () -> Void
     let onUnarchive: () -> Void
@@ -862,29 +863,14 @@ struct ThreadHeaderView: View {
                         )
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-
-                interactionModeMenu
-                    .fixedSize(horizontal: true, vertical: false)
-            }
-
-            HStack(spacing: T3Spacing.xs) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(accentColor)
-                Text(thread.model)
-                    .font(T3Typography.footnote)
-                    .foregroundStyle(T3Color.textSecondary)
-                Text("·")
-                    .font(T3Typography.footnote)
-                    .foregroundStyle(T3Color.textTertiary)
-                runtimeModeMenu
                 if let session, session.status == .running {
-                    Text("·")
-                        .font(T3Typography.footnote)
-                        .foregroundStyle(T3Color.textTertiary)
                     Text("running")
                         .font(T3Typography.footnote)
                         .foregroundStyle(T3Color.warning)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(T3Color.warning.opacity(0.12),
+                                    in: RoundedRectangle(cornerRadius: T3Radius.sm, style: .continuous))
                 }
                 Spacer(minLength: 0)
             }
@@ -908,78 +894,6 @@ struct ThreadHeaderView: View {
             default:
                 EmptyView()
             }
-        }
-    }
-
-    private var interactionModeMenu: some View {
-        Menu {
-            Button {
-                onSetInteractionMode(.default)
-            } label: {
-                Label("Build", systemImage: thread.interactionMode == .default ? "checkmark" : "hammer")
-            }
-            Button {
-                onSetInteractionMode(.plan)
-            } label: {
-                Label("Plan", systemImage: thread.interactionMode == .plan ? "checkmark" : "doc.plaintext")
-            }
-        } label: {
-            interactionModeBadge
-        }
-    }
-
-    private var interactionModeBadge: some View {
-        let mode = thread.interactionMode
-        let label = mode == .plan ? "PLAN" : "BUILD"
-        let tint: Color = mode == .plan ? accentColor : T3Color.success
-        return T3Style.Pill(text: label, tint: tint, emphasized: true)
-    }
-
-    private var runtimeModeMenu: some View {
-        Menu {
-            Button {
-                onSetRuntimeMode(.approvalRequired)
-            } label: {
-                Label("Supervised",
-                      systemImage: thread.runtimeMode == .approvalRequired ? "checkmark" : "checkmark.shield")
-            }
-            Button {
-                onSetRuntimeMode(.autoAcceptEdits)
-            } label: {
-                Label("Auto edits",
-                      systemImage: thread.runtimeMode == .autoAcceptEdits ? "checkmark" : "wand.and.stars")
-            }
-            Button {
-                onSetRuntimeMode(.fullAccess)
-            } label: {
-                Label("Full access",
-                      systemImage: thread.runtimeMode == .fullAccess ? "checkmark" : "lock.open")
-            }
-        } label: {
-            HStack(spacing: 3) {
-                Text(runtimeModeLabel)
-                    .font(T3Typography.footnote)
-                    .foregroundStyle(runtimeModeTint)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(T3Color.textTertiary)
-            }
-        }
-    }
-
-    private var runtimeModeLabel: String {
-        switch thread.runtimeMode {
-        case .approvalRequired: "supervised"
-        case .autoAcceptEdits: "auto edits"
-        case .fullAccess: "full access"
-        }
-    }
-
-    private var runtimeModeTint: Color {
-        switch thread.runtimeMode {
-        case .approvalRequired: T3Color.warning
-        case .autoAcceptEdits: T3Color.primary
-        case .fullAccess: T3Color.success
         }
     }
 

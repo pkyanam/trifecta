@@ -9,8 +9,8 @@
  */
 import { spawn } from "node:child_process";
 
-import { EDITORS, OpenError, type EditorId } from "@t3tools/contracts";
-import { isCommandAvailable, type CommandAvailabilityOptions } from "@t3tools/shared/shell";
+import { EDITORS, OpenError, type EditorId } from "@belweave/contracts";
+import { isCommandAvailable, type CommandAvailabilityOptions } from "@belweave/shared/shell";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -20,7 +20,7 @@ import * as Layer from "effect/Layer";
 // ==============================
 
 export { OpenError };
-export { isCommandAvailable } from "@t3tools/shared/shell";
+export { isCommandAvailable } from "@belweave/shared/shell";
 
 export interface OpenInEditorInput {
   readonly cwd: string;
@@ -148,7 +148,7 @@ export interface OpenShape {
 /**
  * Open - Service tag for browser/editor launch operations.
  */
-export class Open extends Context.Service<Open, OpenShape>()("t3/open") {}
+export class Open extends Context.Service<Open, OpenShape>()("belweave/open") {}
 
 // ==============================
 // Implementations

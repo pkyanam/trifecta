@@ -6,8 +6,8 @@ import {
   ProjectId,
   ThreadId,
   ProviderInstanceId,
-} from "@t3tools/contracts";
-import { createModelSelection } from "@t3tools/shared/model";
+} from "@belweave/contracts";
+import { createModelSelection } from "@belweave/shared/model";
 import { describe, expect, it } from "vitest";
 import * as Effect from "effect/Effect";
 

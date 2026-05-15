@@ -1,10 +1,21 @@
 # Trifecta — AI Coding Agent Extension for VS Code / Cursor
 
-Embed a full-featured AI coding agent chat sidebar directly into your IDE. Companion mobile apps available for <a href="../../trifecta-ios/">iOS</a> and <a href="../../trifecta-android/">Android</a> — compatible with both Trifecta Desktop and <a href="https://t3.gg">T3 Code by Theo (t3.gg)</a>.
+Embed a full-featured AI coding agent chat sidebar directly into your IDE. Companion mobile apps available for <a href="../../trifecta-ios/">iOS</a> and <a href="../../trifecta-android/">Android</a> — compatible with Belweave-powered Trifecta Desktop servers.
 
 ## What's Inside
 
-Trifecta is a universal coding agent interface — it wraps **OpenAI Codex**, **Claude Code**, **OpenCode**, and **Cursor** behind a single UI that lives in your editor's activity bar.
+Trifecta is a universal coding agent interface — it wraps **eight** coding agents behind a single UI that lives in your editor's activity bar:
+
+| Agent | Protocol | Install |
+|-------|----------|---------|
+| **Codex** | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) — `codex login` |
+| **Claude Code** | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) — `claude auth login` |
+| **OpenCode** | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) — `opencode auth login` |
+| **Gemini** | Headless CLI | [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm i -g @google/gemini-cli` |
+| **Cursor** | ACP (stdio) | [Cursor](https://cursor.sh) — comes with the Cursor IDE |
+| **Hermes** | ACP (stdio) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) — `hermes setup` |
+| **Devin** | ACP (stdio) | [Devin](https://devin.ai) — `devin acp` |
+| **ACP Registry** | ACP (stdio) | Any [ACP](https://agentclientprotocol.com)-compatible agent |
 
 ## Architecture
 
@@ -28,7 +39,7 @@ The extension spawns a local Node.js server and embeds its web UI in a sidebar w
 ```bash
 cd ~/projects/trifecta/trifecta-desktop
 bun install
-bun run build --filter=t3 --filter=trifecta-ide
+bun run build --filter=@belweave/trifecta --filter=trifecta-ide
 ```
 
 Then open VS Code and run:
@@ -49,7 +60,7 @@ Then open VS Code and run:
 cd apps/vscode && npm run watch
 
 # Build web app + server
-bun run build --filter=t3
+bun run build --filter=@belweave/trifecta
 
 # Full rebuild
 bun run build

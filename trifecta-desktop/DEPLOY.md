@@ -139,7 +139,7 @@ access to your host's Codex auth session (token from `codex login`).
 
 ```bash
 # Health check
-curl http://localhost:3773/.well-known/t3/environment | jq .
+curl http://localhost:3773/.well-known/belweave/environment | jq .
 
 # Get pairing URL
 docker logs trifecta 2>&1 | grep "Pairing URL"
@@ -181,7 +181,7 @@ docker exec -it trifecta bun /app/apps/server/dist/bin.mjs project add /home/tri
 
 ```bash
 docker logs -f trifecta
-curl -s http://localhost:3773/.well-known/t3/environment | jq .
+curl -s http://localhost:3773/.well-known/belweave/environment | jq .
 docker restart trifecta
 ```
 
@@ -201,7 +201,7 @@ The Codex CLI can't make TLS connections. Rebuild with latest Dockerfile
 ### Can't connect from mobile
 
 - Security group must allow TCP 3773 from 0.0.0.0/0
-- Verify: `curl http://<ec2-public-ip>:3773/.well-known/t3/environment`
+- Verify: `curl http://<ec2-public-ip>:3773/.well-known/belweave/environment`
 - Check binding: `docker logs trifecta | head -5`
 
 ### Disk full

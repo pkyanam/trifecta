@@ -1,5 +1,17 @@
 import SwiftUI
 
+// MARK: - Scale button style (used by toolbar buttons and chips for press feedback)
+
+struct T3ScaleButtonStyle: ButtonStyle {
+    var scale: CGFloat = 0.93
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? scale : 1.0)
+            .animation(.spring(response: 0.22, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
 // MARK: - Legacy full-width buttons
 
 struct PrimaryButton: View {

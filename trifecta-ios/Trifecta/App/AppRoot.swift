@@ -10,7 +10,7 @@ struct AppRoot: View {
             case .unconfigured:
                 ConnectionSetupView()
             case .configured:
-                MainTabView()
+                SidebarRootView()
             }
         }
         .dynamicTypeSize(.small ... .large)

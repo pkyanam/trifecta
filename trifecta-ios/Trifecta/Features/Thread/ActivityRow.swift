@@ -2,9 +2,6 @@ import SwiftUI
 
 /// Compact inline timeline row that renders a single agent activity (tool run,
 /// task progress, file edit) between assistant/user messages.
-///
-/// Designed for mobile chat: small footprint, leading tone bar, optional
-/// tap-to-expand for details that would otherwise dominate the timeline.
 struct ActivityRow: View {
     let activity: RenderableActivity
     @State private var isExpanded: Bool = false
@@ -22,14 +19,13 @@ struct ActivityRow: View {
             if isExpanded {
                 expandedDetail
                     .padding(.top, T3Spacing.sm)
-                    .transition(.opacity)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.horizontal, T3Spacing.md)
         .padding(.vertical, T3Spacing.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(T3Color.surfaceElevated.opacity(0.6))
-        .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
+        .t3Glass(radius: 14, tint: T3Color.surfaceElevated.opacity(0.44))
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                 .fill(toneColor)
@@ -40,7 +36,7 @@ struct ActivityRow: View {
             RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
                 .stroke(T3Color.separator, lineWidth: 0.5)
         )
-        .animation(.easeInOut(duration: 0.18), value: isExpanded)
+        .animation(.spring(response: 0.3, dampingFraction: 0.82), value: isExpanded)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(hasExpansion ? "Double tap to \(isExpanded ? "collapse" : "expand") details" : "")
@@ -65,9 +61,11 @@ struct ActivityRow: View {
                 }
             }
             if hasExpansion {
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(T3Color.textTertiary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isExpanded)
                     .padding(.top, 2)
             }
         }
@@ -81,9 +79,7 @@ struct ActivityRow: View {
                 .fill(toneColor.opacity(0.16))
                 .frame(width: 22, height: 22)
             if activity.isInProgress {
-                ProgressView()
-                    .controlSize(.mini)
-                    .tint(toneColor)
+                TerminalPulseGlyph(color: toneColor)
             } else {
                 Image(systemName: activity.iconName)
                     .font(.system(size: 11, weight: .semibold))
@@ -139,27 +135,18 @@ struct ActivityRow: View {
     // MARK: - Derivations
 
     private var inlinePreview: String? {
-        if let command = activity.command, !command.isEmpty {
-            return firstLine(command)
-        }
+        if let command = activity.command, !command.isEmpty { return firstLine(command) }
         if !activity.changedFiles.isEmpty {
-            if activity.changedFiles.count == 1 {
-                return activity.changedFiles[0]
-            }
-            return "\(activity.changedFiles.count) files"
+            return activity.changedFiles.count == 1
+                ? activity.changedFiles[0]
+                : "\(activity.changedFiles.count) files"
         }
-        if let detail = activity.detail, !detail.isEmpty {
-            return firstLine(detail)
-        }
+        if let detail = activity.detail, !detail.isEmpty { return firstLine(detail) }
         return nil
     }
 
-    private var previewIsCommand: Bool {
-        activity.command?.isEmpty == false
-    }
+    private var previewIsCommand: Bool { activity.command?.isEmpty == false }
 
-    /// Detail to show in expanded view — only when it has more than what's
-    /// already in the inline preview (multi-line or long).
     private var expandableDetail: String? {
         guard let detail = activity.detail else { return nil }
         if detail.contains("\n") || detail.count > 80 { return detail }
@@ -173,25 +160,24 @@ struct ActivityRow: View {
     }
 
     private func firstLine(_ s: String) -> String {
-        if let nl = s.firstIndex(of: "\n") {
-            return String(s[..<nl])
-        }
+        if let nl = s.firstIndex(of: "\n") { return String(s[..<nl]) }
         return s
     }
 
     private var toneColor: Color {
         switch activity.tone {
-        case .info: T3Color.textSecondary
-        case .tool: AppAccent.color(for: accentRaw)
+        case .info:     T3Color.textSecondary
+        case .tool:     AppAccent.color(for: accentRaw)
         case .thinking: T3Color.warning
-        case .error: T3Color.danger
+        case .error:    T3Color.danger
         case .approval: T3Color.warning
-        case .success: T3Color.success
+        case .success:  T3Color.success
         }
     }
 
     private func toggleExpanded() {
         guard hasExpansion else { return }
+        HapticFeedback.selection()
         isExpanded.toggle()
     }
 
@@ -199,5 +185,28 @@ struct ActivityRow: View {
         var parts: [String] = [activity.title]
         if let preview = inlinePreview { parts.append(preview) }
         return parts.joined(separator: ", ")
+    }
+}
+
+private struct TerminalPulseGlyph: View {
+    let color: Color
+    @State private var cursorOpacity: Double = 1
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 1) {
+            Text(">")
+                .font(.system(.caption2, design: .monospaced).weight(.semibold))
+            RoundedRectangle(cornerRadius: 1, style: .continuous)
+                .fill(color)
+                .frame(width: 4, height: 1)
+                .padding(.bottom, 2)
+                .opacity(cursorOpacity)
+        }
+        .foregroundStyle(color)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+                cursorOpacity = 0.18
+            }
+        }
     }
 }

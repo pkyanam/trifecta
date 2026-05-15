@@ -2,7 +2,7 @@ import {
   ProviderDriverKind,
   ProviderInstanceId,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@belweave/contracts";
 import { describe, expect, it } from "vitest";
 import { it as effectIt } from "@effect/vitest";
 import * as Effect from "effect/Effect";

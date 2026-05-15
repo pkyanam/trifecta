@@ -8,7 +8,7 @@ import {
   HermesSettings,
   OpenCodeSettings,
   ProviderDriverKind,
-} from "@t3tools/contracts";
+} from "@belweave/contracts";
 import type * as Schema from "effect/Schema";
 import { ACPRegistryIcon, ClaudeAI, CursorIcon, DevinIcon, Gemini, HermesIcon, type Icon, OpenAI, OpenCodeIcon } from "../Icons";
 

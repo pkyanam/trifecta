@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct PendingApprovalCard: View {
     let approval: PendingApproval
@@ -80,6 +81,9 @@ struct PendingApprovalCard: View {
                                 background: Color,
                                 foreground: Color) -> some View {
         Button {
+            let feedbackType: UINotificationFeedbackGenerator.FeedbackType =
+                decision == .accept || decision == .acceptForSession ? .success : .warning
+            HapticFeedback.notification(feedbackType)
             onRespond(decision)
         } label: {
             HStack(spacing: T3Spacing.xs) {
