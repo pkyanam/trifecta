@@ -18,6 +18,11 @@ import {
   type GitActionProgressEvent,
   type GitManagerServiceError,
   OrchestrationDispatchCommandError,
+  SshError,
+  SshHostId,
+  SshSessionId,
+  SshSpawnError,
+  type SshTerminalEvent,
   type OrchestrationEvent,
   type OrchestrationShellStreamEvent,
   OrchestrationGetFullThreadDiffError,
@@ -55,6 +60,10 @@ import { ServerLifecycleEvents } from "./serverLifecycleEvents.ts";
 import { ServerRuntimeStartup } from "./serverRuntimeStartup.ts";
 import { redactServerSettingsForClient, ServerSettingsService } from "./serverSettings.ts";
 import { TerminalManager } from "./terminal/Services/Manager.ts";
+import { SshHostProfiles } from "./ssh/Services/SshHostProfiles.ts";
+import { SshAuditLog } from "./ssh/Services/SshAuditLog.ts";
+import { SshSessionManager } from "./ssh/Services/SshSessionManager.ts";
+import { SshTokenAuthority } from "./ssh/Services/SshTokenAuthority.ts";
 import { WorkspaceEntries } from "./workspace/Services/WorkspaceEntries.ts";
 import { WorkspaceFileSystem } from "./workspace/Services/WorkspaceFileSystem.ts";
 import { WorkspacePathOutsideRootError } from "./workspace/Services/WorkspacePaths.ts";
@@ -88,6 +97,15 @@ import {
 } from "./auth/Services/SessionCredentialService.ts";
 import { respondToAuthError } from "./auth/http.ts";
 const isOrchestrationDispatchCommandError = Schema.is(OrchestrationDispatchCommandError);
+const isSshError = Schema.is(SshError);
+
+function mapToSshError(cause: unknown): typeof SshError.Type {
+  if (isSshError(cause)) {
+    return cause;
+  }
+  const detail = cause instanceof Error ? cause.message : String(cause);
+  return new SshSpawnError({ detail });
+}
 const isWorkspacePathOutsideRootError = Schema.is(WorkspacePathOutsideRootError);
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
@@ -181,6 +199,10 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
       const serverEnvironment = yield* ServerEnvironment;
       const serverAuth = yield* ServerAuth;
       const sourceControlDiscovery = yield* SourceControlDiscoveryLayer.SourceControlDiscovery;
+      const sshHostProfiles = yield* SshHostProfiles;
+      const sshSessionManager = yield* SshSessionManager;
+      const sshAuditLog = yield* SshAuditLog;
+      const sshTokenAuthority = yield* SshTokenAuthority;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map((settings) => settings.automaticGitFetchInterval),
         Effect.catch((cause) =>
@@ -1192,6 +1214,175 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
               return Stream.concat(Stream.fromIterable(snapshotEvents), liveEvents);
             }),
             { "rpc.aggregate": "server" },
+          ),
+        [WS_METHODS.sshListHosts]: (_input) =>
+          observeRpcEffect(
+            WS_METHODS.sshListHosts,
+            sshHostProfiles.list().pipe(
+              Effect.map((hosts) => ({ hosts })),
+              Effect.mapError((cause) => mapToSshError(cause)),
+            ),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshAddHost]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.sshAddHost,
+            Effect.gen(function* () {
+              const profile = yield* sshHostProfiles.create(input);
+              yield* sshAuditLog
+                .append({
+                  type: "host-profile-created",
+                  actorSessionId: currentSessionId,
+                  hostId: profile.id,
+                  hostname: profile.hostname,
+                  port: profile.port,
+                  username: profile.username,
+                  authMethod: profile.authMethod,
+                  sshSessionId: null,
+                  message: `Host profile created: ${profile.label}`,
+                })
+                .pipe(Effect.catch(() => Effect.void));
+              return profile;
+            }).pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshRemoveHost]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.sshRemoveHost,
+            Effect.gen(function* () {
+              const profile = yield* sshHostProfiles.get(input.hostId);
+              yield* sshHostProfiles.remove(input.hostId);
+              yield* sshAuditLog
+                .append({
+                  type: "host-profile-removed",
+                  actorSessionId: currentSessionId,
+                  hostId: profile.id,
+                  hostname: profile.hostname,
+                  port: profile.port,
+                  username: profile.username,
+                  authMethod: profile.authMethod,
+                  sshSessionId: null,
+                  message: `Host profile removed: ${profile.label}`,
+                })
+                .pipe(Effect.catch(() => Effect.void));
+            }).pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshOpenSession]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.sshOpenSession,
+            Effect.gen(function* () {
+              const snapshot = yield* sshSessionManager.open({
+                authSessionId: currentSessionId,
+                hostId: input.hostId,
+                cols: input.cols,
+                rows: input.rows,
+              });
+              const issued = yield* sshTokenAuthority.issue({
+                authSessionId: currentSessionId,
+                sshSessionId: snapshot.sessionId,
+              });
+              return {
+                snapshot,
+                sessionToken: issued.token,
+                sessionTokenExpiresAt: DateTime.formatIso(issued.expiresAt),
+              };
+            }).pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshGetSession]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.sshGetSession,
+            sshSessionManager
+              .get({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
+              .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshSendInput]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.sshSendInput,
+            sshSessionManager
+              .sendInput({
+                authSessionId: currentSessionId,
+                sshSessionId: input.sessionId,
+                data: input.data,
+              })
+              .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshResize]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.sshResize,
+            sshSessionManager
+              .resize({
+                authSessionId: currentSessionId,
+                sshSessionId: input.sessionId,
+                cols: input.cols,
+                rows: input.rows,
+              })
+              .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshConfirmHostKey]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.sshConfirmHostKey,
+            sshSessionManager
+              .confirmHostKey({
+                authSessionId: currentSessionId,
+                sshSessionId: input.sessionId,
+                fingerprintSha256: input.fingerprintSha256,
+                decision: input.decision,
+                remember: input.remember,
+              })
+              .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshCloseSession]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.sshCloseSession,
+            sshSessionManager
+              .close({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
+              .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshIssueSessionToken]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.sshIssueSessionToken,
+            Effect.gen(function* () {
+              // Verify caller still owns the session before minting a fresh token.
+              yield* sshSessionManager
+                .get({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
+                .pipe(Effect.mapError((cause) => mapToSshError(cause)));
+              const issued = yield* sshTokenAuthority.issue({
+                authSessionId: currentSessionId,
+                sshSessionId: input.sessionId,
+              });
+              return {
+                sessionToken: issued.token,
+                expiresAt: DateTime.formatIso(issued.expiresAt),
+              };
+            }),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshListAudit]: (_input) =>
+          observeRpcEffect(
+            WS_METHODS.sshListAudit,
+            sshAuditLog.list().pipe(
+              Effect.map((events) => ({ events })),
+              Effect.mapError((cause) => mapToSshError(cause)),
+            ),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.subscribeSshTerminal]: (input) =>
+          observeRpcStream(
+            WS_METHODS.subscribeSshTerminal,
+            sshSessionManager
+              .subscribe({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
+              .pipe(Stream.mapError((cause) => mapToSshError(cause))) as Stream.Stream<
+              SshTerminalEvent,
+              SshError
+            >,
+            { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.subscribeAuthAccess]: (_input) =>
           observeRpcStreamEffect(

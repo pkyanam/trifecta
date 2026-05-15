@@ -33,6 +33,12 @@ import * as GitLabCli from "./sourceControl/GitLabCli.ts";
 import * as TextGeneration from "./textGeneration/TextGeneration.ts";
 import { ProviderInstanceRegistryHydrationLive } from "./provider/Layers/ProviderInstanceRegistryHydration.ts";
 import { TerminalManagerLive } from "./terminal/Layers/Manager.ts";
+import { SshAuditLogSqliteLive } from "./ssh/Layers/SshAuditLogSqlite.ts";
+import { SshCredentialsLive } from "./ssh/Layers/SshCredentialsLive.ts";
+import { SshHostProfilesSqliteLive } from "./ssh/Layers/SshHostProfilesSqlite.ts";
+import { SshKnownHostsSqliteLive } from "./ssh/Layers/SshKnownHostsSqlite.ts";
+import { SshSessionManagerLive } from "./ssh/Layers/SshSessionManagerLive.ts";
+import { SshTokenAuthorityLive } from "./ssh/Layers/SshTokenAuthorityLive.ts";
 import * as GitManager from "./git/GitManager.ts";
 import { KeybindingsLive } from "./keybindings.ts";
 import { ServerRuntimeStartup, ServerRuntimeStartupLive } from "./serverRuntimeStartup.ts";
@@ -58,6 +64,7 @@ import * as VcsStatusBroadcaster from "./vcs/VcsStatusBroadcaster.ts";
 import * as GitWorkflowService from "./git/GitWorkflowService.ts";
 import * as SourceControlProviderRegistry from "./sourceControl/SourceControlProviderRegistry.ts";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
+import * as ProcessRunner from "./processRunner.ts";
 import { ProjectSetupScriptRunnerLive } from "./project/Layers/ProjectSetupScriptRunner.ts";
 import { ObservabilityLive } from "./observability/Layers/Observability.ts";
 import { ServerEnvironmentLive } from "./environment/Layers/ServerEnvironment.ts";
@@ -214,6 +221,21 @@ const CheckpointingLayerLive = Layer.empty.pipe(
 
 const TerminalLayerLive = TerminalManagerLive.pipe(Layer.provide(PtyAdapterLive));
 
+const SshBaseLayerLive = Layer.mergeAll(
+  SshHostProfilesSqliteLive,
+  SshKnownHostsSqliteLive,
+  SshAuditLogSqliteLive,
+  SshCredentialsLive,
+  SshTokenAuthorityLive,
+  ProcessRunner.layer,
+);
+
+const SshLayerLive = SshSessionManagerLive.pipe(
+  Layer.provideMerge(SshBaseLayerLive),
+  Layer.provide(PtyAdapterLive),
+  Layer.provide(ServerSecretStoreLive),
+);
+
 const WorkspaceEntriesLayerLive = WorkspaceEntriesLive.pipe(
   Layer.provide(WorkspacePathsLive),
   Layer.provideMerge(VcsDriverRegistryLayerLive),
@@ -248,6 +270,7 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   Layer.provideMerge(VcsLayerLive),
   Layer.provideMerge(ProviderRuntimeLayerLive),
   Layer.provideMerge(TerminalLayerLive),
+  Layer.provideMerge(SshLayerLive),
   Layer.provideMerge(PersistenceLayerLive),
   Layer.provideMerge(KeybindingsLive),
   Layer.provideMerge(ProviderRegistryLive),
