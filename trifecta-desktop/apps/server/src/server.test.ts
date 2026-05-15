@@ -11,7 +11,13 @@ import {
   KeybindingRule,
   MessageId,
   OpenError,
+  AuthSessionId,
+  SshHostProfileNotFoundError,
+  SshSessionId,
+  SshSessionNotFoundError,
   type OrchestrationThreadShell,
+  type SshAuditEvent,
+  type SshHostProfile,
   TerminalNotRunningError,
   type OrchestrationCommand,
   type OrchestrationEvent,
@@ -84,6 +90,16 @@ import { ServerLifecycleEvents, type ServerLifecycleEventsShape } from "./server
 import { ServerRuntimeStartup, type ServerRuntimeStartupShape } from "./serverRuntimeStartup.ts";
 import { ServerSettingsService, type ServerSettingsShape } from "./serverSettings.ts";
 import { TerminalManager, type TerminalManagerShape } from "./terminal/Services/Manager.ts";
+import { SshAuditLog, type SshAuditLogShape } from "./ssh/Services/SshAuditLog.ts";
+import { SshHostProfiles, type SshHostProfilesShape } from "./ssh/Services/SshHostProfiles.ts";
+import {
+  SshSessionManager,
+  type SshSessionManagerShape,
+} from "./ssh/Services/SshSessionManager.ts";
+import {
+  SshTokenAuthority,
+  type SshTokenAuthorityShape,
+} from "./ssh/Services/SshTokenAuthority.ts";
 import {
   BrowserTraceCollector,
   type BrowserTraceCollectorShape,
@@ -121,6 +137,7 @@ import * as Data from "effect/Data";
 const defaultProjectId = ProjectId.make("project-default");
 const defaultThreadId = ThreadId.make("thread-default");
 const defaultDesktopBootstrapToken = "test-desktop-bootstrap-token";
+const defaultAuthSessionId = AuthSessionId.make("auth-session-test");
 const defaultModelSelection = {
   instanceId: ProviderInstanceId.make("codex"),
   model: "gpt-5-codex",
@@ -328,6 +345,10 @@ const buildAppUnderTest = (options?: {
     vcsStatusBroadcaster?: Partial<VcsStatusBroadcaster.VcsStatusBroadcasterShape>;
     projectSetupScriptRunner?: Partial<ProjectSetupScriptRunnerShape>;
     terminalManager?: Partial<TerminalManagerShape>;
+    sshAuditLog?: Partial<SshAuditLogShape>;
+    sshHostProfiles?: Partial<SshHostProfilesShape>;
+    sshSessionManager?: Partial<SshSessionManagerShape>;
+    sshTokenAuthority?: Partial<SshTokenAuthorityShape>;
     orchestrationEngine?: Partial<OrchestrationEngineShape>;
     projectionSnapshotQuery?: Partial<ProjectionSnapshotQueryShape>;
     checkpointDiffQuery?: Partial<CheckpointDiffQueryShape>;
@@ -500,6 +521,81 @@ const buildAppUnderTest = (options?: {
           ...options.layers.vcsStatusBroadcaster,
         })
       : VcsStatusBroadcaster.layer.pipe(Layer.provide(gitWorkflowLayer));
+    const sshServicesLayer = Layer.mergeAll(
+      Layer.mock(SshAuditLog)({
+        append: (input) =>
+          Effect.succeed({
+            id: `ssh-audit-${crypto.randomUUID()}` as SshAuditEvent["id"],
+            occurredAt: DateTime.formatIso(TEST_EPOCH),
+            ...input,
+          }),
+        list: () => Effect.succeed([]),
+        ...options?.layers?.sshAuditLog,
+      }),
+      Layer.mock(SshHostProfiles)({
+        list: () => Effect.succeed([]),
+        get: (hostId) => Effect.fail(new SshHostProfileNotFoundError({ hostId })),
+        create: (input) =>
+          Effect.succeed({
+            id: `ssh-host-${crypto.randomUUID()}` as SshHostProfile["id"],
+            expectedFingerprint: null,
+            createdAt: DateTime.formatIso(TEST_EPOCH),
+            updatedAt: DateTime.formatIso(TEST_EPOCH),
+            ...input,
+          }),
+        remove: () => Effect.void,
+        setExpectedFingerprint: ({ hostId, fingerprint }) =>
+          Effect.succeed({
+            id: hostId,
+            label: "SSH Host",
+            hostname: "localhost",
+            port: 22,
+            username: "test",
+            authMethod: "agent-forward" as const,
+            expectedFingerprint: fingerprint,
+            createdAt: DateTime.formatIso(TEST_EPOCH),
+            updatedAt: DateTime.formatIso(TEST_EPOCH),
+          }),
+        ...options?.layers?.sshHostProfiles,
+      }),
+      Layer.mock(SshSessionManager)({
+        open: () =>
+          Effect.fail(
+            new SshSessionNotFoundError({
+              sessionId: SshSessionId.make("ssh-session-test"),
+            }),
+          ) as never,
+        get: ({ sshSessionId }) =>
+          Effect.fail(new SshSessionNotFoundError({ sessionId: sshSessionId })),
+        sendInput: ({ sshSessionId }) =>
+          Effect.fail(new SshSessionNotFoundError({ sessionId: sshSessionId })),
+        resize: ({ sshSessionId }) =>
+          Effect.fail(new SshSessionNotFoundError({ sessionId: sshSessionId })),
+        confirmHostKey: ({ sshSessionId }) =>
+          Effect.fail(new SshSessionNotFoundError({ sessionId: sshSessionId })),
+        close: () => Effect.void,
+        subscribe: ({ sshSessionId }) =>
+          Stream.fail(new SshSessionNotFoundError({ sessionId: sshSessionId })),
+        ...options?.layers?.sshSessionManager,
+      }),
+      Layer.mock(SshTokenAuthority)({
+        issue: (input) =>
+          Effect.succeed({
+            token: "test-ssh-session-token",
+            authSessionId: input.authSessionId,
+            sshSessionId: input.sshSessionId,
+            expiresAt: TEST_EPOCH,
+          }),
+        verify: ({ expectedSshSessionId }) =>
+          Effect.succeed({
+            authSessionId: defaultAuthSessionId,
+            sshSessionId: expectedSshSessionId,
+            expiresAt: TEST_EPOCH,
+          }),
+        revokeForSession: () => Effect.void,
+        ...options?.layers?.sshTokenAuthority,
+      }),
+    );
 
     const servedRoutesLayer = HttpRouter.serve(makeRoutesLayer, {
       disableListenLog: true,
@@ -611,6 +707,7 @@ const buildAppUnderTest = (options?: {
           ...options?.layers?.terminalManager,
         }),
       ),
+      Layer.provide(sshServicesLayer),
       Layer.provide(
         Layer.mock(OrchestrationEngineService)({
           readEvents: () => Stream.empty,
