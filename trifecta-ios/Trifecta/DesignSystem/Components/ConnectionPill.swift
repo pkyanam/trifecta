@@ -36,23 +36,40 @@ enum ConnectionState: Equatable {
 
 struct ConnectionPill: View {
     let state: ConnectionState
+    @State private var pulseScale: CGFloat = 1.0
+    @State private var pulseOpacity: Double = 0.6
 
     var body: some View {
         HStack(spacing: T3Spacing.xs) {
-            Circle()
-                .fill(state.tint)
-                .frame(width: 6, height: 6)
+            ZStack {
+                if state == .connecting {
+                    Circle()
+                        .fill(state.tint.opacity(pulseOpacity))
+                        .frame(width: 11, height: 11)
+                        .scaleEffect(pulseScale)
+                }
+                Circle()
+                    .fill(state.tint)
+                    .frame(width: 6, height: 6)
+            }
+            .frame(width: 11, height: 11)
             Text(state.label)
                 .font(T3Typography.caption)
                 .foregroundStyle(T3Color.textSecondary)
         }
         .padding(.horizontal, T3Spacing.md)
         .padding(.vertical, T3Spacing.xs)
-        .background(
-            Capsule().fill(T3Color.surfaceElevated)
-        )
-        .overlay {
-            Capsule().stroke(T3Color.separator, lineWidth: 0.5)
+        .background(Capsule().fill(T3Color.surfaceElevated))
+        .overlay { Capsule().stroke(T3Color.separator, lineWidth: 0.5) }
+        .onAppear { startPulseIfNeeded() }
+        .onChange(of: state) { _, _ in startPulseIfNeeded() }
+    }
+
+    private func startPulseIfNeeded() {
+        guard state == .connecting else { return }
+        withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+            pulseScale = 1.9
+            pulseOpacity = 0.0
         }
     }
 }

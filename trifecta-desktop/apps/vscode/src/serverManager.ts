@@ -313,7 +313,7 @@ export class ServerManager {
     const message =
       "Trifecta server not found. Build it first:\n\n" +
       "  cd ~/projects/trifecta/trifecta-desktop\n" +
-      "  bun install && bun run build --filter=t3\n\n" +
+      "  bun install && bun run build --filter=@belweave/trifecta\n\n" +
       'Or set "trifecta.serverPath" in VS Code settings.';
 
     vscode.window
@@ -358,7 +358,7 @@ export class ServerManager {
   }
 
   private async waitForReady(port: number): Promise<void> {
-    const url = `http://127.0.0.1:${port}/.well-known/t3/environment`;
+    const url = `http://127.0.0.1:${port}/.well-known/belweave/environment`;
     const deadline = Date.now() + 30_000;
 
     while (Date.now() < deadline) {

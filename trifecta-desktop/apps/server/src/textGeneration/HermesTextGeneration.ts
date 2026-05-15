@@ -15,9 +15,9 @@ import * as Layer from "effect/Layer";
 import * as Context from "effect/Context";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-import type { HermesSettings } from "@t3tools/contracts";
-import { TextGenerationError } from "@t3tools/contracts";
-import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@t3tools/shared/git";
+import type { HermesSettings } from "@belweave/contracts";
+import { TextGenerationError } from "@belweave/contracts";
+import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@belweave/shared/git";
 
 import * as AcpClient from "effect-acp/client";
 import { AGENT_METHODS } from "effect-acp/schema";

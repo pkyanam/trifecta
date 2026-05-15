@@ -1,8 +1,8 @@
 # Keybindings
 
-T3 Code reads keybindings from:
+Belweave reads keybindings from:
 
-- `~/.t3/keybindings.json`
+- `~/.belweave/keybindings.json`
 
 The file must be a JSON array of rules:
 

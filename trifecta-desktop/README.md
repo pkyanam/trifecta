@@ -1,46 +1,84 @@
 # Trifecta
 
-Trifecta is a minimal web GUI for coding agents (currently Codex, Claude, and OpenCode, more coming soon).
+Trifecta is a coding agent platform with a desktop server, web UI, and native mobile clients. It supports **eight** coding agents behind a single unified interface.
 
-Companion mobile apps for <a href="../trifecta-ios/">iOS</a> and <a href="../trifecta-android/">Android</a> are also available — they work with both Trifecta Desktop and the official <strong><a href="https://t3.gg">T3 Code by Theo (t3.gg)</a></strong> desktop server.
+Companion mobile apps for <a href="../trifecta-ios/">iOS</a> and <a href="../trifecta-android/">Android</a> are also available — they work with Belweave-powered Trifecta Desktop servers.
 
 ## Installation
 
 > [!WARNING]
-> Trifecta currently supports Codex, Claude, and OpenCode.
-> Install and authenticate at least one provider before use:
+> Trifecta supports multiple coding agents. Install and authenticate at least one before use:
 >
-> - Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
-> - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
-> - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
+> **Native providers:**
+> - [Codex](https://developers.openai.com/codex/cli): `codex login`
+> - [Claude Code](https://claude.com/product/claude-code): `claude auth login`
+> - [OpenCode](https://opencode.ai): `opencode auth login`
+> - [Gemini CLI](https://github.com/google-gemini/gemini-cli): `npm i -g @google/gemini-cli` + set `GEMINI_API_KEY`
+>
+> **ACP providers (Agent Client Protocol):**
+> - [Cursor](https://cursor.sh): comes with the Cursor IDE (`cursor auth login`)
+> - [Hermes Agent](https://github.com/NousResearch/hermes-agent): `hermes setup`
+> - [Devin](https://devin.ai): `devin acp`
+> - **ACP Registry**: any [ACP](https://agentclientprotocol.com)-compatible agent (configurable command + args)
 
 ### Run without installing
 
 ```bash
-npx t3
+npx @belweave/trifecta
 ```
 
 ### Desktop app
 
-Install the latest version of the desktop app from [GitHub Releases](https://github.com/belweave/trifecta/releases), or from your favorite package registry:
+Install the latest version of the desktop app from [GitHub Releases](https://github.com/pkyanam/trifecta/releases), or from your favorite package registry:
 
 #### Windows (`winget`)
 
 ```bash
-winget install T3Tools.T3Code
+winget install Belweave.T3Code
 ```
 
 #### macOS (Homebrew)
 
 ```bash
-brew install --cask t3-code
+brew install --cask belweave-code
 ```
 
 #### Arch Linux (AUR)
 
 ```bash
-yay -S t3code-bin
+yay -S belweave-bin
 ```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│              Electron Desktop Shell                  │
+│  ┌───────────────────────────────────────────────┐  │
+│  │           React/Vite Web UI                    │  │
+│  └──────────────────┬────────────────────────────┘  │
+│                     │ WebSocket                      │
+│  ┌──────────────────▼────────────────────────────┐  │
+│  │         Node.js Server (Effect-TS)             │  │
+│  │  ┌─────────────────────────────────────────┐  │  │
+│  │  │         Provider Registry                │  │  │
+│  │  │  Codex │ Claude │ Gemini │ Cursor        │  │  │
+│  │  │  Hermes │ Devin │ OpenCode │ ACP Registry │  │  │
+│  │  └─────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+```
+
+### Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Runtime | Electron 41 (desktop), Node.js (server) |
+| Framework | Effect-TS (functional effect system) |
+| Build | Turborepo, tsdown, Vite 8 |
+| Web UI | React 19, Tailwind CSS 4, Zustand, Lexical |
+| Linting | oxlint + oxfmt (Oxidation toolchain) |
+| Agents | 8 providers via JSON-RPC or ACP over stdio |
 
 ## Some notes
 

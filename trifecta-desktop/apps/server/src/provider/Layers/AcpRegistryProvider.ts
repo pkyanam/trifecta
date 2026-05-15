@@ -16,8 +16,8 @@ import * as Result from "effect/Result";
 import * as Scope from "effect/Scope";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-import type { AcpRegistrySettings, ServerProvider, ServerProviderModel } from "@t3tools/contracts";
-import { ServerSettingsError } from "@t3tools/contracts";
+import type { AcpRegistrySettings, ServerProvider, ServerProviderModel } from "@belweave/contracts";
+import { ServerSettingsError } from "@belweave/contracts";
 
 import * as AcpClient from "effect-acp/client";
 

@@ -101,7 +101,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
   </style>
 </head>
 <body>
-  <iframe id="t3-iframe" src="${iframeSrc}"></iframe>
+  <iframe id="belweave-iframe" src="${iframeSrc}"></iframe>
 </body>
 </html>`;
   }

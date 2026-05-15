@@ -182,7 +182,7 @@ function assertMissing(path: string, message: string): void {
   }
 }
 
-const tempRoot = mkdtempSync(join(tmpdir(), "t3-release-smoke-"));
+const tempRoot = mkdtempSync(join(tmpdir(), "belweave-release-smoke-"));
 
 try {
   copyWorkspaceManifestFixture(tempRoot);

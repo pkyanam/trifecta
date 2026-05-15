@@ -1,5 +1,5 @@
 {
-  "name": "@t3tools/oxlint-plugin-trifecta",
+  "name": "@belweave/oxlint-plugin-trifecta",
   "private": true,
   "type": "module",
   "scripts": {

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@t3tools/monorepo",
+      "name": "@belweave/monorepo",
       "devDependencies": {
         "@effect/language-service": "catalog:",
         "@oxlint/plugins": "^1.64.0",
@@ -16,8 +16,8 @@
       },
     },
     "apps/desktop": {
-      "name": "@t3tools/desktop",
-      "version": "0.0.25",
+      "name": "@belweave/desktop",
+      "version": "0.0.29-alpha.3",
       "dependencies": {
         "@effect/platform-node": "catalog:",
         "effect": "catalog:",
@@ -25,13 +25,13 @@
         "electron-updater": "^6.6.2",
       },
       "devDependencies": {
+        "@belweave/client-runtime": "workspace:*",
+        "@belweave/contracts": "workspace:*",
+        "@belweave/shared": "workspace:*",
+        "@belweave/ssh": "workspace:*",
+        "@belweave/tailscale": "workspace:*",
         "@effect/language-service": "catalog:",
         "@effect/vitest": "catalog:",
-        "@t3tools/client-runtime": "workspace:*",
-        "@t3tools/contracts": "workspace:*",
-        "@t3tools/shared": "workspace:*",
-        "@t3tools/ssh": "workspace:*",
-        "@t3tools/tailscale": "workspace:*",
         "@types/node": "catalog:",
         "effect-acp": "workspace:*",
         "tsdown": "catalog:",
@@ -40,7 +40,7 @@
       },
     },
     "apps/marketing": {
-      "name": "@t3tools/marketing",
+      "name": "@belweave/marketing",
       "version": "0.0.0",
       "dependencies": {
         "astro": "^6.0.4",
@@ -51,10 +51,10 @@
       },
     },
     "apps/server": {
-      "name": "t3",
-      "version": "0.0.25",
+      "name": "@belweave/trifecta",
+      "version": "0.0.29-alpha.3",
       "bin": {
-        "t3": "./dist/bin.mjs",
+        "trifecta": "./dist/bin.mjs",
       },
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.2.111",
@@ -68,12 +68,12 @@
         "open": "^10.1.0",
       },
       "devDependencies": {
+        "@belweave/contracts": "workspace:*",
+        "@belweave/shared": "workspace:*",
+        "@belweave/tailscale": "workspace:*",
+        "@belweave/web": "workspace:*",
         "@effect/language-service": "catalog:",
         "@effect/vitest": "catalog:",
-        "@t3tools/contracts": "workspace:*",
-        "@t3tools/shared": "workspace:*",
-        "@t3tools/tailscale": "workspace:*",
-        "@t3tools/web": "workspace:*",
         "@types/bun": "catalog:",
         "@types/node": "catalog:",
         "effect-acp": "workspace:*",
@@ -95,10 +95,13 @@
       },
     },
     "apps/web": {
-      "name": "@t3tools/web",
-      "version": "0.0.25",
+      "name": "@belweave/web",
+      "version": "0.0.29-alpha.3",
       "dependencies": {
         "@base-ui/react": "^1.4.1",
+        "@belweave/client-runtime": "workspace:*",
+        "@belweave/contracts": "workspace:*",
+        "@belweave/shared": "workspace:*",
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/modifiers": "^9.0.0",
         "@dnd-kit/sortable": "^10.0.0",
@@ -108,9 +111,6 @@
         "@legendapp/list": "3.0.0-beta.44",
         "@lexical/react": "^0.41.0",
         "@pierre/diffs": "catalog:",
-        "@t3tools/client-runtime": "workspace:*",
-        "@t3tools/contracts": "workspace:*",
-        "@t3tools/shared": "workspace:*",
         "@tanstack/react-pacer": "^0.19.4",
         "@tanstack/react-query": "^5.90.0",
         "@tanstack/react-router": "^1.160.2",
@@ -149,7 +149,7 @@
       },
     },
     "oxlint-plugin-trifecta": {
-      "name": "@t3tools/oxlint-plugin-trifecta",
+      "name": "@belweave/oxlint-plugin-trifecta",
       "dependencies": {
         "@effect/platform-node": "catalog:",
         "@oxlint/plugins": "^1.63.0",
@@ -164,10 +164,10 @@
       },
     },
     "packages/client-runtime": {
-      "name": "@t3tools/client-runtime",
+      "name": "@belweave/client-runtime",
       "version": "0.0.0-alpha.1",
       "dependencies": {
-        "@t3tools/contracts": "workspace:*",
+        "@belweave/contracts": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -177,8 +177,8 @@
       },
     },
     "packages/contracts": {
-      "name": "@t3tools/contracts",
-      "version": "0.0.25",
+      "name": "@belweave/contracts",
+      "version": "0.0.29-alpha.3",
       "dependencies": {
         "effect": "catalog:",
       },
@@ -221,10 +221,10 @@
       },
     },
     "packages/shared": {
-      "name": "@t3tools/shared",
+      "name": "@belweave/shared",
       "version": "0.0.0-alpha.1",
       "dependencies": {
-        "@t3tools/contracts": "workspace:*",
+        "@belweave/contracts": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -237,11 +237,11 @@
       },
     },
     "packages/ssh": {
-      "name": "@t3tools/ssh",
+      "name": "@belweave/ssh",
       "version": "0.0.0-alpha.1",
       "dependencies": {
-        "@t3tools/contracts": "workspace:*",
-        "@t3tools/shared": "workspace:*",
+        "@belweave/contracts": "workspace:*",
+        "@belweave/shared": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -254,7 +254,7 @@
       },
     },
     "packages/tailscale": {
-      "name": "@t3tools/tailscale",
+      "name": "@belweave/tailscale",
       "version": "0.0.0-alpha.1",
       "dependencies": {
         "@effect/platform-node": "catalog:",
@@ -269,12 +269,12 @@
       },
     },
     "scripts": {
-      "name": "@t3tools/scripts",
+      "name": "@belweave/scripts",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.2.77",
+        "@belweave/contracts": "workspace:*",
+        "@belweave/shared": "workspace:*",
         "@effect/platform-node": "catalog:",
-        "@t3tools/contracts": "workspace:*",
-        "@t3tools/shared": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -420,6 +420,28 @@
     "@base-ui/react": ["@base-ui/react@1.4.1", "", { "dependencies": { "@babel/runtime": "^7.29.2", "@base-ui/utils": "0.2.8", "@floating-ui/react-dom": "^2.1.8", "@floating-ui/utils": "^0.2.11", "use-sync-external-store": "^1.6.0" }, "peerDependencies": { "@date-fns/tz": "^1.2.0", "@types/react": "^17 || ^18 || ^19", "date-fns": "^4.0.0", "react": "^17 || ^18 || ^19", "react-dom": "^17 || ^18 || ^19" }, "optionalPeers": ["@date-fns/tz", "@types/react", "date-fns"] }, "sha512-Ab5/LIhcmL8BQcsBUYiOfkSDRdLpvgUBzMK30cu684JPcLclYlztharvCZyNNgzJtbAiREzI9q0pI5erHCMgCw=="],
 
     "@base-ui/utils": ["@base-ui/utils@0.2.8", "", { "dependencies": { "@babel/runtime": "^7.29.2", "@floating-ui/utils": "^0.2.11", "reselect": "^5.1.1", "use-sync-external-store": "^1.6.0" }, "peerDependencies": { "@types/react": "^17 || ^18 || ^19", "react": "^17 || ^18 || ^19", "react-dom": "^17 || ^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-jvOi+c+ftGlGotNcKnzPVg2IhCaDTB6/6R3JeqdjdXktuAJi3wKH9T7+svuaKh1mmfVU11UWzUZVH74JDfi/wQ=="],
+
+    "@belweave/client-runtime": ["@belweave/client-runtime@workspace:packages/client-runtime"],
+
+    "@belweave/contracts": ["@belweave/contracts@workspace:packages/contracts"],
+
+    "@belweave/desktop": ["@belweave/desktop@workspace:apps/desktop"],
+
+    "@belweave/marketing": ["@belweave/marketing@workspace:apps/marketing"],
+
+    "@belweave/oxlint-plugin-trifecta": ["@belweave/oxlint-plugin-trifecta@workspace:oxlint-plugin-trifecta"],
+
+    "@belweave/scripts": ["@belweave/scripts@workspace:scripts"],
+
+    "@belweave/shared": ["@belweave/shared@workspace:packages/shared"],
+
+    "@belweave/ssh": ["@belweave/ssh@workspace:packages/ssh"],
+
+    "@belweave/tailscale": ["@belweave/tailscale@workspace:packages/tailscale"],
+
+    "@belweave/trifecta": ["@belweave/trifecta@workspace:apps/server"],
+
+    "@belweave/web": ["@belweave/web@workspace:apps/web"],
 
     "@blazediff/core": ["@blazediff/core@1.9.1", "", {}, "sha512-ehg3jIkYKulZh+8om/O25vkvSsXXwC+skXmyA87FFx6A/45eqOkZsBltMw/TVteb0mloiGT8oGRTcjRAz66zaA=="],
 
@@ -922,26 +944,6 @@
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
     "@szmarczak/http-timer": ["@szmarczak/http-timer@4.0.6", "", { "dependencies": { "defer-to-connect": "^2.0.0" } }, "sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w=="],
-
-    "@t3tools/client-runtime": ["@t3tools/client-runtime@workspace:packages/client-runtime"],
-
-    "@t3tools/contracts": ["@t3tools/contracts@workspace:packages/contracts"],
-
-    "@t3tools/desktop": ["@t3tools/desktop@workspace:apps/desktop"],
-
-    "@t3tools/marketing": ["@t3tools/marketing@workspace:apps/marketing"],
-
-    "@t3tools/oxlint-plugin-trifecta": ["@t3tools/oxlint-plugin-trifecta@workspace:oxlint-plugin-trifecta"],
-
-    "@t3tools/scripts": ["@t3tools/scripts@workspace:scripts"],
-
-    "@t3tools/shared": ["@t3tools/shared@workspace:packages/shared"],
-
-    "@t3tools/ssh": ["@t3tools/ssh@workspace:packages/ssh"],
-
-    "@t3tools/tailscale": ["@t3tools/tailscale@workspace:packages/tailscale"],
-
-    "@t3tools/web": ["@t3tools/web@workspace:apps/web"],
 
     "@tailwindcss/node": ["@tailwindcss/node@4.2.1", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "enhanced-resolve": "^5.19.0", "jiti": "^2.6.1", "lightningcss": "1.31.1", "magic-string": "^0.30.21", "source-map-js": "^1.2.1", "tailwindcss": "4.2.1" } }, "sha512-jlx6sLk4EOwO6hHe1oCGm1Q4AN/s0rSrTTPBGPM0/RQ6Uylwq17FuU8IeJJKEjtc6K6O07zsvP+gDO6MMWo7pg=="],
 
@@ -2294,8 +2296,6 @@
     "supports-hyperlinks": ["supports-hyperlinks@3.2.0", "", { "dependencies": { "has-flag": "^4.0.0", "supports-color": "^7.0.0" } }, "sha512-zFObLMyZeEwzAoKCyu1B91U79K2t7ApXuQfo8OuxwXLDgcKxuwM+YvcbIhm6QWqz7mHUH1TVytR1PwVVjEuMig=="],
 
     "svgo": ["svgo@4.0.1", "", { "dependencies": { "commander": "^11.1.0", "css-select": "^5.1.0", "css-tree": "^3.0.1", "css-what": "^6.1.0", "csso": "^5.0.5", "picocolors": "^1.1.1", "sax": "^1.5.0" }, "bin": "./bin/svgo.js" }, "sha512-XDpWUOPC6FEibaLzjfe0ucaV0YrOjYotGJO1WpF0Zd+n6ZGEQUsSugaoLq9QkEZtAfQIxT42UChcssDVPP3+/w=="],
-
-    "t3": ["t3@workspace:apps/server"],
 
     "tabbable": ["tabbable@6.4.0", "", {}, "sha512-05PUHKSNE8ou2dwIxTngl4EzcnsCDZGJ/iCLtDflR/SHB/ny14rXc+qU5P4mG9JkusiV7EivzY9Mhm55AzAvCg=="],
 

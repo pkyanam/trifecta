@@ -82,11 +82,11 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           ConfigProvider.layer(
             ConfigProvider.fromEnv({
               env: {
-                T3CODE_DESKTOP_SKIP_BUILD: "true",
-                T3CODE_DESKTOP_KEEP_STAGE: "true",
-                T3CODE_DESKTOP_SIGNED: "true",
-                T3CODE_DESKTOP_VERBOSE: "true",
-                T3CODE_DESKTOP_MOCK_UPDATES: "true",
+                BELWEAVE_DESKTOP_SKIP_BUILD: "true",
+                BELWEAVE_DESKTOP_KEEP_STAGE: "true",
+                BELWEAVE_DESKTOP_SIGNED: "true",
+                BELWEAVE_DESKTOP_VERBOSE: "true",
+                BELWEAVE_DESKTOP_MOCK_UPDATES: "true",
               },
             }),
           ),

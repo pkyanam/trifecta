@@ -47,6 +47,18 @@ actor T3Client {
         subscriptionTemplates.removeAll()
     }
 
+    func attachmentData(id: String) async throws -> Data {
+        let safeId = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        guard let request = await connection.authenticatedRequest(path: "/attachments/\(safeId)") else {
+            throw T3Error.invalidServerURL
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw T3Error.requestFailed("Attachment unavailable")
+        }
+        return data
+    }
+
     func addStatusListener(_ listener: @escaping (T3Connection.ConnectionStatus) -> Void) {
         statusListeners.append(listener)
         listener(status)

@@ -4,7 +4,7 @@
 #   docker compose up --build
 #
 # Then test:
-#   curl http://localhost:3773/.well-known/t3/environment
+#   curl http://localhost:3773/.well-known/belweave/environment
 #
 # Connect your iOS/Android app to http://localhost:3773
 # ─────────────────────────────────────────────────────────────────────

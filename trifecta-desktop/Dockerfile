@@ -44,7 +44,7 @@ COPY scripts/package.json scripts/
 COPY . .
 
 RUN bun install --frozen-lockfile && \
-    bun run build --filter=t3 && \
+    bun run build --filter=@belweave/trifecta && \
     # Keep only what the runtime needs, drop everything else
     rm -rf apps/web apps/marketing apps/desktop packages scripts oxlint-plugin-trifecta && \
     rm -rf .turbo tsconfig.base.json turbo.json patches

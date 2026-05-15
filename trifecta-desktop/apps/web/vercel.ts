@@ -1,7 +1,7 @@
 import { matchers, routes, type Transform, type VercelConfig } from "@vercel/config/v1";
 
 const ROUTER_HOST = "app.trifecta.belweave.ai";
-const HOSTED_WEB_CHANNEL_COOKIE = "t3code_web_channel";
+const HOSTED_WEB_CHANNEL_COOKIE = "belweave_web_channel";
 const LATEST_ORIGIN = "https://latest.app.trifecta.belweave.ai";
 const NIGHTLY_ORIGIN = "https://nightly.app.trifecta.belweave.ai";
 const CLEAN_CHANNEL_QUERY_TRANSFORMS = [
@@ -25,15 +25,15 @@ function channelCookie(channel: "latest" | "nightly"): string {
 
 export const config: VercelConfig = {
   buildCommand:
-    'turbo build --filter @t3tools/web && bun ../../scripts/apply-web-brand-assets.ts --channel "${VITE_HOSTED_APP_CHANNEL:-latest}"',
+    'turbo build --filter @belweave/web && bun ../../scripts/apply-web-brand-assets.ts --channel "${VITE_HOSTED_APP_CHANNEL:-latest}"',
   git: {
     deploymentEnabled: false,
   },
   installCommand:
-    "bun add -g turbo && bun install --filter '@t3tools/contracts' --filter '@t3tools/client-runtime' --filter '@t3tools/scripts' --filter '@t3tools/web'",
+    "bun add -g turbo && bun install --filter '@belweave/contracts' --filter '@belweave/client-runtime' --filter '@belweave/scripts' --filter '@belweave/web'",
   routes: [
     {
-      src: "/__t3code/channel",
+      src: "/__belweave/channel",
       has: [matchers.query("channel", "nightly")],
       transforms: CLEAN_CHANNEL_QUERY_TRANSFORMS,
       headers: {
@@ -43,7 +43,7 @@ export const config: VercelConfig = {
       status: 302,
     },
     {
-      src: "/__t3code/channel",
+      src: "/__belweave/channel",
       transforms: CLEAN_CHANNEL_QUERY_TRANSFORMS,
       headers: {
         Location: "/",

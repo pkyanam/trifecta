@@ -1,14 +1,14 @@
 {
-  "name": "t3",
+  "name": "@belweave/trifecta",
   "version": "0.0.29-alpha.3",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/belweave/trifecta",
+    "url": "git+https://github.com/belweave/trifecta.git",
     "directory": "apps/server"
   },
   "bin": {
-    "t3": "./dist/bin.mjs"
+    "trifecta": "dist/bin.mjs"
   },
   "files": [
     "dist"
@@ -37,10 +37,10 @@
   "devDependencies": {
     "@effect/language-service": "catalog:",
     "@effect/vitest": "catalog:",
-    "@t3tools/contracts": "workspace:*",
-    "@t3tools/shared": "workspace:*",
-    "@t3tools/tailscale": "workspace:*",
-    "@t3tools/web": "workspace:*",
+    "@belweave/contracts": "workspace:*",
+    "@belweave/shared": "workspace:*",
+    "@belweave/tailscale": "workspace:*",
+    "@belweave/web": "workspace:*",
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
     "effect-acp": "workspace:*",

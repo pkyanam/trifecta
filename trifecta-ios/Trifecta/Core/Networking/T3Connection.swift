@@ -40,6 +40,16 @@ actor T3Connection {
         self.config = newConfig
     }
 
+    func authenticatedRequest(path: String) -> URLRequest? {
+        let base = PairingFlow.serverBaseURL(from: config.serverURL)
+        guard let url = URL(string: path, relativeTo: base)?.absoluteURL else { return nil }
+        var request = URLRequest(url: url)
+        if let token = config.bearerToken, !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        return request
+    }
+
     func statusStream() -> AsyncStream<ConnectionStatus> {
         AsyncStream { continuation in
             self.statusContinuation = continuation

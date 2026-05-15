@@ -16,8 +16,8 @@ import * as Result from "effect/Result";
 import * as Scope from "effect/Scope";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-import type { HermesSettings, ServerProvider, ServerProviderModel } from "@t3tools/contracts";
-import { ServerSettingsError } from "@t3tools/contracts";
+import type { HermesSettings, ServerProvider, ServerProviderModel } from "@belweave/contracts";
+import { ServerSettingsError } from "@belweave/contracts";
 
 import * as AcpClient from "effect-acp/client";
 import { AGENT_METHODS } from "effect-acp/schema";

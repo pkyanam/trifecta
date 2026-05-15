@@ -1,5 +1,5 @@
 {
-  "name": "@t3tools/desktop",
+  "name": "@belweave/desktop",
   "version": "0.0.29-alpha.3",
   "private": true,
   "type": "module",
@@ -23,11 +23,11 @@
   "devDependencies": {
     "@effect/language-service": "catalog:",
     "@effect/vitest": "catalog:",
-    "@t3tools/client-runtime": "workspace:*",
-    "@t3tools/contracts": "workspace:*",
-    "@t3tools/shared": "workspace:*",
-    "@t3tools/ssh": "workspace:*",
-    "@t3tools/tailscale": "workspace:*",
+    "@belweave/client-runtime": "workspace:*",
+    "@belweave/contracts": "workspace:*",
+    "@belweave/shared": "workspace:*",
+    "@belweave/ssh": "workspace:*",
+    "@belweave/tailscale": "workspace:*",
     "@types/node": "catalog:",
     "effect-acp": "workspace:*",
     "tsdown": "catalog:",

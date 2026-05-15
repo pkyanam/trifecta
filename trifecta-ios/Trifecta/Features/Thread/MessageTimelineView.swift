@@ -161,34 +161,35 @@ struct MessageTimelineView: View {
 
     private func jumpToLatestButton(proxy: ScrollViewProxy) -> some View {
         let isStreaming = store.messages.last?.streaming == true
-        let label = hasNewWhileScrolledUp || isStreaming ? "New message" : "Jump to latest"
+        let hasActivity = hasNewWhileScrolledUp || isStreaming
+        let label = hasActivity ? "New message" : "Jump to latest"
         return Button {
+            HapticFeedback.impact(.light)
             hasNewWhileScrolledUp = false
             withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
                 proxy.scrollTo(bottomAnchor, anchor: .bottom)
             }
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: hasNewWhileScrolledUp || isStreaming
-                      ? "arrow.down.circle.fill" : "arrow.down")
-                    .font(.system(size: 13, weight: .semibold))
+            HStack(spacing: 5) {
+                Image(systemName: hasActivity ? "arrow.down.circle.fill" : "arrow.down")
+                    .font(.system(size: 12, weight: .semibold))
                 Text(label)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
             }
-            .foregroundStyle(accentColor)
+            .foregroundStyle(hasActivity ? .white : accentColor)
             .padding(.horizontal, T3Spacing.md)
             .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                    .fill(T3Color.surfaceElevated)
+                Capsule()
+                    .fill(hasActivity ? accentColor : T3Color.surfaceElevated)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                    .stroke(T3Color.separator, lineWidth: 0.5)
+                Capsule()
+                    .stroke(hasActivity ? Color.clear : T3Color.separator, lineWidth: 0.5)
             )
-            .shadow(color: .black.opacity(0.18), radius: 8, y: 2)
+            .shadow(color: .black.opacity(0.20), radius: 10, y: 3)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(T3ScaleButtonStyle())
         .accessibilityLabel(label)
     }
 
@@ -199,11 +200,19 @@ struct MessageTimelineView: View {
     }
 
     private var messageSpacing: CGFloat {
-        density == .compact ? T3Spacing.sm : T3Spacing.md
+        switch density {
+        case .compact:     T3Spacing.sm
+        case .comfortable: T3Spacing.md
+        case .spacious:    T3Spacing.xl
+        }
     }
 
     private var horizontalPadding: CGFloat {
-        density == .compact ? T3Spacing.lg : T3Spacing.xl
+        switch density {
+        case .compact:     T3Spacing.lg
+        case .comfortable: T3Spacing.xl
+        case .spacious:    T3Spacing.xxl
+        }
     }
 
     private var accentColor: Color {

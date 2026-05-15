@@ -15,6 +15,7 @@ struct SettingsView: View {
 
     @AppStorage("appearance") private var appearanceRaw: String = AppAppearance.system.rawValue
     @AppStorage("accent") private var accentRaw: String = AppAccent.blue.rawValue
+    @AppStorage("userBubbleColor") private var userBubbleColorRaw: String = UserBubbleColor.accent.rawValue
     @AppStorage("transcriptDensity") private var transcriptDensityRaw: String = TranscriptDensity.comfortable.rawValue
     @AppStorage("composerSize") private var composerSizeRaw: String = ComposerSize.comfortable.rawValue
 
@@ -285,6 +286,7 @@ struct SettingsView: View {
     private func accentSwatch(_ accent: AppAccent) -> some View {
         let selected = accentRaw == accent.rawValue
         return Button {
+            HapticFeedback.selection()
             accentRaw = accent.rawValue
         } label: {
             ZStack {
@@ -330,9 +332,52 @@ struct SettingsView: View {
                             Button(s.label) { composerSizeRaw = s.rawValue }
                         }
                     }
+                    Divider().overlay(T3Color.separator)
+                    VStack(alignment: .leading, spacing: T3Spacing.sm) {
+                        HStack {
+                            Text("User bubble")
+                                .font(T3Typography.body)
+                                .foregroundStyle(T3Color.textPrimary)
+                            Spacer()
+                            Text((UserBubbleColor(rawValue: userBubbleColorRaw) ?? .accent).label)
+                                .font(T3Typography.footnote)
+                                .foregroundStyle(T3Color.textTertiary)
+                        }
+                        LazyVGrid(columns: Array(repeating: GridItem(.fixed(30), spacing: 10), count: 7),
+                                  alignment: .leading,
+                                  spacing: 10) {
+                            ForEach(UserBubbleColor.allCases) { bubbleColor in
+                                userBubbleSwatch(bubbleColor)
+                            }
+                        }
+                    }
+                    .padding(.vertical, T3Spacing.md)
                 }
             }
         }
+    }
+
+    private func userBubbleSwatch(_ bubbleColor: UserBubbleColor) -> some View {
+        let selected = userBubbleColorRaw == bubbleColor.rawValue
+        let color = bubbleColor.color(accentRaw: accentRaw)
+        return Button {
+            HapticFeedback.selection()
+            userBubbleColorRaw = bubbleColor.rawValue
+        } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(color)
+                    .frame(width: 30, height: 30)
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(bubbleColor.label)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     // MARK: - Archived threads
@@ -420,6 +465,7 @@ struct SettingsView: View {
                         HStack(spacing: T3Spacing.sm) {
                             Button {
                                 UIPasteboard.general.string = url.absoluteString
+                                HapticFeedback.notification(.success)
                                 didCopyURL = true
                                 Task {
                                     try? await Task.sleep(nanoseconds: 1_800_000_000)
