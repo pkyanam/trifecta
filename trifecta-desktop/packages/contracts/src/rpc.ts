@@ -69,6 +69,24 @@ import {
   TerminalWriteInput,
 } from "./terminal.ts";
 import {
+  SshAuditEventList,
+  SshConfirmHostKeyInput,
+  SshError,
+  SshHostProfile,
+  SshHostProfileCreateInput,
+  SshHostProfileList,
+  SshHostProfileRemoveInput,
+  SshIssueSessionTokenInput,
+  SshIssueSessionTokenResult,
+  SshOpenSessionInput,
+  SshOpenSessionResult,
+  SshResizeInput,
+  SshSendInputInput,
+  SshSessionInput,
+  SshSessionSnapshot,
+  SshTerminalEvent,
+} from "./sshSession.ts";
+import {
   ServerConfigStreamEvent,
   ServerConfig,
   ServerProviderUpdateError,
@@ -134,6 +152,19 @@ export const WS_METHODS = {
   terminalRestart: "terminal.restart",
   terminalClose: "terminal.close",
 
+  // SSH terminal methods
+  sshListHosts: "ssh.listHosts",
+  sshAddHost: "ssh.addHost",
+  sshRemoveHost: "ssh.removeHost",
+  sshOpenSession: "ssh.openSession",
+  sshGetSession: "ssh.getSession",
+  sshSendInput: "ssh.sendInput",
+  sshResize: "ssh.resize",
+  sshConfirmHostKey: "ssh.confirmHostKey",
+  sshCloseSession: "ssh.closeSession",
+  sshIssueSessionToken: "ssh.issueSessionToken",
+  sshListAudit: "ssh.listAudit",
+
   // Server meta
   serverGetConfig: "server.getConfig",
   serverRefreshProviders: "server.refreshProviders",
@@ -158,6 +189,7 @@ export const WS_METHODS = {
   subscribeServerConfig: "subscribeServerConfig",
   subscribeServerLifecycle: "subscribeServerLifecycle",
   subscribeAuthAccess: "subscribeAuthAccess",
+  subscribeSshTerminal: "subscribeSshTerminal",
 } as const;
 
 export const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -380,6 +412,75 @@ export const WsTerminalCloseRpc = Rpc.make(WS_METHODS.terminalClose, {
   error: TerminalError,
 });
 
+export const WsSshListHostsRpc = Rpc.make(WS_METHODS.sshListHosts, {
+  payload: Schema.Struct({}),
+  success: SshHostProfileList,
+  error: SshError,
+});
+
+export const WsSshAddHostRpc = Rpc.make(WS_METHODS.sshAddHost, {
+  payload: SshHostProfileCreateInput,
+  success: SshHostProfile,
+  error: SshError,
+});
+
+export const WsSshRemoveHostRpc = Rpc.make(WS_METHODS.sshRemoveHost, {
+  payload: SshHostProfileRemoveInput,
+  error: SshError,
+});
+
+export const WsSshOpenSessionRpc = Rpc.make(WS_METHODS.sshOpenSession, {
+  payload: SshOpenSessionInput,
+  success: SshOpenSessionResult,
+  error: SshError,
+});
+
+export const WsSshGetSessionRpc = Rpc.make(WS_METHODS.sshGetSession, {
+  payload: SshSessionInput,
+  success: SshSessionSnapshot,
+  error: SshError,
+});
+
+export const WsSshSendInputRpc = Rpc.make(WS_METHODS.sshSendInput, {
+  payload: SshSendInputInput,
+  error: SshError,
+});
+
+export const WsSshResizeRpc = Rpc.make(WS_METHODS.sshResize, {
+  payload: SshResizeInput,
+  error: SshError,
+});
+
+export const WsSshConfirmHostKeyRpc = Rpc.make(WS_METHODS.sshConfirmHostKey, {
+  payload: SshConfirmHostKeyInput,
+  success: SshSessionSnapshot,
+  error: SshError,
+});
+
+export const WsSshCloseSessionRpc = Rpc.make(WS_METHODS.sshCloseSession, {
+  payload: SshSessionInput,
+  error: SshError,
+});
+
+export const WsSshIssueSessionTokenRpc = Rpc.make(WS_METHODS.sshIssueSessionToken, {
+  payload: SshIssueSessionTokenInput,
+  success: SshIssueSessionTokenResult,
+  error: SshError,
+});
+
+export const WsSshListAuditRpc = Rpc.make(WS_METHODS.sshListAudit, {
+  payload: Schema.Struct({}),
+  success: SshAuditEventList,
+  error: SshError,
+});
+
+export const WsSubscribeSshTerminalRpc = Rpc.make(WS_METHODS.subscribeSshTerminal, {
+  payload: SshSessionInput,
+  success: SshTerminalEvent,
+  error: SshError,
+  stream: true,
+});
+
 export const WsOrchestrationDispatchCommandRpc = Rpc.make(
   ORCHESTRATION_WS_METHODS.dispatchCommand,
   {
@@ -499,6 +600,18 @@ export const WsRpcGroup = RpcGroup.make(
   WsTerminalRestartRpc,
   WsTerminalCloseRpc,
   WsSubscribeTerminalEventsRpc,
+  WsSshListHostsRpc,
+  WsSshAddHostRpc,
+  WsSshRemoveHostRpc,
+  WsSshOpenSessionRpc,
+  WsSshGetSessionRpc,
+  WsSshSendInputRpc,
+  WsSshResizeRpc,
+  WsSshConfirmHostKeyRpc,
+  WsSshCloseSessionRpc,
+  WsSshIssueSessionTokenRpc,
+  WsSshListAuditRpc,
+  WsSubscribeSshTerminalRpc,
   WsSubscribeServerConfigRpc,
   WsSubscribeServerLifecycleRpc,
   WsSubscribeAuthAccessRpc,
