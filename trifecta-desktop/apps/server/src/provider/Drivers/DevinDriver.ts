@@ -22,10 +22,7 @@ import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMainte
 import { makeDevinTextGeneration } from "../../textGeneration/DevinTextGeneration.ts";
 import { ProviderDriverError } from "../Errors.ts";
 import { makeDevinAdapter } from "../Layers/DevinAdapter.ts";
-import {
-  checkDevinProviderStatus,
-  makePendingDevinProvider,
-} from "../Layers/DevinProvider.ts";
+import { checkDevinProviderStatus, makePendingDevinProvider } from "../Layers/DevinProvider.ts";
 import { makeManagedServerProvider } from "../makeManagedServerProvider.ts";
 import {
   defaultProviderContinuationIdentity,

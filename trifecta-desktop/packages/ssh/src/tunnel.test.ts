@@ -125,9 +125,18 @@ describe("ssh tunnel scripts", () => {
       packageSpec: "@belweave/trifecta@nightly; touch /tmp/belweave-owned",
     });
 
-    assert.include(script, "exec npx --yes '@belweave/trifecta@nightly; touch /tmp/belweave-owned' \"$@\"");
-    assert.include(script, "exec npm exec --yes '@belweave/trifecta@nightly; touch /tmp/belweave-owned' -- \"$@\"");
-    assert.notInclude(script, "exec npx --yes @belweave/trifecta@nightly; touch /tmp/belweave-owned");
+    assert.include(
+      script,
+      "exec npx --yes '@belweave/trifecta@nightly; touch /tmp/belweave-owned' \"$@\"",
+    );
+    assert.include(
+      script,
+      "exec npm exec --yes '@belweave/trifecta@nightly; touch /tmp/belweave-owned' -- \"$@\"",
+    );
+    assert.notInclude(
+      script,
+      "exec npx --yes @belweave/trifecta@nightly; touch /tmp/belweave-owned",
+    );
   });
 
   it("builds the remote Trifecta runner with a node script override", () => {
@@ -171,14 +180,20 @@ describe("ssh tunnel scripts", () => {
     assert.include(buildRemoteLaunchScript(), '--base-dir "$DEFAULT_SERVER_HOME"');
     assert.notInclude(buildRemoteLaunchScript(), "server-home");
     assert.include(buildRemoteLaunchScript(), "Remote Belweave server did not become ready");
-    assert.include(buildRemoteLaunchScript({ packageSpec: "@belweave/trifecta@nightly" }), "@belweave/trifecta@nightly");
+    assert.include(
+      buildRemoteLaunchScript({ packageSpec: "@belweave/trifecta@nightly" }),
+      "@belweave/trifecta@nightly",
+    );
     assert.include(
       buildRemotePairingScript(target),
       '"$RUNNER_FILE" auth pairing create --base-dir "$PAIRING_BASE_DIR" --json',
     );
     assert.include(buildRemotePairingScript(target), 'PAIRING_BASE_DIR="$DEFAULT_SERVER_HOME"');
     assert.notInclude(buildRemotePairingScript(target), "server-home");
-    assert.include(buildRemotePairingScript(target, { packageSpec: "@belweave/trifecta@nightly" }), "@belweave/trifecta@nightly");
+    assert.include(
+      buildRemotePairingScript(target, { packageSpec: "@belweave/trifecta@nightly" }),
+      "@belweave/trifecta@nightly",
+    );
     assert.include(
       buildRemoteStopScript(target),
       'if [ "$REMOTE_MANAGED" != "external" ] && [ -n "$REMOTE_PID" ]',

@@ -31,9 +31,7 @@ export interface SshCredentialResolveInput {
 }
 
 export interface SshCredentialsShape {
-  readonly resolve: (
-    input: SshCredentialResolveInput,
-  ) => Effect.Effect<SshResolvedCredential>;
+  readonly resolve: (input: SshCredentialResolveInput) => Effect.Effect<SshResolvedCredential>;
 }
 
 export class SshCredentials extends Context.Service<SshCredentials, SshCredentialsShape>()(

@@ -1,8 +1,4 @@
-import {
-  ProviderDriverKind,
-  ProviderInstanceId,
-  ThreadId,
-} from "@belweave/contracts";
+import { ProviderDriverKind, ProviderInstanceId, ThreadId } from "@belweave/contracts";
 import { describe, expect, it } from "vitest";
 import { it as effectIt } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -230,7 +226,11 @@ describe("makeGeminiHeadlessAdapter (session pinning)", () => {
             const cmd = command as unknown as { args: ReadonlyArray<string> };
             if (cmd.args[0] === "--list-sessions") {
               return Effect.succeed(
-                mockHandle({ stdout: "Available sessions for this project (0):\n", stderr: "", code: 0 }),
+                mockHandle({
+                  stdout: "Available sessions for this project (0):\n",
+                  stderr: "",
+                  code: 0,
+                }),
               );
             }
             return Effect.succeed(mockHandle({ stdout: "done\n", stderr: "", code: 0 }));

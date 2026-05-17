@@ -22,10 +22,7 @@ import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMainte
 import { makeHermesTextGeneration } from "../../textGeneration/HermesTextGeneration.ts";
 import { ProviderDriverError } from "../Errors.ts";
 import { makeHermesAdapter } from "../Layers/HermesAdapter.ts";
-import {
-  checkHermesProviderStatus,
-  makePendingHermesProvider,
-} from "../Layers/HermesProvider.ts";
+import { checkHermesProviderStatus, makePendingHermesProvider } from "../Layers/HermesProvider.ts";
 import { makeManagedServerProvider } from "../makeManagedServerProvider.ts";
 import {
   defaultProviderContinuationIdentity,

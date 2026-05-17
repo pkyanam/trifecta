@@ -1,8 +1,4 @@
-import {
-  AuthSessionId,
-  SshSessionId,
-  SshSessionTokenInvalidError,
-} from "@belweave/contracts";
+import { AuthSessionId, SshSessionId, SshSessionTokenInvalidError } from "@belweave/contracts";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -19,10 +15,7 @@ import {
   signPayload,
   timingSafeEqualBase64Url,
 } from "../../auth/utils.ts";
-import {
-  SshTokenAuthority,
-  type SshTokenAuthorityShape,
-} from "../Services/SshTokenAuthority.ts";
+import { SshTokenAuthority, type SshTokenAuthorityShape } from "../Services/SshTokenAuthority.ts";
 
 const SIGNING_SECRET_NAME = "ssh-session-signing-key";
 const DEFAULT_SSH_TOKEN_TTL = Duration.minutes(2);
@@ -41,9 +34,9 @@ const decodeSshSessionClaims = Schema.decodeUnknownEffect(Schema.fromJsonString(
 
 const make = Effect.gen(function* () {
   const secretStore = yield* ServerSecretStore;
-  const signingKey = yield* secretStore.getOrCreateRandom(SIGNING_SECRET_NAME, 64).pipe(
-    Effect.orDie,
-  );
+  const signingKey = yield* secretStore
+    .getOrCreateRandom(SIGNING_SECRET_NAME, 64)
+    .pipe(Effect.orDie);
 
   const revoked = yield* Ref.make<Set<SshSessionId>>(new Set());
 

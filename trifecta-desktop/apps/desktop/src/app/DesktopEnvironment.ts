@@ -68,6 +68,7 @@ export interface DesktopEnvironmentShape {
   readonly linuxWmClass: string;
   readonly userDataDirName: string;
   readonly legacyUserDataDirName: string;
+  readonly legacyUserDataDirNames: ReadonlyArray<string>;
   readonly defaultDesktopSettings: DesktopSettings;
   readonly runtimeInfo: DesktopRuntimeInfo;
   readonly resolvePickFolderDefaultPath: (rawOptions: unknown) => Option.Option<string>;
@@ -151,7 +152,9 @@ const makeDesktopEnvironment = Effect.fn("desktop.environment.make")(function* (
       : input.platform === "darwin"
         ? path.join(homeDirectory, "Library", "Application Support")
         : Option.getOrElse(config.xdgConfigHome, () => path.join(homeDirectory, ".config"));
-  const baseDir = Option.getOrElse(config.belweaveHome, () => path.join(homeDirectory, ".belweave"));
+  const baseDir = Option.getOrElse(config.belweaveHome, () =>
+    path.join(homeDirectory, ".belweave"),
+  );
   const rootDir = path.resolve(input.dirname, "../../..");
   const appRoot = input.isPackaged ? input.appPath : rootDir;
   const branding = resolveDesktopAppBranding({
@@ -162,6 +165,9 @@ const makeDesktopEnvironment = Effect.fn("desktop.environment.make")(function* (
   const stateDir = path.join(baseDir, isDevelopment ? "dev" : "userdata");
   const userDataDirName = isDevelopment ? "belweave-dev" : "belweave";
   const legacyUserDataDirName = isDevelopment ? "Trifecta (Dev)" : "Trifecta (Alpha)";
+  const legacyUserDataDirNames = isDevelopment
+    ? ["Trifecta (Dev)", "trifecta-dev"]
+    : ["Trifecta (Alpha)", "trifecta"];
   const resourcesPath = input.resourcesPath;
 
   return DesktopEnvironment.of({
@@ -204,6 +210,7 @@ const makeDesktopEnvironment = Effect.fn("desktop.environment.make")(function* (
     linuxWmClass: isDevelopment ? "belweave-dev" : "belweave",
     userDataDirName,
     legacyUserDataDirName,
+    legacyUserDataDirNames,
     defaultDesktopSettings: resolveDefaultDesktopSettings(input.appVersion),
     runtimeInfo: resolveDesktopRuntimeInfo({
       platform: input.platform,

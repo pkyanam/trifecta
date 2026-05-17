@@ -65,6 +65,7 @@
 			);
 			name = Trifecta;
 			packageProductDependencies = (
+				6099A0112FADCC44007535A7 /* SwiftTerm */,
 			);
 			productName = Trifecta;
 			productReference = 609943022FADCC44007535A7 /* Trifecta.app */;
@@ -97,6 +98,9 @@
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 609943032FADCC44007535A7 /* Products */;
 			projectDirPath = "";
+			packageReferences = (
+				6099A0102FADCC44007535A7 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
+			);
 			projectRoot = "";
 			targets = (
 				609943012FADCC44007535A7 /* Trifecta */,
@@ -326,6 +330,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		6099A0102FADCC44007535A7 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6099A0112FADCC44007535A7 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6099A0102FADCC44007535A7 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 609942FA2FADCC44007535A7 /* Project object */;
 }

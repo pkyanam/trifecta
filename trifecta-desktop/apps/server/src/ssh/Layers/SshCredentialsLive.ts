@@ -4,6 +4,8 @@ import * as Layer from "effect/Layer";
 import { SshCredentials, type SshCredentialsShape } from "../Services/SshCredentials.ts";
 
 const make = Effect.sync(() => {
+  const defaultIdentity = process.env.HOME ? `${process.env.HOME}/.ssh/id_ed25519` : undefined;
+
   /**
    * Build the env + extra ssh args for the requested auth method. Raw private
    * keys are NEVER serialised to the wire — they live only in the desktop's
@@ -19,6 +21,7 @@ const make = Effect.sync(() => {
             method: host.authMethod,
             env: process.env.SSH_AUTH_SOCK ? { SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK } : {},
             extraSshArgs: [
+              "-A",
               "-o",
               "PreferredAuthentications=publickey",
               "-o",
@@ -37,6 +40,10 @@ const make = Effect.sync(() => {
             extraSshArgs: [
               "-o",
               "PreferredAuthentications=publickey",
+              ...(process.platform === "darwin"
+                ? ["-o", "UseKeychain=yes", "-o", "AddKeysToAgent=yes"]
+                : []),
+              ...(defaultIdentity ? ["-i", defaultIdentity] : []),
               "-o",
               "PasswordAuthentication=no",
               "-o",

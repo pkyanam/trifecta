@@ -21,6 +21,7 @@ import {
   SshError,
   SshHostId,
   SshSessionId,
+  SshSetupShellProfileResult,
   SshSpawnError,
   type SshTerminalEvent,
   type OrchestrationEvent,
@@ -61,6 +62,7 @@ import { ServerRuntimeStartup } from "./serverRuntimeStartup.ts";
 import { redactServerSettingsForClient, ServerSettingsService } from "./serverSettings.ts";
 import { TerminalManager } from "./terminal/Services/Manager.ts";
 import { SshHostProfiles } from "./ssh/Services/SshHostProfiles.ts";
+import { SshKnownHosts } from "./ssh/Services/SshKnownHosts.ts";
 import { SshAuditLog } from "./ssh/Services/SshAuditLog.ts";
 import { SshSessionManager } from "./ssh/Services/SshSessionManager.ts";
 import { SshTokenAuthority } from "./ssh/Services/SshTokenAuthority.ts";
@@ -200,6 +202,7 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
       const serverAuth = yield* ServerAuth;
       const sourceControlDiscovery = yield* SourceControlDiscoveryLayer.SourceControlDiscovery;
       const sshHostProfiles = yield* SshHostProfiles;
+      const sshKnownHosts = yield* SshKnownHosts;
       const sshSessionManager = yield* SshSessionManager;
       const sshAuditLog = yield* SshAuditLog;
       const sshTokenAuthority = yield* SshTokenAuthority;
@@ -1252,6 +1255,9 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
             Effect.gen(function* () {
               const profile = yield* sshHostProfiles.get(input.hostId);
               yield* sshHostProfiles.remove(input.hostId);
+              yield* sshKnownHosts
+                .remove({ hostname: profile.hostname, port: profile.port })
+                .pipe(Effect.catch(() => Effect.void));
               yield* sshAuditLog
                 .append({
                   type: "host-profile-removed",
@@ -1371,6 +1377,53 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
               Effect.map((events) => ({ events })),
               Effect.mapError((cause) => mapToSshError(cause)),
             ),
+            { "rpc.aggregate": "ssh" },
+          ),
+        [WS_METHODS.sshSetupShellProfile]: (_input: unknown) =>
+          observeRpcEffect(
+            WS_METHODS.sshSetupShellProfile,
+            Effect.sync(() => {
+              const home = process.env.HOME ?? process.cwd();
+              const marker = "# >>> trifecta-ssh-keychain >>>";
+              const markerEnd = "# <<< trifecta-ssh-keychain <<<";
+              const snippet = [
+                marker,
+                'if [ -n "$SSH_CONNECTION" ] && [ "$TERM" != "dumb" ]; then',
+                "  security unlock-keychain ~/Library/Keychains/login.keychain-db 2>/dev/null || true",
+                "fi",
+                markerEnd,
+              ].join("\n");
+              const fs = require("node:fs");
+              const path = require("node:path");
+              for (const rcFile of [".zshrc", ".bashrc", ".bash_profile"]) {
+                const rcPath = path.join(home, rcFile);
+                try {
+                  const content = fs.readFileSync(rcPath, "utf-8");
+                  if (content.includes(marker)) {
+                    return SshSetupShellProfileResult.make({
+                      shellProfile: rcFile as any,
+                      alreadyPresent: true,
+                    });
+                  }
+                } catch {
+                  continue;
+                }
+              }
+              const shell = process.env.SHELL ?? "/bin/zsh";
+              const rcFile = shell.endsWith("zsh") ? ".zshrc" : ".bashrc";
+              const rcPath = path.join(home, rcFile);
+              let content = "";
+              try {
+                content = fs.readFileSync(rcPath, "utf-8");
+              } catch {
+                content = "";
+              }
+              fs.writeFileSync(rcPath, content.trimEnd() + "\n\n" + snippet + "\n", "utf-8");
+              return SshSetupShellProfileResult.make({
+                shellProfile: rcFile as any,
+                alreadyPresent: false,
+              });
+            }),
             { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.subscribeSshTerminal]: (input) =>

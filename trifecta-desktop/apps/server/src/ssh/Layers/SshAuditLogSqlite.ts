@@ -14,10 +14,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 
-import {
-  toPersistenceDecodeError,
-  toPersistenceSqlError,
-} from "../../persistence/Errors.ts";
+import { toPersistenceDecodeError, toPersistenceSqlError } from "../../persistence/Errors.ts";
 import {
   SshAuditLog,
   type SshAuditLogError,

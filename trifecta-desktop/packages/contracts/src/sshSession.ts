@@ -28,11 +28,7 @@ export const SshHostLabelSchema = TrimmedNonEmptyString.check(Schema.isMaxLength
  * protocol must only ever describe how authentication happened, never carry
  * the secret material that authenticated it.
  */
-export const SshAuthMethod = Schema.Literals([
-  "agent-forward",
-  "keychain-key",
-  "password-prompt",
-]);
+export const SshAuthMethod = Schema.Literals(["agent-forward", "keychain-key", "password-prompt"]);
 export type SshAuthMethod = typeof SshAuthMethod.Type;
 
 /**
@@ -357,3 +353,9 @@ export const SshError = Schema.Union([
   SshSpawnError,
 ]);
 export type SshError = typeof SshError.Type;
+
+export const SshSetupShellProfileResult = Schema.Struct({
+  shellProfile: TrimmedNonEmptyString,
+  alreadyPresent: Schema.Boolean,
+});
+export type SshSetupShellProfileResult = typeof SshSetupShellProfileResult.Type;

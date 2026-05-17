@@ -26,7 +26,9 @@ const makeServerConfigLayer = (
       } satisfies ServerConfigShape;
     }),
   ).pipe(
-    Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "belweave-auth-control-plane-test-" })),
+    Layer.provide(
+      ServerConfig.layerTest(process.cwd(), { prefix: "belweave-auth-control-plane-test-" }),
+    ),
   );
 
 const makeAuthControlPlaneLayer = (

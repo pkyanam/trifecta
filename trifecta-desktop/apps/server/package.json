@@ -35,12 +35,12 @@
     "open": "^10.1.0"
   },
   "devDependencies": {
-    "@effect/language-service": "catalog:",
-    "@effect/vitest": "catalog:",
     "@belweave/contracts": "workspace:*",
     "@belweave/shared": "workspace:*",
     "@belweave/tailscale": "workspace:*",
     "@belweave/web": "workspace:*",
+    "@effect/language-service": "catalog:",
+    "@effect/vitest": "catalog:",
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
     "effect-acp": "workspace:*",

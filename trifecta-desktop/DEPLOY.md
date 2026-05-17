@@ -224,11 +224,11 @@ sudo rm -rf /opt/trifecta/data
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `TRIFECTA_HOST` | `0.0.0.0` | Interface to bind |
-| `TRIFECTA_PORT` | `3773` | HTTP + WebSocket port |
-| `TRIFECTA_HOME` | `/data` | Persistent data directory |
-| `TRIFECTA_LOG_LEVEL` | `Info` | Debug, Info, Warning, Error |
-| `CODEX_HOME` | — | Codex auth/config directory |
-| `OPENAI_API_KEY` | — | Codex API key (alternative to `codex login`) |
+| Variable             | Default   | Description                                  |
+| -------------------- | --------- | -------------------------------------------- |
+| `TRIFECTA_HOST`      | `0.0.0.0` | Interface to bind                            |
+| `TRIFECTA_PORT`      | `3773`    | HTTP + WebSocket port                        |
+| `TRIFECTA_HOME`      | `/data`   | Persistent data directory                    |
+| `TRIFECTA_LOG_LEVEL` | `Info`    | Debug, Info, Warning, Error                  |
+| `CODEX_HOME`         | —         | Codex auth/config directory                  |
+| `OPENAI_API_KEY`     | —         | Codex API key (alternative to `codex login`) |

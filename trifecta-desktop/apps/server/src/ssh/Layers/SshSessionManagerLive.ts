@@ -52,6 +52,7 @@ const WATCHDOG_TICK = Duration.seconds(30);
 const KEYSCAN_TIMEOUT = Duration.seconds(15);
 const FINGERPRINT_TIMEOUT = Duration.seconds(5);
 const SSH_KEY_TYPES = "ed25519,ecdsa,rsa";
+const MAX_REPLAY_EVENTS = 128;
 
 interface SshSessionState {
   readonly sessionId: SshSessionId;
@@ -73,6 +74,7 @@ interface SshSessionState {
   unsubscribeData: (() => void) | null;
   unsubscribeExit: (() => void) | null;
   watchdog: Fiber.Fiber<unknown, unknown> | null;
+  replayEvents: Array<SshTerminalEvent>;
 }
 
 function isoFromMillis(ms: number): string {
@@ -118,12 +120,13 @@ const make = Effect.gen(function* () {
     );
 
   const writeKnownHostsFile = (knownHostsPath: string, rawLine: string) =>
-    fs.writeFileString(knownHostsPath, `${rawLine}\n`, { flag: "w" }).pipe(
-      Effect.mapError(
-        (cause) =>
-          new SshSpawnError({ detail: `Failed to write known_hosts: ${cause.message}` }),
-      ),
-    );
+    fs
+      .writeFileString(knownHostsPath, `${rawLine}\n`, { flag: "w" })
+      .pipe(
+        Effect.mapError(
+          (cause) => new SshSpawnError({ detail: `Failed to write known_hosts: ${cause.message}` }),
+        ),
+      );
 
   const runHostKeyScan = (hostname: string, port: number) =>
     processRunner
@@ -238,6 +241,46 @@ const make = Effect.gen(function* () {
       });
     });
 
+  const publishReplayable = (state: SshSessionState, event: SshTerminalEvent) =>
+    Effect.gen(function* () {
+      state.replayEvents.push(event);
+      if (state.replayEvents.length > MAX_REPLAY_EVENTS) {
+        state.replayEvents.splice(0, state.replayEvents.length - MAX_REPLAY_EVENTS);
+      }
+      yield* PubSub.publish(state.hub, event);
+    });
+
+  const initialEventsFor = (state: SshSessionState) =>
+    Effect.gen(function* () {
+      const now = DateTime.formatIso(yield* DateTime.now);
+      const events: SshTerminalEvent[] = [
+        {
+          type: "status",
+          sessionId: state.sessionId,
+          createdAt: now,
+          snapshot: snapshotOf(state),
+        },
+      ];
+      if (state.status === "pending-host-key" && state.pendingFingerprint) {
+        events.push({
+          type: "host-key-prompt",
+          sessionId: state.sessionId,
+          createdAt: now,
+          prompt: {
+            sessionId: state.sessionId,
+            hostId: state.host.id,
+            hostname: state.host.hostname,
+            port: state.host.port,
+            keyType: state.pendingFingerprint.keyType,
+            fingerprintSha256: state.pendingFingerprint.sha256,
+            promptedAt: now,
+          },
+        });
+      }
+      events.push(...state.replayEvents);
+      return events;
+    });
+
   const closeSessionInternal = (sshSessionId: SshSessionId, reason: "user" | "timeout" | "error") =>
     Effect.gen(function* () {
       const state = yield* removeState(sshSessionId);
@@ -342,12 +385,7 @@ const make = Effect.gen(function* () {
           rows: state.rows,
           env,
         })
-        .pipe(
-          Effect.mapError(
-            (cause) =>
-              new SshSpawnError({ detail: cause.message, cause: cause as unknown as Error }),
-          ),
-        );
+        .pipe(Effect.mapError((cause) => new SshSpawnError({ detail: cause.message })));
 
       const nowMs = yield* Clock.currentTimeMillis;
       yield* updateState(sshSessionId, (s) => {
@@ -366,7 +404,7 @@ const make = Effect.gen(function* () {
             const isoNow = DateTime.formatIso(yield* DateTime.now);
             const current = (yield* Ref.get(sessions)).get(sshSessionId);
             if (!current) return;
-            yield* PubSub.publish(current.hub, {
+            yield* publishReplayable(current, {
               type: "output",
               sessionId: sshSessionId,
               createdAt: isoNow,
@@ -386,7 +424,7 @@ const make = Effect.gen(function* () {
             const isoNow = DateTime.formatIso(yield* DateTime.now);
             const current = (yield* Ref.get(sessions)).get(sshSessionId);
             if (current) {
-              yield* PubSub.publish(current.hub, {
+              yield* publishReplayable(current, {
                 type: "exited",
                 sessionId: sshSessionId,
                 createdAt: isoNow,
@@ -429,12 +467,14 @@ const make = Effect.gen(function* () {
       );
 
       const sessionId = SshSessionId.make(`ssh-session-${Crypto.randomUUID()}`);
-      const tempDir = yield* fs.makeTempDirectory({ prefix: "belweave-ssh-known-" }).pipe(
-        Effect.mapError(
-          (cause) =>
-            new SshSpawnError({ detail: `Failed to allocate temp dir: ${cause.message}` }),
-        ),
-      );
+      const tempDir = yield* fs
+        .makeTempDirectory({ prefix: "belweave-ssh-known-" })
+        .pipe(
+          Effect.mapError(
+            (cause) =>
+              new SshSpawnError({ detail: `Failed to allocate temp dir: ${cause.message}` }),
+          ),
+        );
       const knownHostsPath = path.join(tempDir, "known_hosts");
 
       const rawLine = yield* runHostKeyScan(host.hostname, host.port);
@@ -501,6 +541,7 @@ const make = Effect.gen(function* () {
         unsubscribeData: null,
         unsubscribeExit: null,
         watchdog: null,
+        replayEvents: [],
       };
 
       yield* Ref.update(sessions, (current) => {
@@ -558,7 +599,9 @@ const make = Effect.gen(function* () {
       const state = yield* requireSession(input.sshSessionId, input.authSessionId);
       if (state.status !== "running" || !state.process) {
         return yield* Effect.fail(
-          new SshSessionNotFoundError({ sessionId: input.sshSessionId }),
+          new SshSpawnError({
+            detail: `SSH session is ${state.status}; input is accepted after the terminal is running`,
+          }),
         );
       }
       state.process.write(input.data);
@@ -570,7 +613,9 @@ const make = Effect.gen(function* () {
       const state = yield* requireSession(input.sshSessionId, input.authSessionId);
       if (state.status !== "running" || !state.process) {
         return yield* Effect.fail(
-          new SshSessionNotFoundError({ sessionId: input.sshSessionId }),
+          new SshSpawnError({
+            detail: `SSH session is ${state.status}; resize is accepted after the terminal is running`,
+          }),
         );
       }
       state.process.resize(input.cols, input.rows);
@@ -585,9 +630,7 @@ const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const state = yield* requireSession(input.sshSessionId, input.authSessionId);
       if (state.status !== "pending-host-key" || !state.pendingFingerprint) {
-        return yield* Effect.fail(
-          new SshSessionNotFoundError({ sessionId: input.sshSessionId }),
-        );
+        return yield* Effect.fail(new SshSessionNotFoundError({ sessionId: input.sshSessionId }));
       }
       if (state.pendingFingerprint.sha256 !== input.fingerprintSha256) {
         yield* audit({
@@ -682,9 +725,11 @@ const make = Effect.gen(function* () {
 
   const subscribe: SshSessionManagerShape["subscribe"] = (input: SshSessionAccessRequest) =>
     Stream.unwrap(
-      requireSession(input.sshSessionId, input.authSessionId).pipe(
-        Effect.map((state) => Stream.fromPubSub(state.hub)),
-      ),
+      Effect.gen(function* () {
+        const state = yield* requireSession(input.sshSessionId, input.authSessionId);
+        const initialEvents = yield* initialEventsFor(state);
+        return Stream.concat(Stream.fromIterable(initialEvents), Stream.fromPubSub(state.hub));
+      }),
     );
 
   return SshSessionManager.of({ open, get, sendInput, resize, confirmHostKey, close, subscribe });

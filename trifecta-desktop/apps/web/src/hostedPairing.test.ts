@@ -14,7 +14,9 @@ describe("hostedPairing", () => {
   });
 
   it("reads hosted pairing host and query token parameters", () => {
-    const url = new URL("https://app.trifecta.belweave.ai/pair?host=100.64.1.2:3773&token=ABCD1234");
+    const url = new URL(
+      "https://app.trifecta.belweave.ai/pair?host=100.64.1.2:3773&token=ABCD1234",
+    );
 
     expect(readHostedPairingRequest(url)).toEqual({
       host: "100.64.1.2:3773",
@@ -60,11 +62,13 @@ describe("hostedPairing", () => {
 
   it("ignores incomplete hosted pairing requests", () => {
     expect(
-      hasHostedPairingRequest(new URL("https://app.trifecta.belweave.ai/pair?host=backend.example.com")),
+      hasHostedPairingRequest(
+        new URL("https://app.trifecta.belweave.ai/pair?host=backend.example.com"),
+      ),
     ).toBe(false);
-    expect(hasHostedPairingRequest(new URL("https://app.trifecta.belweave.ai/pair?token=ABCD1234"))).toBe(
-      false,
-    );
+    expect(
+      hasHostedPairingRequest(new URL("https://app.trifecta.belweave.ai/pair?token=ABCD1234")),
+    ).toBe(false);
   });
 
   it("detects the hosted static app only when no backend URL is configured", () => {

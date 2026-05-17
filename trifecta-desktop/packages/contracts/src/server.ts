@@ -188,6 +188,7 @@ export const ServerProvider = Schema.Struct({
   skills: Schema.Array(ServerProviderSkill).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   versionAdvisory: Schema.optionalKey(ServerProviderVersionAdvisory),
   updateState: Schema.optionalKey(ServerProviderUpdateState),
+  rateLimits: Schema.optional(Schema.Unknown),
 });
 export type ServerProvider = typeof ServerProvider.Type;
 

@@ -118,7 +118,10 @@ const withIdentity = <A, E, R>(
         Layer.provideMerge(
           FileSystem.layerNoop({
             exists: (path) =>
-              Effect.succeed(input.legacyPathExists === true && path.includes("Trifecta (Alpha)")),
+              Effect.succeed(
+                input.legacyPathExists === true &&
+                  (path.includes("Trifecta (Alpha)") || path.includes("trifecta")),
+              ),
             readFileString: () =>
               Effect.succeed(input.packageJson ?? '{"belweaveCommitHash":"abcdef1234567890"}'),
           }),

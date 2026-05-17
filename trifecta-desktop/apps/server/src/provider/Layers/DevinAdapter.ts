@@ -70,10 +70,12 @@ function bestEffortDevinSetSessionModel(
   sessionId: string,
   modelId: string,
 ): Effect.Effect<void, never> {
-  return client.raw.request(AGENT_METHODS.session_set_model, {
-    sessionId,
-    modelId,
-  }).pipe(Effect.ignoreCause);
+  return client.raw
+    .request(AGENT_METHODS.session_set_model, {
+      sessionId,
+      modelId,
+    })
+    .pipe(Effect.ignoreCause);
 }
 
 export interface DevinAdapterOptions {
@@ -334,20 +336,18 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
           shell: process.platform === "win32",
         });
 
-        const handle = yield* spawner
-          .spawn(command)
-          .pipe(
-            Effect.provideService(Scope.Scope, sessionScope),
-            Effect.mapError(
-              (cause) =>
-                new ProviderAdapterProcessError({
-                  provider: PROVIDER,
-                  threadId: input.threadId,
-                  detail: `Failed to spawn devin acp: ${cause.message}`,
-                  cause,
-                }),
-            ),
-          );
+        const handle = yield* spawner.spawn(command).pipe(
+          Effect.provideService(Scope.Scope, sessionScope),
+          Effect.mapError(
+            (cause) =>
+              new ProviderAdapterProcessError({
+                provider: PROVIDER,
+                threadId: input.threadId,
+                detail: `Failed to spawn devin acp: ${cause.message}`,
+                cause,
+              }),
+          ),
+        );
 
         const acpLayer = AcpClient.layerChildProcess(handle);
         const acpContext = yield* Layer.build(acpLayer).pipe(
@@ -402,17 +402,19 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
           mcpServers: [],
         } satisfies AcpSchema.NewSessionRequest;
 
-        const rawSession = yield* acpClient.raw.request(AGENT_METHODS.session_new, createPayload).pipe(
-          Effect.mapError(
-            (cause) =>
-              new ProviderAdapterProcessError({
-                provider: PROVIDER,
-                threadId: input.threadId,
-                detail: `ACP session/new transport failed: ${cause.message ?? String(cause)}`,
-                cause: new Error(String(cause)),
-              }),
-          ),
-        );
+        const rawSession = yield* acpClient.raw
+          .request(AGENT_METHODS.session_new, createPayload)
+          .pipe(
+            Effect.mapError(
+              (cause) =>
+                new ProviderAdapterProcessError({
+                  provider: PROVIDER,
+                  threadId: input.threadId,
+                  detail: `ACP session/new transport failed: ${cause.message ?? String(cause)}`,
+                  cause: new Error(String(cause)),
+                }),
+            ),
+          );
 
         const sessionResponse = yield* decodeDevinNewSessionResponse(rawSession).pipe(
           Effect.mapError(
@@ -448,9 +450,7 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
           Effect.gen(function* () {
             const ms = yield* Clock.currentTimeMillis;
             const uuid = yield* Random.nextUUIDv4;
-            const reqId = ApprovalRequestIdSchema.make(
-              `devin-req-${ms}-${uuid.slice(0, 8)}`,
-            );
+            const reqId = ApprovalRequestIdSchema.make(`devin-req-${ms}-${uuid.slice(0, 8)}`);
             const deferred = yield* Deferred.make<ProviderApprovalDecision, never>();
             session.pendingRequests.set(reqId, deferred);
 
@@ -470,23 +470,32 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
             session.pendingRequests.delete(reqId);
 
             if (decision === "cancel") {
-              return { outcome: { outcome: "cancelled" as const } } satisfies AcpSchema.RequestPermissionResponse;
+              return {
+                outcome: { outcome: "cancelled" as const },
+              } satisfies AcpSchema.RequestPermissionResponse;
             }
 
             // Find the matching option from the request's options list
             const wantAlways = decision === "acceptForSession";
             const wantReject = decision === "decline";
             const targetKind = wantReject
-              ? (wantAlways ? "reject_always" : "reject_once")
-              : (wantAlways ? "allow_always" : "allow_once");
-            const matchingOption = request.options.find((o) => o.kind === targetKind)
-              ?? request.options.find((o) =>
-                  wantReject ? o.kind.startsWith("reject") : o.kind.startsWith("allow"),
-                )
-              ?? request.options[0];
+              ? wantAlways
+                ? "reject_always"
+                : "reject_once"
+              : wantAlways
+                ? "allow_always"
+                : "allow_once";
+            const matchingOption =
+              request.options.find((o) => o.kind === targetKind) ??
+              request.options.find((o) =>
+                wantReject ? o.kind.startsWith("reject") : o.kind.startsWith("allow"),
+              ) ??
+              request.options[0];
 
             if (!matchingOption) {
-              return { outcome: { outcome: "cancelled" as const } } satisfies AcpSchema.RequestPermissionResponse;
+              return {
+                outcome: { outcome: "cancelled" as const },
+              } satisfies AcpSchema.RequestPermissionResponse;
             }
 
             return {
@@ -712,7 +721,9 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
 
   const readThread: ProviderAdapterShape<ProviderAdapterError>["readThread"] = (threadId) =>
     requireSession(threadId).pipe(
-      Effect.map((session) => ({ threadId: session.threadId, turns: [] }) satisfies ProviderThreadSnapshot),
+      Effect.map(
+        (session) => ({ threadId: session.threadId, turns: [] }) satisfies ProviderThreadSnapshot,
+      ),
       Effect.mapError((cause) =>
         cause._tag === "ProviderAdapterSessionNotFoundError"
           ? cause
@@ -752,10 +763,7 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
     }).pipe(Effect.asVoid);
 
   yield* Effect.acquireRelease(Effect.void, () =>
-    stopAll().pipe(
-      Effect.andThen(Queue.shutdown(runtimeEventQueue)),
-      Effect.ignore,
-    ),
+    stopAll().pipe(Effect.andThen(Queue.shutdown(runtimeEventQueue)), Effect.ignore),
   );
 
   return {

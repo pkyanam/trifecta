@@ -37,13 +37,19 @@ import { makeAdapterRegistryMock } from "../src/provider/testUtils/providerAdapt
 import { ProviderAdapterRegistry } from "../src/provider/Services/ProviderAdapterRegistry.ts";
 import { ProviderSessionDirectoryLive } from "../src/provider/Layers/ProviderSessionDirectory.ts";
 import { ServerSettingsService } from "../src/serverSettings.ts";
+import { ProviderService } from "../src/provider/Services/ProviderService.ts";
 import { makeProviderServiceLive } from "../src/provider/Layers/ProviderService.ts";
 import { makeCodexAdapter } from "../src/provider/Layers/CodexAdapter.ts";
 import {
   NoOpProviderEventLoggers,
   ProviderEventLoggers,
 } from "../src/provider/Layers/ProviderEventLoggers.ts";
-import { ProviderService } from "../src/provider/Services/ProviderService.ts";
+import {
+  ProviderRegistry,
+  type ProviderRegistryShape,
+} from "../src/provider/Services/ProviderRegistry.ts";
+import { ProviderRegistryLive } from "../src/provider/Layers/ProviderRegistry.ts";
+import { ProviderInstanceRegistryHydrationLive } from "../src/provider/Layers/ProviderInstanceRegistryHydration.ts";
 import { AnalyticsService } from "../src/telemetry/Services/AnalyticsService.ts";
 import { CheckpointReactorLive } from "../src/orchestration/Layers/CheckpointReactor.ts";
 import { RepositoryIdentityResolverLive } from "../src/project/Layers/RepositoryIdentityResolver.ts";
@@ -373,6 +379,8 @@ export const makeOrchestrationIntegrationHarness = (
       Layer.provideMerge(ServerSettingsService.layerTest()),
       Layer.provideMerge(ServerConfig.layerTest(workspaceDir, rootDir)),
       Layer.provideMerge(NodeServices.layer),
+      Layer.provideMerge(ProviderRegistryLive),
+      Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
     );
 
     const runtime = ManagedRuntime.make(layer);

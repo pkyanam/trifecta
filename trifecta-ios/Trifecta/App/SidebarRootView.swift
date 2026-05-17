@@ -66,6 +66,7 @@ struct SidebarRootView: View {
         .sheet(isPresented: $showSSH) {
             NavigationStack {
                 SshClientView()
+                    .environment(env)
             }
         }
         .environment(\.t3OpenSidebar, openSidebar)
@@ -258,45 +259,5 @@ struct T3BottomNavBar: View {
         .padding(.vertical, 7)
         .t3Glass(radius: 28, tint: T3Color.surfaceElevated.opacity(0.48))
         .shadow(color: .black.opacity(0.14), radius: 16, x: 0, y: 6)
-    }
-}
-
-private struct SshClientView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var host = ""
-    @State private var user = ""
-    @State private var port = "22"
-
-    var body: some View {
-        Form {
-            Section("Remote Instance") {
-                TextField("Host", text: $host)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                TextField("User", text: $user)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                TextField("Port", text: $port)
-                    .keyboardType(.numberPad)
-            }
-
-            Section {
-                Button {
-                    HapticFeedback.impact(.light)
-                } label: {
-                    Label("Connect", systemImage: "terminal")
-                }
-                .disabled(host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            } footer: {
-                Text("SSH terminal UI is scaffolded here; wiring it to the desktop server terminal transport is the next backend integration step.")
-            }
-        }
-        .navigationTitle("SSH Client")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Done") { dismiss() }
-            }
-        }
     }
 }

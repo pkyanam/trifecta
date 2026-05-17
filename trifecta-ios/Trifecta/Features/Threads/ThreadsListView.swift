@@ -21,6 +21,11 @@ struct ThreadsListView: View {
     @AppStorage("accent") private var accentRaw: String = AppAccent.blue.rawValue
 
     private let defaultVisibleThreadCount = 6
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
 
     var body: some View {
         NavigationStack {
@@ -485,9 +490,7 @@ struct ThreadsListView: View {
 
     private func relativeDate(for thread: ThreadShell) -> String {
         let date = thread.latestUserMessageAt ?? thread.updatedAt
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
     }
 
     private var allCollapsed: Bool {
@@ -532,14 +535,13 @@ struct ThreadsListView: View {
     // MARK: - Filtered data
 
     private var activeThreads: [ThreadShell] {
-        env.threadList.threads.filter { $0.archivedAt == nil }
+        env.threadList.activeThreads
     }
 
     private var groupedThreads: [(ProjectShell, [ThreadShell])] {
-        var byProject: [ProjectID: [ThreadShell]] = [:]
-        for t in activeThreads { byProject[t.projectId, default: []].append(t) }
         return env.threadList.projects.compactMap { project in
-            guard let threads = byProject[project.id], !threads.isEmpty else { return nil }
+            let threads = env.threadList.threads(in: project.id)
+            guard !threads.isEmpty else { return nil }
             return (project, threads)
         }
     }

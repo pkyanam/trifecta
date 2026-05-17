@@ -19,7 +19,10 @@ export interface SshKnownHostUpsertInput extends SshKnownHostLookupInput {
 }
 
 export interface SshKnownHostsShape {
-  readonly list: () => Effect.Effect<ReadonlyArray<SshKnownHostEntry>, SshKnownHostsRepositoryError>;
+  readonly list: () => Effect.Effect<
+    ReadonlyArray<SshKnownHostEntry>,
+    SshKnownHostsRepositoryError
+  >;
   readonly find: (
     input: SshKnownHostLookupInput,
   ) => Effect.Effect<Option.Option<SshKnownHostEntry>, SshKnownHostsRepositoryError>;

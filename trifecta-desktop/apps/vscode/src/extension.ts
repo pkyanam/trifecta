@@ -30,10 +30,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  const statusBar = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right,
-    100,
-  );
+  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBar.command = "trifecta.openPanel";
   statusBar.text = "$(hubot) Trifecta";
   statusBar.show();
@@ -81,7 +78,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private getChatHtml(conn: { port: number; pairingToken: string | null; wsToken: string | null; sessionToken: string | null }): string {
+  private getChatHtml(conn: {
+    port: number;
+    pairingToken: string | null;
+    wsToken: string | null;
+    sessionToken: string | null;
+  }): string {
     const baseUrl = `http://127.0.0.1:${conn.port}`;
     let iframeSrc: string;
     if (conn.wsToken) {

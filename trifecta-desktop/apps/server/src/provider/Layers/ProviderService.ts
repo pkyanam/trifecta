@@ -49,6 +49,7 @@ import { type ProviderAdapterError, ProviderValidationError } from "../Errors.ts
 import type { ProviderAdapterShape } from "../Services/ProviderAdapter.ts";
 import { ProviderAdapterRegistry } from "../Services/ProviderAdapterRegistry.ts";
 import { ProviderService, type ProviderServiceShape } from "../Services/ProviderService.ts";
+import { ProviderRegistry } from "../Services/ProviderRegistry.ts";
 import {
   ProviderSessionDirectory,
   type ProviderRuntimeBinding,
@@ -208,6 +209,7 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
   // no-op.
   const canonicalEventLogger = options?.canonicalEventLogger ?? eventLoggers.canonical;
 
+  const providerRegistry = yield* ProviderRegistry;
   const registry = yield* ProviderAdapterRegistry;
   const directory = yield* ProviderSessionDirectory;
   const runtimeEventPubSub = yield* PubSub.unbounded<ProviderRuntimeEvent>();
@@ -275,6 +277,15 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     event: ProviderRuntimeEvent,
   ): Effect.Effect<void> =>
     Effect.sync(() => correlateRuntimeEventWithInstance(source, event)).pipe(
+      Effect.tap((canonicalEvent) => {
+        if (canonicalEvent.type === "account.rate-limits.updated") {
+          return providerRegistry.setRateLimits(
+            source.instanceId,
+            canonicalEvent.payload.rateLimits,
+          );
+        }
+        return Effect.void;
+      }),
       Effect.flatMap((canonicalEvent) =>
         increment(providerRuntimeEventsTotal, {
           provider: canonicalEvent.provider,

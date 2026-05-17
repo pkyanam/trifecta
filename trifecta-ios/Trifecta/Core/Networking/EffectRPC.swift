@@ -94,10 +94,9 @@ enum EffectRPCDecoder {
                              errorTag: nil, errorMessage: nil)
             } else {
                 let cause = exit["cause"] as? [String: Any] ?? [:]
-                let errorMessage = (cause["error"] as? [String: Any])?["message"] as? String
-                    ?? (cause["defect"] as? String)
-                    ?? "Server error"
-                let errorTag = (cause["error"] as? [String: Any])?["_tag"] as? String
+                let error = findErrorPayload(in: cause)
+                let errorMessage = findErrorMessage(in: cause) ?? "Server error"
+                let errorTag = error?["_tag"] as? String
                 return .exit(requestId: id, success: false, value: nil,
                              errorTag: errorTag, errorMessage: errorMessage)
             }
@@ -110,5 +109,98 @@ enum EffectRPCDecoder {
         default:
             return .unknown(json: any)
         }
+    }
+
+    private static func findErrorPayload(in value: Any) -> [String: Any]? {
+        if let dict = value as? [String: Any] {
+            if let error = dict["error"] as? [String: Any] {
+                return error
+            }
+            for child in dict.values {
+                if let found = findErrorPayload(in: child) {
+                    return found
+                }
+            }
+        } else if let array = value as? [Any] {
+            for child in array {
+                if let found = findErrorPayload(in: child) {
+                    return found
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func findErrorMessage(in value: Any) -> String? {
+        if let dict = value as? [String: Any] {
+            if let message = taggedErrorMessage(in: dict) {
+                return message
+            }
+            for key in ["message", "detail", "reason", "description", "errorDescription", "defect"] {
+                if let message = dict[key] as? String,
+                   !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   !isRawFingerprint(message) {
+                    return message
+                }
+            }
+            for key in ["error", "cause", "failure", "defect"] {
+                if let child = dict[key],
+                   let found = findErrorMessage(in: child) {
+                    return found
+                }
+            }
+            for (key, child) in dict where !ignoredErrorValueKeys.contains(key) {
+                if let found = findErrorMessage(in: child) {
+                    return found
+                }
+            }
+        } else if let array = value as? [Any] {
+            for child in array {
+                if let found = findErrorMessage(in: child) {
+                    return found
+                }
+            }
+        } else if let message = value as? String,
+                  !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !isRawFingerprint(message) {
+            return message
+        }
+        return nil
+    }
+
+    private static let ignoredErrorValueKeys = Set([
+        "_tag", "id", "requestId", "tag", "sessionId", "hostId",
+        "fingerprintSha256", "expectedFingerprint", "actualFingerprint",
+    ])
+
+    private static func taggedErrorMessage(in dict: [String: Any]) -> String? {
+        guard let tag = dict["_tag"] as? String else { return nil }
+        switch tag {
+        case "SshHostProfileNotFoundError":
+            return "SSH host profile was not found. Refresh the host list and try again."
+        case "SshHostProfileConflictError":
+            return "An SSH host with this label or address already exists."
+        case "SshHostKeyMismatchError":
+            let hostname = dict["hostname"] as? String ?? "host"
+            let port = dict["port"].map { "\($0)" } ?? "22"
+            return "Host key mismatch for \(hostname):\(port). Refusing to connect."
+        case "SshSessionNotFoundError":
+            return "SSH session is no longer active. Reconnect and try again."
+        case "SshSessionTokenInvalidError":
+            let reason = dict["reason"] as? String ?? "invalid"
+            return "SSH session token rejected (\(reason)). Reconnect and try again."
+        case "SshAuthorizationError":
+            let reason = dict["reason"] as? String ?? "not authorized"
+            return "SSH operation denied: \(reason)"
+        case "SshSessionLimitError":
+            let limit = dict["limit"].map { "\($0)" } ?? "maximum"
+            return "SSH session limit reached (\(limit)). Close another SSH session and try again."
+        default:
+            return nil
+        }
+    }
+
+    private static func isRawFingerprint(_ text: String) -> Bool {
+        text.hasPrefix("SHA256:") && !text.contains(" ")
     }
 }

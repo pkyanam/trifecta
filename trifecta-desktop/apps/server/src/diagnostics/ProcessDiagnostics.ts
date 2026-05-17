@@ -385,7 +385,9 @@ function assertDescendantPid(
   pid: number,
 ): Effect.Effect<void, ProcessDiagnosticsError, ChildProcessSpawner.ChildProcessSpawner> {
   if (pid === process.pid) {
-    return Effect.fail(toProcessDiagnosticsError("Refusing to signal the Belweave server process."));
+    return Effect.fail(
+      toProcessDiagnosticsError("Refusing to signal the Belweave server process."),
+    );
   }
 
   return readProcessRows().pipe(
@@ -397,7 +399,9 @@ function assertDescendantPid(
       return descendant
         ? Effect.void
         : Effect.fail(
-            toProcessDiagnosticsError(`Process ${pid} is not a live descendant of the Belweave server.`),
+            toProcessDiagnosticsError(
+              `Process ${pid} is not a live descendant of the Belweave server.`,
+            ),
           );
     }),
   );

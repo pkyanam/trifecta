@@ -61,8 +61,7 @@ struct SidebarPanel: View {
         .frame(maxHeight: .infinity)
         .background {
             Rectangle()
-                .fill(T3Color.surface.opacity(0.76))
-                .background(.ultraThinMaterial)
+                .fill(T3Color.surface.opacity(0.96))
                 .ignoresSafeArea()
         }
         .overlay(alignment: .trailing) {
@@ -250,8 +249,7 @@ struct SidebarPanel: View {
     private var groupedThreads: [(project: ProjectShell, threads: [ThreadShell])] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let liveGroups: [(project: ProjectShell, threads: [ThreadShell])] = env.threadList.projects.compactMap { project in
-            let threads = env.threadList.threads
-                .filter { $0.projectId == project.id && $0.archivedAt == nil }
+            let threads = env.threadList.threads(in: project.id)
                 .filter { thread in
                     query.isEmpty
                     || thread.title.lowercased().contains(query)
@@ -273,7 +271,7 @@ struct SidebarPanel: View {
     }
 
     private var archivedThreads: [ThreadShell] {
-        env.threadList.threads.filter { $0.archivedAt != nil }
+        env.threadList.archivedThreads
     }
 
     private var pinnedThreadIDs: Set<String> {

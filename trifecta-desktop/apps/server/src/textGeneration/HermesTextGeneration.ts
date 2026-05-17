@@ -33,7 +33,11 @@ import {
   buildPrContentPrompt,
   buildThreadTitlePrompt,
 } from "./TextGenerationPrompts.ts";
-import { sanitizeCommitSubject, sanitizePrTitle, sanitizeThreadTitle } from "./TextGenerationUtils.ts";
+import {
+  sanitizeCommitSubject,
+  sanitizePrTitle,
+  sanitizeThreadTitle,
+} from "./TextGenerationUtils.ts";
 import type {
   BranchNameGenerationInput,
   BranchNameGenerationResult,
@@ -63,18 +67,16 @@ const runHermesPrompt = Effect.fn("runHermesPrompt")(function* (
       shell: process.platform === "win32",
     });
 
-    const handle = yield* spawner
-      .spawn(command)
-      .pipe(
-        Effect.provideService(Scope.Scope, scope),
-        Effect.mapError(
-          (err) =>
-            new TextGenerationError({
-              operation: "generateText",
-              detail: `Failed to spawn hermes acp: ${err.message}`,
-            }),
-        ),
-      );
+    const handle = yield* spawner.spawn(command).pipe(
+      Effect.provideService(Scope.Scope, scope),
+      Effect.mapError(
+        (err) =>
+          new TextGenerationError({
+            operation: "generateText",
+            detail: `Failed to spawn hermes acp: ${err.message}`,
+          }),
+      ),
+    );
 
     const acpLayer = AcpClient.layerChildProcess(handle);
     const acpContext = yield* Layer.build(acpLayer).pipe(
@@ -89,22 +91,24 @@ const runHermesPrompt = Effect.fn("runHermesPrompt")(function* (
     );
     const acp = Context.get(acpContext, AcpClient.AcpClient);
 
-    const rawInit = yield* acp.raw.request(AGENT_METHODS.initialize, {
-      protocolVersion: 1 as const,
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-      },
-      clientInfo: { name: "trifecta-desktop", version: "1.0.0" },
-    }).pipe(
-      Effect.mapError(
-        (err) =>
-          new TextGenerationError({
-            operation: "generateText",
-            detail: `ACP initialize transport failed: ${String(err)}`,
-          }),
-      ),
-    );
+    const rawInit = yield* acp.raw
+      .request(AGENT_METHODS.initialize, {
+        protocolVersion: 1 as const,
+        clientCapabilities: {
+          fs: { readTextFile: false, writeTextFile: false },
+          terminal: false,
+        },
+        clientInfo: { name: "trifecta-desktop", version: "1.0.0" },
+      })
+      .pipe(
+        Effect.mapError(
+          (err) =>
+            new TextGenerationError({
+              operation: "generateText",
+              detail: `ACP initialize transport failed: ${String(err)}`,
+            }),
+        ),
+      );
 
     yield* decodeHermesInitializeResponse(rawInit).pipe(
       Effect.mapError(
@@ -191,7 +195,11 @@ const runHermesJsonPrompt = Effect.fn("runHermesJsonPrompt")(function* <S extend
   promptText: string,
   outputSchema: S,
   environment?: NodeJS.ProcessEnv,
-): Effect.fn.Return<S["Type"], TextGenerationError, ChildProcessSpawner.ChildProcessSpawner | S["DecodingServices"]> {
+): Effect.fn.Return<
+  S["Type"],
+  TextGenerationError,
+  ChildProcessSpawner.ChildProcessSpawner | S["DecodingServices"]
+> {
   const raw = yield* runHermesPrompt(binaryPath, cwd, promptText, environment);
   const trimmed = raw.trim();
 
@@ -218,11 +226,7 @@ export const makeHermesTextGeneration = Effect.fn("makeHermesTextGeneration")(fu
   const binaryPath = hermesConfig.binaryPath || "hermes";
   const env = environment ?? process.env;
 
-  const runJson = <S extends Schema.Top>(
-    cwd: string,
-    promptText: string,
-    outputSchema: S,
-  ) =>
+  const runJson = <S extends Schema.Top>(cwd: string, promptText: string, outputSchema: S) =>
     runHermesJsonPrompt(binaryPath, cwd, promptText, outputSchema, env).pipe(
       Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
     );

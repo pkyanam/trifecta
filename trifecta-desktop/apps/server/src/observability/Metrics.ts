@@ -23,9 +23,12 @@ export const orchestrationCommandsTotal = Metric.counter("belweave_orchestration
   description: "Total orchestration commands dispatched.",
 });
 
-export const orchestrationCommandDuration = Metric.timer("belweave_orchestration_command_duration", {
-  description: "Orchestration command dispatch duration.",
-});
+export const orchestrationCommandDuration = Metric.timer(
+  "belweave_orchestration_command_duration",
+  {
+    description: "Orchestration command dispatch duration.",
+  },
+);
 
 export const orchestrationCommandAckDuration = Metric.timer(
   "belweave_orchestration_command_ack_duration",

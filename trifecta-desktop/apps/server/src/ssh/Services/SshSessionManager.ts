@@ -54,7 +54,11 @@ export interface SshSessionManagerShape {
     input: SshOpenSessionRequest,
   ) => Effect.Effect<
     SshSessionSnapshot,
-    SshHostProfileNotFoundError | SshHostKeyMismatchError | SshSessionLimitError | SshSpawnError | SshError
+    | SshHostProfileNotFoundError
+    | SshHostKeyMismatchError
+    | SshSessionLimitError
+    | SshSpawnError
+    | SshError
   >;
   readonly get: (
     input: SshSessionAccessRequest,
@@ -76,7 +80,6 @@ export interface SshSessionManagerShape {
   ) => Stream.Stream<SshTerminalEvent, SshSessionNotFoundError | SshError>;
 }
 
-export class SshSessionManager extends Context.Service<
-  SshSessionManager,
-  SshSessionManagerShape
->()("belweave/ssh/Services/SshSessionManager") {}
+export class SshSessionManager extends Context.Service<SshSessionManager, SshSessionManagerShape>()(
+  "belweave/ssh/Services/SshSessionManager",
+) {}

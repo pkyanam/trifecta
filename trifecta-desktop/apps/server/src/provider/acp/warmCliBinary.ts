@@ -40,11 +40,7 @@ export const warmSpawnCommandForAcpAgent = (command: string, environment?: NodeJ
       ],
       { concurrency: "unbounded" },
     );
-  }).pipe(
-    Effect.scoped,
-    Effect.timeout(WARM_TIMEOUT_MS),
-    Effect.ignore,
-  );
+  }).pipe(Effect.scoped, Effect.timeout(WARM_TIMEOUT_MS), Effect.ignore);
 
 /**
  * Forks a detached fiber that runs `command --version` (ignored result).

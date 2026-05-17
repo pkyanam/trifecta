@@ -64,10 +64,7 @@ function buildGeminiAcpConfig(config: GeminiSettings): AcpRegistrySettings {
   };
 }
 
-function buildGeminiEnv(
-  baseEnv: NodeJS.ProcessEnv,
-  config: GeminiSettings,
-): NodeJS.ProcessEnv {
+function buildGeminiEnv(baseEnv: NodeJS.ProcessEnv, config: GeminiSettings): NodeJS.ProcessEnv {
   if (config.apiKey?.trim()) {
     return { ...baseEnv, GEMINI_API_KEY: config.apiKey.trim() };
   }
@@ -90,9 +87,7 @@ const withInstanceIdentity =
     continuation: { groupKey: input.continuationGroupKey },
   });
 
-export type GeminiDriverEnv =
-  | ChildProcessSpawner.ChildProcessSpawner
-  | ProviderSessionDirectory;
+export type GeminiDriverEnv = ChildProcessSpawner.ChildProcessSpawner | ProviderSessionDirectory;
 
 export const GeminiDriver: ProviderDriver<GeminiSettings, GeminiDriverEnv> = {
   driverKind: DRIVER_KIND,
