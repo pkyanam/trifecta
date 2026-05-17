@@ -48,8 +48,6 @@ import {
   ProviderRegistry,
   type ProviderRegistryShape,
 } from "../src/provider/Services/ProviderRegistry.ts";
-import { ProviderRegistryLive } from "../src/provider/Layers/ProviderRegistry.ts";
-import { ProviderInstanceRegistryHydrationLive } from "../src/provider/Layers/ProviderInstanceRegistryHydration.ts";
 import { AnalyticsService } from "../src/telemetry/Services/AnalyticsService.ts";
 import { CheckpointReactorLive } from "../src/orchestration/Layers/CheckpointReactor.ts";
 import { RepositoryIdentityResolverLive } from "../src/project/Layers/RepositoryIdentityResolver.ts";
@@ -85,6 +83,17 @@ import { GitWorkflowService } from "../src/git/GitWorkflowService.ts";
 import * as VcsProcess from "../src/vcs/VcsProcess.ts";
 
 const decodeCodexSettings = Schema.decodeEffect(CodexSettings);
+
+const harnessProviderRegistryMock: ProviderRegistryShape = {
+  getProviders: Effect.succeed([]),
+  refresh: () => Effect.succeed([]),
+  refreshInstance: () => Effect.succeed([]),
+  getProviderMaintenanceCapabilitiesForInstance: (_instanceId, provider) =>
+    Effect.succeed({ provider, packageName: null, update: null }),
+  setProviderMaintenanceActionState: () => Effect.succeed([]),
+  setRateLimits: () => Effect.void,
+  streamChanges: Stream.empty,
+};
 
 function runGit(cwd: string, args: ReadonlyArray<string>) {
   return execFileSync("git", args, {
@@ -379,8 +388,7 @@ export const makeOrchestrationIntegrationHarness = (
       Layer.provideMerge(ServerSettingsService.layerTest()),
       Layer.provideMerge(ServerConfig.layerTest(workspaceDir, rootDir)),
       Layer.provideMerge(NodeServices.layer),
-      Layer.provideMerge(ProviderRegistryLive),
-      Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
+      Layer.provideMerge(Layer.succeed(ProviderRegistry, harnessProviderRegistryMock)),
     );
 
     const runtime = ManagedRuntime.make(layer);
