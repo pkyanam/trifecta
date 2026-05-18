@@ -75,7 +75,9 @@ function makeLayer(input: {
         ...input.git,
       }),
     ),
-    Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "belweave-source-control-repos-" })),
+    Layer.provide(
+      ServerConfig.layerTest(process.cwd(), { prefix: "belweave-source-control-repos-" }),
+    ),
     Layer.provideMerge(NodeServices.layer),
   );
 }

@@ -339,5 +339,7 @@ export function resolveRemoteBelweaveCliPackageSpec(input: {
     return "@belweave/trifecta@nightly";
   }
 
-  return input.updateChannel === "nightly" ? "@belweave/trifecta@nightly" : "@belweave/trifecta@latest";
+  return input.updateChannel === "nightly"
+    ? "@belweave/trifecta@nightly"
+    : "@belweave/trifecta@latest";
 }

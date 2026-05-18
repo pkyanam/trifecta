@@ -18,10 +18,10 @@ struct MessageTimelineView: View {
             ZStack(alignment: .bottomTrailing) {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: messageSpacing) {
-                        if rows.isEmpty {
+                        if store.timelineRows.isEmpty {
                             emptyState.padding(.top, 96)
                         } else {
-                            ForEach(rows) { row in
+                            ForEach(store.timelineRows) { row in
                                 rowView(row)
                             }
                         }
@@ -47,7 +47,7 @@ struct MessageTimelineView: View {
                     isNearBottom = near
                     if near { hasNewWhileScrolledUp = false }
                 }
-                .onChange(of: rows.count) { _, _ in
+                .onChange(of: store.timelineRows.count) { _, _ in
                     handleStreamUpdate(proxy: proxy, animated: true)
                 }
                 .onChange(of: store.messages.last?.text) { _, _ in
@@ -67,7 +67,7 @@ struct MessageTimelineView: View {
                     }
                 }
 
-                if !isNearBottom && !rows.isEmpty {
+                if !isNearBottom && !store.timelineRows.isEmpty {
                     jumpToLatestButton(proxy: proxy)
                         .padding(.trailing, T3Spacing.lg)
                         .padding(.bottom, T3Spacing.md)
@@ -80,7 +80,7 @@ struct MessageTimelineView: View {
     }
 
     @ViewBuilder
-    private func rowView(_ row: TimelineRow) -> some View {
+    private func rowView(_ row: ThreadTimelineRow) -> some View {
         switch row {
         case .message(let message):
             MessageBubble(role: message.role,
@@ -92,47 +92,6 @@ struct MessageTimelineView: View {
         case .activity(let activity):
             ActivityRow(activity: activity)
                 .id(row.id)
-        }
-    }
-
-    // MARK: - Timeline rows
-
-    private enum TimelineRow: Identifiable {
-        case message(Message)
-        case activity(RenderableActivity)
-
-        var id: String {
-            switch self {
-            case .message(let m): return "msg:" + m.id.rawValue
-            case .activity(let a): return "act:" + a.id
-            }
-        }
-
-        var createdAt: Date {
-            switch self {
-            case .message(let m): return m.createdAt
-            case .activity(let a): return a.createdAt
-            }
-        }
-
-        var sortRank: Int {
-            // When timestamps tie, render messages after the activities that
-            // led to them so the chip flow visually leads into the bubble.
-            switch self {
-            case .activity: return 0
-            case .message: return 1
-            }
-        }
-    }
-
-    private var rows: [TimelineRow] {
-        let activityRows: [TimelineRow] = RenderableActivity
-            .collapse(store.activities)
-            .map { TimelineRow.activity($0) }
-        let messageRows: [TimelineRow] = store.messages.map { TimelineRow.message($0) }
-        return (activityRows + messageRows).sorted { lhs, rhs in
-            if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
-            return lhs.sortRank < rhs.sortRank
         }
     }
 

@@ -343,20 +343,18 @@ export const makeAcpRegistryAdapter = Effect.fn("makeAcpRegistryAdapter")(functi
           shell: process.platform === "win32",
         });
 
-        const handle = yield* spawner
-          .spawn(command)
-          .pipe(
-            Effect.provideService(Scope.Scope, sessionScope),
-            Effect.mapError(
-              (cause) =>
-                new ProviderAdapterProcessError({
-                  provider: providerKind,
-                  threadId: input.threadId,
-                  detail: `Failed to spawn ${spawnCommand}: ${cause.message}`,
-                  cause,
-                }),
-            ),
-          );
+        const handle = yield* spawner.spawn(command).pipe(
+          Effect.provideService(Scope.Scope, sessionScope),
+          Effect.mapError(
+            (cause) =>
+              new ProviderAdapterProcessError({
+                provider: providerKind,
+                threadId: input.threadId,
+                detail: `Failed to spawn ${spawnCommand}: ${cause.message}`,
+                cause,
+              }),
+          ),
+        );
 
         const acpLayer = AcpClient.layerChildProcess(handle);
         const acpContext = yield* Layer.build(acpLayer).pipe(
@@ -441,7 +439,13 @@ export const makeAcpRegistryAdapter = Effect.fn("makeAcpRegistryAdapter")(functi
             session.pendingRequests.set(reqId, deferred);
 
             const permTitle = request.toolCall?.title ?? undefined;
-            const base = yield* makeEventBase(providerKind, session, session.currentTurnId, undefined, reqId);
+            const base = yield* makeEventBase(
+              providerKind,
+              session,
+              session.currentTurnId,
+              undefined,
+              reqId,
+            );
             yield* Queue.offer(runtimeEventQueue, {
               ...base,
               requestId: RuntimeRequestId.make(reqId),
@@ -571,10 +575,7 @@ export const makeAcpRegistryAdapter = Effect.fn("makeAcpRegistryAdapter")(functi
               ? ("cancelled" as const)
               : ("completed" as const);
 
-        if (
-          session.assistantTextChunksThisTurn === 0 &&
-          result.stopReason !== "cancelled"
-        ) {
+        if (session.assistantTextChunksThisTurn === 0 && result.stopReason !== "cancelled") {
           const fallback =
             result.stopReason === "refusal"
               ? "The model refused this prompt, so no assistant reply was produced."
@@ -750,10 +751,7 @@ export const makeAcpRegistryAdapter = Effect.fn("makeAcpRegistryAdapter")(functi
     }).pipe(Effect.asVoid);
 
   yield* Effect.acquireRelease(Effect.void, () =>
-    stopAll().pipe(
-      Effect.andThen(Queue.shutdown(runtimeEventQueue)),
-      Effect.ignore,
-    ),
+    stopAll().pipe(Effect.andThen(Queue.shutdown(runtimeEventQueue)), Effect.ignore),
   );
 
   return {

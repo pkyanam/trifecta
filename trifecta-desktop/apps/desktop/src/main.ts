@@ -32,6 +32,7 @@ import * as DesktopBackendConfiguration from "./backend/DesktopBackendConfigurat
 import * as DesktopBackendManager from "./backend/DesktopBackendManager.ts";
 import * as DesktopEnvironment from "./app/DesktopEnvironment.ts";
 import * as DesktopLifecycle from "./app/DesktopLifecycle.ts";
+import * as DesktopLocalStorageMigration from "./app/DesktopLocalStorageMigration.ts";
 import * as DesktopObservability from "./app/DesktopObservability.ts";
 import * as DesktopServerExposure from "./backend/DesktopServerExposure.ts";
 import * as DesktopClientSettings from "./settings/DesktopClientSettings.ts";
@@ -114,6 +115,7 @@ const desktopFoundationLayer = Layer.mergeAll(
   DesktopSavedEnvironments.layer,
   DesktopAssets.layer,
   DesktopObservability.layer,
+  DesktopLocalStorageMigration.layer,
 ).pipe(Layer.provideMerge(desktopEnvironmentLayer));
 
 const desktopSshLayer = Layer.mergeAll(desktopSshEnvironmentLayer, DesktopSshRemoteApi.layer).pipe(

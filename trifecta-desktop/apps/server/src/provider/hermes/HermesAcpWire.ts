@@ -67,9 +67,9 @@ function normalizeModelEntry(model: unknown): unknown {
     typeof o.name === "string"
       ? o.name
       : typeof (o as { displayName?: unknown }).displayName === "string"
-        ? ((o as { displayName: string }).displayName)
+        ? (o as { displayName: string }).displayName
         : typeof (o as { display_name?: unknown }).display_name === "string"
-          ? ((o as { display_name: string }).display_name)
+          ? (o as { display_name: string }).display_name
           : "";
   const name = rawName.trim().length > 0 ? rawName : modelId.length > 0 ? modelId : "model";
   return { ...o, modelId, name };
@@ -78,17 +78,14 @@ function normalizeModelEntry(model: unknown): unknown {
 function normalizeSessionModels(models: Record<string, unknown>): Record<string, unknown> {
   const rawAvail = models.availableModels;
   const rawSnake = (models as { available_models?: unknown }).available_models;
-  const list = Array.isArray(rawAvail)
-    ? rawAvail
-    : Array.isArray(rawSnake)
-      ? rawSnake
-      : [];
+  const list = Array.isArray(rawAvail) ? rawAvail : Array.isArray(rawSnake) ? rawSnake : [];
   const availableModels = list.map(normalizeModelEntry);
   let currentRaw =
     models.currentModelId ??
     (models as { current_model_id?: unknown }).current_model_id ??
     undefined;
-  const firstRec = typeof availableModels[0] !== "undefined" ? asRecord(availableModels[0]) : undefined;
+  const firstRec =
+    typeof availableModels[0] !== "undefined" ? asRecord(availableModels[0]) : undefined;
   if (
     typeof currentRaw !== "string" ||
     (typeof currentRaw === "string" && currentRaw.trim().length === 0)
@@ -100,8 +97,7 @@ function normalizeSessionModels(models: Record<string, unknown>): Record<string,
           ? (firstRec.model_id as string)
           : currentRaw;
   }
-  const currentModelId =
-    typeof currentRaw === "string" ? currentRaw : String(currentRaw ?? "");
+  const currentModelId = typeof currentRaw === "string" ? currentRaw : String(currentRaw ?? "");
   return {
     ...models,
     availableModels,
@@ -116,13 +112,13 @@ function normalizeSessionModeEntry(mode: unknown): unknown {
     typeof o.id === "string"
       ? o.id
       : typeof (o as { mode_id?: unknown }).mode_id === "string"
-        ? ((o as { mode_id: string }).mode_id)
+        ? (o as { mode_id: string }).mode_id
         : "";
   const rawName =
     typeof o.name === "string"
       ? o.name
       : typeof (o as { label?: unknown }).label === "string"
-        ? ((o as { label: string }).label)
+        ? (o as { label: string }).label
         : "";
   const name = rawName.trim().length > 0 ? rawName : id.length > 0 ? id : "mode";
   return { ...o, id, name };
@@ -131,25 +127,19 @@ function normalizeSessionModeEntry(mode: unknown): unknown {
 function normalizeSessionModes(modes: Record<string, unknown>): Record<string, unknown> {
   const rawAvail = modes.availableModes;
   const rawSnake = (modes as { available_modes?: unknown }).available_modes;
-  const list = Array.isArray(rawAvail)
-    ? rawAvail
-    : Array.isArray(rawSnake)
-      ? rawSnake
-      : [];
+  const list = Array.isArray(rawAvail) ? rawAvail : Array.isArray(rawSnake) ? rawSnake : [];
   const availableModes = list.map(normalizeSessionModeEntry);
   let currentRaw =
-    modes.currentModeId ??
-    (modes as { current_mode_id?: unknown }).current_mode_id ??
-    undefined;
-  const firstRec = typeof availableModes[0] !== "undefined" ? asRecord(availableModes[0]) : undefined;
+    modes.currentModeId ?? (modes as { current_mode_id?: unknown }).current_mode_id ?? undefined;
+  const firstRec =
+    typeof availableModes[0] !== "undefined" ? asRecord(availableModes[0]) : undefined;
   if (
     typeof currentRaw !== "string" ||
     (typeof currentRaw === "string" && currentRaw.trim().length === 0)
   ) {
     currentRaw = typeof firstRec?.id === "string" ? firstRec.id : currentRaw;
   }
-  const currentModeId =
-    typeof currentRaw === "string" ? currentRaw : String(currentRaw ?? "");
+  const currentModeId = typeof currentRaw === "string" ? currentRaw : String(currentRaw ?? "");
   return {
     ...modes,
     availableModes,

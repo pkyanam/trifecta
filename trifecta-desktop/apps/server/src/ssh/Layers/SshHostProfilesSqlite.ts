@@ -15,10 +15,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 
-import {
-  toPersistenceDecodeError,
-  toPersistenceSqlError,
-} from "../../persistence/Errors.ts";
+import { toPersistenceDecodeError, toPersistenceSqlError } from "../../persistence/Errors.ts";
 import {
   SshHostProfiles,
   type SshHostProfileRepositoryError,
@@ -161,7 +158,9 @@ const make = Effect.gen(function* () {
         port: input.port,
         username: input.username,
       }).pipe(
-        Effect.mapError(toError("SshHostProfiles.create:lookup", "SshHostProfiles.create:lookupDecode")),
+        Effect.mapError(
+          toError("SshHostProfiles.create:lookup", "SshHostProfiles.create:lookupDecode"),
+        ),
       );
       if (Option.isSome(existing)) {
         return yield* Effect.fail(
@@ -230,7 +229,9 @@ const make = Effect.gen(function* () {
         UPDATE ssh_host_profiles
         SET expected_fingerprint = ${fingerprint}, updated_at = ${now}
         WHERE id = ${hostId}
-      `.pipe(Effect.mapError(toPersistenceSqlError("SshHostProfiles.setExpectedFingerprint:update")));
+      `.pipe(
+        Effect.mapError(toPersistenceSqlError("SshHostProfiles.setExpectedFingerprint:update")),
+      );
       return {
         ...existing,
         expectedFingerprint: fingerprint,

@@ -1,5 +1,15 @@
 import { ProviderDriverKind } from "@belweave/contracts";
-import { ACPRegistryIcon, ClaudeAI, CursorIcon, DevinIcon, Gemini, HermesIcon, Icon, OpenAI, OpenCodeIcon } from "../Icons";
+import {
+  ACPRegistryIcon,
+  ClaudeAI,
+  CursorIcon,
+  DevinIcon,
+  Gemini,
+  HermesIcon,
+  Icon,
+  OpenAI,
+  OpenCodeIcon,
+} from "../Icons";
 import { PROVIDER_OPTIONS } from "../../session-logic";
 
 export const PROVIDER_ICON_BY_PROVIDER: Partial<Record<ProviderDriverKind, Icon>> = {

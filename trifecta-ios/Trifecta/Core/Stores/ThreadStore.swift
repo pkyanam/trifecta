@@ -10,6 +10,32 @@ struct ThreadDiffChange: Identifiable, Hashable {
     let createdAt: Date
 }
 
+enum ThreadTimelineRow: Identifiable, Sendable {
+    case message(Message)
+    case activity(RenderableActivity)
+
+    var id: String {
+        switch self {
+        case .message(let message): return "msg:" + message.id.rawValue
+        case .activity(let activity): return "act:" + activity.id
+        }
+    }
+
+    var createdAt: Date {
+        switch self {
+        case .message(let message): return message.createdAt
+        case .activity(let activity): return activity.createdAt
+        }
+    }
+
+    var sortRank: Int {
+        switch self {
+        case .activity: return 0
+        case .message: return 1
+        }
+    }
+}
+
 @Observable
 final class ThreadStore {
     let threadId: ThreadID
@@ -18,6 +44,10 @@ final class ThreadStore {
     var session: OrchestrationSession?
     var proposedPlans: [ProposedPlan] = []
     var activities: [ThreadActivity] = []
+    private(set) var renderedActivities: [RenderableActivity] = []
+    private(set) var timelineRows: [ThreadTimelineRow] = []
+    private(set) var diffChanges: [ThreadDiffChange] = []
+    private(set) var latestProposedPlan: ProposedPlan?
     var pendingApprovals: [PendingApproval] = []
     var pendingUserInputs: [PendingUserInput] = []
     var lastError: String?
@@ -44,34 +74,10 @@ final class ThreadStore {
         subscription = nil
     }
 
-    var latestProposedPlan: ProposedPlan? {
-        let sortedPlans = proposedPlans.sorted { $0.updatedAt < $1.updatedAt }
-        guard let plan = sortedPlans.last else { return nil }
-        guard plan.implementedAt == nil else { return nil }
-        return plan
-    }
-
     var isTurnRunning: Bool {
         if let session, session.status == .running { return true }
         if let state = detail?.latestTurn?.state, state == .running { return true }
         return isSending
-    }
-
-    var diffChanges: [ThreadDiffChange] {
-        let rendered = RenderableActivity.collapse(activities)
-        return rendered
-            .filter { !$0.changedFiles.isEmpty }
-            .map {
-                ThreadDiffChange(
-                    id: $0.id,
-                    title: $0.title,
-                    command: $0.command,
-                    detail: $0.detail,
-                    files: $0.changedFiles,
-                    createdAt: $0.createdAt
-                )
-            }
-            .sorted { $0.createdAt > $1.createdAt }
     }
 
     func sendMessage(text: String,
@@ -202,7 +208,8 @@ final class ThreadStore {
             self.session = detail.session
             self.proposedPlans = detail.proposedPlans
             self.activities = detail.activities
-            recomputePending()
+            recomputeDerivedState()
+            recomputeTimelineRows()
         case .event(let event):
             apply(event)
         }
@@ -253,7 +260,7 @@ final class ThreadStore {
             if let activityDict = event.payload["activity"] as? [String: Any],
                let activity = ThreadActivity.decode(from: activityDict) {
                 upsertActivity(activity)
-                recomputePending()
+                recomputeDerivedState()
             }
         case "thread.proposed-plan-upserted":
             if let planDict = event.payload["proposedPlan"] as? [String: Any],
@@ -271,6 +278,7 @@ final class ThreadStore {
                     }
                     self.detail = detail
                 }
+                recomputeLatestProposedPlan()
             }
         default:
             break
@@ -314,6 +322,7 @@ final class ThreadStore {
             messages.append(msg)
             messages.sort { $0.createdAt < $1.createdAt }
         }
+        recomputeTimelineRows()
     }
 
     /// Merges top-level event payload with nested `message` object when present.
@@ -368,9 +377,42 @@ final class ThreadStore {
     }
 
     @MainActor
-    private func recomputePending() {
+    private func recomputeDerivedState() {
+        renderedActivities = RenderableActivity.collapse(activities)
+        diffChanges = renderedActivities
+            .filter { !$0.changedFiles.isEmpty }
+            .map {
+                ThreadDiffChange(
+                    id: $0.id,
+                    title: $0.title,
+                    command: $0.command,
+                    detail: $0.detail,
+                    files: $0.changedFiles,
+                    createdAt: $0.createdAt
+                )
+            }
+            .sorted { $0.createdAt > $1.createdAt }
         pendingApprovals = PendingDerivation.pendingApprovals(from: activities)
         pendingUserInputs = PendingDerivation.pendingUserInputs(from: activities)
+        recomputeLatestProposedPlan()
+        recomputeTimelineRows()
+    }
+
+    @MainActor
+    private func recomputeLatestProposedPlan() {
+        latestProposedPlan = proposedPlans
+            .filter { $0.implementedAt == nil }
+            .max { $0.updatedAt < $1.updatedAt }
+    }
+
+    @MainActor
+    private func recomputeTimelineRows() {
+        let activityRows = renderedActivities.map { ThreadTimelineRow.activity($0) }
+        let messageRows = messages.map { ThreadTimelineRow.message($0) }
+        timelineRows = (activityRows + messageRows).sorted { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+            return lhs.sortRank < rhs.sortRank
+        }
     }
 }
 

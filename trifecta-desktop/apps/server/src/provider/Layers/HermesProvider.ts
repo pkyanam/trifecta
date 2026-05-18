@@ -82,24 +82,26 @@ const probeHermesProvider = Effect.fn("probeHermesProvider")(function* (input: {
   return yield* Effect.gen(function* () {
     const acp = yield* AcpClient.AcpClient;
 
-    const rawInit = yield* acp.raw.request(AGENT_METHODS.initialize, {
-      protocolVersion: 1 as const,
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-      },
-      clientInfo: {
-        name: "trifecta-desktop",
-        version: packageJson.version,
-      },
-    }).pipe(
-      Effect.mapError(
-        (e) =>
-          new HermesAcpProbeError({
-            message: `ACP initialize transport failed: ${String((e as { message?: string }).message ?? e)}`,
-          }),
-      ),
-    );
+    const rawInit = yield* acp.raw
+      .request(AGENT_METHODS.initialize, {
+        protocolVersion: 1 as const,
+        clientCapabilities: {
+          fs: { readTextFile: false, writeTextFile: false },
+          terminal: false,
+        },
+        clientInfo: {
+          name: "trifecta-desktop",
+          version: packageJson.version,
+        },
+      })
+      .pipe(
+        Effect.mapError(
+          (e) =>
+            new HermesAcpProbeError({
+              message: `ACP initialize transport failed: ${String((e as { message?: string }).message ?? e)}`,
+            }),
+        ),
+      );
 
     const initialized = yield* decodeHermesInitializeResponse(rawInit).pipe(
       Effect.mapError(
@@ -110,17 +112,19 @@ const probeHermesProvider = Effect.fn("probeHermesProvider")(function* (input: {
       ),
     );
 
-    const rawSession = yield* acp.raw.request(AGENT_METHODS.session_new, {
-      cwd: input.cwd,
-      mcpServers: [],
-    }).pipe(
-      Effect.mapError(
-        (e) =>
-          new HermesAcpProbeError({
-            message: `ACP session/new transport failed: ${String((e as { message?: string }).message ?? e)}`,
-          }),
-      ),
-    );
+    const rawSession = yield* acp.raw
+      .request(AGENT_METHODS.session_new, {
+        cwd: input.cwd,
+        mcpServers: [],
+      })
+      .pipe(
+        Effect.mapError(
+          (e) =>
+            new HermesAcpProbeError({
+              message: `ACP session/new transport failed: ${String((e as { message?: string }).message ?? e)}`,
+            }),
+        ),
+      );
 
     const session = yield* decodeHermesNewSessionResponse(rawSession).pipe(
       Effect.mapError(

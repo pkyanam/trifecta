@@ -151,10 +151,10 @@ export const mergeProviderSnapshot = (
         (isUncheckedPendingSnapshot(nextProvider) ||
           (previousProvider.status === "ready" && isTransientRefreshFailure(nextProvider)))
       ? preservePreviousProbeResult(previousProvider, nextProvider)
-    : {
-        ...nextProvider,
-        models: mergeProviderModels(previousProvider.models, nextProvider.models),
-      };
+      : {
+          ...nextProvider,
+          models: mergeProviderModels(previousProvider.models, nextProvider.models),
+        };
 
 export const mergeProviderSnapshots = (
   previousProviders: ReadonlyArray<ServerProvider>,
@@ -314,6 +314,7 @@ export const ProviderRegistryLive = Layer.effect(
     const maintenanceActionStatesRef = yield* Ref.make<
       ReadonlyMap<ProviderInstanceId, { readonly update?: ServerProviderUpdateState | undefined }>
     >(new Map());
+    const rateLimitsRef = yield* Ref.make<ReadonlyMap<ProviderInstanceId, unknown>>(new Map());
 
     // Live-source registry — the dynamic counterpart to the boot-time
     // `bootSources`. Keyed by `instanceId`; the stored `ProviderInstance`
@@ -365,6 +366,21 @@ export const ProviderRegistryLive = Layer.effect(
         updateState,
       };
     });
+
+    const applyRateLimits = (provider: ServerProvider): Effect.Effect<ServerProvider> =>
+      Effect.gen(function* () {
+        const rateLimitsMap = yield* Ref.get(rateLimitsRef);
+        const rateLimits = rateLimitsMap.get(provider.instanceId);
+        if (rateLimits !== undefined) {
+          return { ...provider, rateLimits };
+        }
+        return provider;
+      });
+
+    const mergeRateLimitsIntoProviders = (
+      providers: ReadonlyArray<ServerProvider>,
+    ): Effect.Effect<ReadonlyArray<ServerProvider>> =>
+      Effect.forEach(providers, applyRateLimits, { concurrency: "unbounded" });
 
     const upsertProviders = Effect.fn("upsertProviders")(function* (
       nextProviders: ReadonlyArray<ServerProvider>,
@@ -730,8 +746,26 @@ export const ProviderRegistryLive = Layer.effect(
       return yield* Ref.get(providersRef);
     });
 
+    const getProvidersEffect: Effect.Effect<ReadonlyArray<ServerProvider>> = Effect.gen(
+      function* () {
+        const providers = yield* Ref.get(providersRef);
+        return yield* mergeRateLimitsIntoProviders(providers);
+      },
+    );
+
     return {
-      getProviders: Ref.get(providersRef),
+      getProviders: getProvidersEffect,
+      setRateLimits: (instanceId: ProviderInstanceId, rateLimits: unknown): Effect.Effect<void> =>
+        Effect.gen(function* () {
+          yield* Ref.update(rateLimitsRef, (map) => {
+            const next = new Map(map);
+            next.set(instanceId, rateLimits);
+            return next;
+          });
+          const providers = yield* Ref.get(providersRef);
+          const updatedProviders = yield* mergeRateLimitsIntoProviders(providers);
+          yield* PubSub.publish(changesPubSub, updatedProviders);
+        }),
       refresh: (provider?: ProviderDriverKind) =>
         refresh(provider).pipe(Effect.catchCause(recoverRefreshFailure)),
       refreshInstance: (instanceId: ProviderInstanceId) =>

@@ -21,7 +21,9 @@ const makeServerAuthPolicyLayer = (overrides?: Partial<ServerConfigShape>) =>
           } satisfies ServerConfigShape;
         }),
       ).pipe(
-        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "belweave-auth-policy-test-" })),
+        Layer.provide(
+          ServerConfig.layerTest(process.cwd(), { prefix: "belweave-auth-policy-test-" }),
+        ),
       ),
     ),
   );

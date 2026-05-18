@@ -6,16 +6,16 @@ Embed a full-featured AI coding agent chat sidebar directly into your IDE. Compa
 
 Trifecta is a universal coding agent interface — it wraps **eight** coding agents behind a single UI that lives in your editor's activity bar:
 
-| Agent | Protocol | Install |
-|-------|----------|---------|
-| **Codex** | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) — `codex login` |
-| **Claude Code** | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) — `claude auth login` |
-| **OpenCode** | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) — `opencode auth login` |
-| **Gemini** | Headless CLI | [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm i -g @google/gemini-cli` |
-| **Cursor** | ACP (stdio) | [Cursor](https://cursor.sh) — comes with the Cursor IDE |
-| **Hermes** | ACP (stdio) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) — `hermes setup` |
-| **Devin** | ACP (stdio) | [Devin](https://devin.ai) — `devin acp` |
-| **ACP Registry** | ACP (stdio) | Any [ACP](https://agentclientprotocol.com)-compatible agent |
+| Agent            | Protocol         | Install                                                                                   |
+| ---------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| **Codex**        | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) — `codex login`                      |
+| **Claude Code**  | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) — `claude auth login`               |
+| **OpenCode**     | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) — `opencode auth login`                                   |
+| **Gemini**       | Headless CLI     | [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm i -g @google/gemini-cli` |
+| **Cursor**       | ACP (stdio)      | [Cursor](https://cursor.sh) — comes with the Cursor IDE                                   |
+| **Hermes**       | ACP (stdio)      | [Hermes Agent](https://github.com/NousResearch/hermes-agent) — `hermes setup`             |
+| **Devin**        | ACP (stdio)      | [Devin](https://devin.ai) — `devin acp`                                                   |
+| **ACP Registry** | ACP (stdio)      | Any [ACP](https://agentclientprotocol.com)-compatible agent                               |
 
 ## Architecture
 
@@ -43,15 +43,16 @@ bun run build --filter=@belweave/trifecta --filter=trifecta-ide
 ```
 
 Then open VS Code and run:
+
 - `Extensions: Install from VSIX...` → select the built `.vsix`
 - Or run the extension from the Debug view (`F5`)
 
 ### Settings
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `trifecta.autoStart` | `true` | Auto-start server on VS Code open |
-| `trifecta.serverPort` | `0` | Server port (`0` = random) |
+| Setting               | Default | Description                       |
+| --------------------- | ------- | --------------------------------- |
+| `trifecta.autoStart`  | `true`  | Auto-start server on VS Code open |
+| `trifecta.serverPort` | `0`     | Server port (`0` = random)        |
 
 ## Development
 
@@ -77,10 +78,10 @@ bun run build
 
 ## Commands
 
-| Command | ID | Description |
-|---------|----|-------------|
-| Open Trifecta | `trifecta.openPanel` | Show the sidebar chat panel |
-| Focus Trifecta Chat | `trifecta.focusChat` | Focus into the chat input |
+| Command             | ID                   | Description                 |
+| ------------------- | -------------------- | --------------------------- |
+| Open Trifecta       | `trifecta.openPanel` | Show the sidebar chat panel |
+| Focus Trifecta Chat | `trifecta.focusChat` | Focus into the chat input   |
 
 ## License
 

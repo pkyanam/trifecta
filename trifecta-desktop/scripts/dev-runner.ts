@@ -40,7 +40,13 @@ const MODE_ARGS = {
   ],
   "dev:server": ["run", "dev", "--filter=@belweave/trifecta"],
   "dev:web": ["run", "dev", "--filter=@belweave/web"],
-  "dev:desktop": ["run", "dev", "--filter=@belweave/desktop", "--filter=@belweave/web", "--parallel"],
+  "dev:desktop": [
+    "run",
+    "dev",
+    "--filter=@belweave/desktop",
+    "--filter=@belweave/web",
+    "--parallel",
+  ],
 } as const satisfies Record<string, ReadonlyArray<string>>;
 
 type DevMode = keyof typeof MODE_ARGS;

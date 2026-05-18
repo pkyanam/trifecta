@@ -37,13 +37,17 @@ import { makeAdapterRegistryMock } from "../src/provider/testUtils/providerAdapt
 import { ProviderAdapterRegistry } from "../src/provider/Services/ProviderAdapterRegistry.ts";
 import { ProviderSessionDirectoryLive } from "../src/provider/Layers/ProviderSessionDirectory.ts";
 import { ServerSettingsService } from "../src/serverSettings.ts";
+import { ProviderService } from "../src/provider/Services/ProviderService.ts";
 import { makeProviderServiceLive } from "../src/provider/Layers/ProviderService.ts";
 import { makeCodexAdapter } from "../src/provider/Layers/CodexAdapter.ts";
 import {
   NoOpProviderEventLoggers,
   ProviderEventLoggers,
 } from "../src/provider/Layers/ProviderEventLoggers.ts";
-import { ProviderService } from "../src/provider/Services/ProviderService.ts";
+import {
+  ProviderRegistry,
+  type ProviderRegistryShape,
+} from "../src/provider/Services/ProviderRegistry.ts";
 import { AnalyticsService } from "../src/telemetry/Services/AnalyticsService.ts";
 import { CheckpointReactorLive } from "../src/orchestration/Layers/CheckpointReactor.ts";
 import { RepositoryIdentityResolverLive } from "../src/project/Layers/RepositoryIdentityResolver.ts";
@@ -79,6 +83,17 @@ import { GitWorkflowService } from "../src/git/GitWorkflowService.ts";
 import * as VcsProcess from "../src/vcs/VcsProcess.ts";
 
 const decodeCodexSettings = Schema.decodeEffect(CodexSettings);
+
+const harnessProviderRegistryMock: ProviderRegistryShape = {
+  getProviders: Effect.succeed([]),
+  refresh: () => Effect.succeed([]),
+  refreshInstance: () => Effect.succeed([]),
+  getProviderMaintenanceCapabilitiesForInstance: (_instanceId, provider) =>
+    Effect.succeed({ provider, packageName: null, update: null }),
+  setProviderMaintenanceActionState: () => Effect.succeed([]),
+  setRateLimits: () => Effect.void,
+  streamChanges: Stream.empty,
+};
 
 function runGit(cwd: string, args: ReadonlyArray<string>) {
   return execFileSync("git", args, {
@@ -373,6 +388,7 @@ export const makeOrchestrationIntegrationHarness = (
       Layer.provideMerge(ServerSettingsService.layerTest()),
       Layer.provideMerge(ServerConfig.layerTest(workspaceDir, rootDir)),
       Layer.provideMerge(NodeServices.layer),
+      Layer.provideMerge(Layer.succeed(ProviderRegistry, harnessProviderRegistryMock)),
     );
 
     const runtime = ManagedRuntime.make(layer);

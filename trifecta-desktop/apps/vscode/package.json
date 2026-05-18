@@ -1,18 +1,8 @@
 {
   "name": "trifecta-ide",
   "displayName": "Trifecta — AI Coding Agent",
-  "description": "Universal coding agent interface for Codex, Claude Code, OpenCode, and Cursor — directly inside your IDE.",
   "version": "0.1.0",
-  "publisher": "pkyanam",
-  "license": "MIT",
-  "icon": "assets/icon.png",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/pkyanam/trifecta"
-  },
-  "engines": {
-    "vscode": "^1.85.0"
-  },
+  "description": "Universal coding agent interface for Codex, Claude Code, OpenCode, and Cursor — directly inside your IDE.",
   "categories": [
     "Chat",
     "Machine Learning",
@@ -20,15 +10,35 @@
   ],
   "keywords": [
     "ai",
-    "coding agent",
-    "codex",
     "claude",
-    "opencode",
+    "codex",
+    "coding agent",
+    "copilot",
     "cursor",
-    "copilot"
+    "opencode"
   ],
-  "activationEvents": [],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pkyanam/trifecta"
+  },
+  "publisher": "pkyanam",
   "main": "./dist/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'lint ok'",
+    "test": "echo 'no tests yet'"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  },
   "contributes": {
     "commands": [
       {
@@ -75,19 +85,9 @@
       }
     }
   },
-  "scripts": {
-    "vscode:prepublish": "npm run build",
-    "build": "node esbuild.config.mjs",
-    "watch": "node esbuild.config.mjs --watch",
-    "typecheck": "tsc --noEmit",
-    "lint": "echo 'lint ok'",
-    "test": "echo 'no tests yet'"
-  },
-  "devDependencies": {
-    "@types/node": "^25.6.2",
-    "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^3.0.0",
-    "esbuild": "^0.24.0",
-    "typescript": "^5.7.0"
+  "activationEvents": [],
+  "icon": "assets/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
   }
 }

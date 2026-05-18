@@ -4654,7 +4654,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
       const repositoryInput = await waitForCommandPaletteInput(
         "Enter GitHub repository (owner/repo)",
       );
-      await page.getByPlaceholder("Enter GitHub repository (owner/repo)").fill("belweave-oss/belweave-env");
+      await page
+        .getByPlaceholder("Enter GitHub repository (owner/repo)")
+        .fill("belweave-oss/belweave-env");
       await dispatchInputKey(repositoryInput, { key: "Enter" });
 
       await vi.waitFor(
@@ -4665,7 +4667,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
           expect(clonePathInput?.value).toBe("~/");
           expect(document.body.textContent).toContain("Repository");
           expect(document.body.textContent).toContain("belweave-oss/belweave-env");
-          expect(document.body.textContent).toContain("https://github.com/belweave-oss/belweave-env");
+          expect(document.body.textContent).toContain(
+            "https://github.com/belweave-oss/belweave-env",
+          );
           expect(document.body.textContent).toContain("Select where to clone");
           expect(document.body.textContent).toContain("Development");
           expect(document.body.textContent).toContain("Clone");

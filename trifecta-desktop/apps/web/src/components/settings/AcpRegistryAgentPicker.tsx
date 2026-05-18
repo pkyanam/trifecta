@@ -31,7 +31,12 @@ function detectPlatformKey(): string {
   if (/Win/i.test(ua)) return "windows-x86_64";
   if (/Mac/i.test(ua)) {
     // M-series Macs report arm in the UA via some browsers; fall back to x86 as safe default
-    if (/arm/i.test(ua) || (typeof navigator !== "undefined" && (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform === "macOS")) {
+    if (
+      /arm/i.test(ua) ||
+      (typeof navigator !== "undefined" &&
+        (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ===
+          "macOS")
+    ) {
       return "darwin-aarch64";
     }
     return "darwin-x86_64";
@@ -141,7 +146,9 @@ export function AcpRegistryAgentPicker({ onSelect, selectedAgentId }: AcpRegistr
       </div>
       <div className="max-h-52 overflow-y-auto rounded-lg border border-border bg-background">
         {filtered.length === 0 ? (
-          <div className="px-4 py-6 text-center text-sm text-muted-foreground">No agents found.</div>
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+            No agents found.
+          </div>
         ) : (
           filtered.map((agent) => {
             const derived = deriveCommand(agent.distribution);
@@ -153,7 +160,11 @@ export function AcpRegistryAgentPicker({ onSelect, selectedAgentId }: AcpRegistr
                 disabled={!derived}
                 onClick={() => {
                   if (!derived) return;
-                  onSelect({ agentId: agent.id, command: derived.command, commandArgs: derived.commandArgs });
+                  onSelect({
+                    agentId: agent.id,
+                    command: derived.command,
+                    commandArgs: derived.commandArgs,
+                  });
                 }}
                 className={cn(
                   "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors",
@@ -186,7 +197,9 @@ export function AcpRegistryAgentPicker({ onSelect, selectedAgentId }: AcpRegistr
                       <span className="text-[10px] text-muted-foreground">v{agent.version}</span>
                     ) : null}
                     {!derived ? (
-                      <span className="ml-auto text-[10px] text-muted-foreground">No distribution</span>
+                      <span className="ml-auto text-[10px] text-muted-foreground">
+                        No distribution
+                      </span>
                     ) : null}
                   </div>
                   {agent.description ? (

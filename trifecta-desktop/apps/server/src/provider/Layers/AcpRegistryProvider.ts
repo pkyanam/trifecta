@@ -230,11 +230,7 @@ export const checkAcpRegistryProviderStatus = Effect.fn("checkAcpRegistryProvide
       commandArgs: config.commandArgs,
       cwd: process.cwd(),
       environment,
-    }).pipe(
-      Effect.scoped,
-      Effect.timeoutOption(Duration.millis(timeoutMs)),
-      Effect.result,
-    );
+    }).pipe(Effect.scoped, Effect.timeoutOption(Duration.millis(timeoutMs)), Effect.result);
 
     if (Result.isFailure(probeResult)) {
       const error = probeResult.failure;

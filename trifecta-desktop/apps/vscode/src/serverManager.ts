@@ -87,7 +87,9 @@ export class ServerManager {
 
   private notifyListeners(conn: ServerConnection): void {
     for (const l of this.listeners) {
-      try { l(conn); } catch (_) {}
+      try {
+        l(conn);
+      } catch (_) {}
     }
   }
 
@@ -95,9 +97,7 @@ export class ServerManager {
     const serverPath = await this.resolveServerPath();
     const port = await findFreePort();
 
-    this.outputChannel.appendLine(
-      `[trifecta] Starting server on port ${port}…`,
-    );
+    this.outputChannel.appendLine(`[trifecta] Starting server on port ${port}…`);
 
     const runtime = await this.resolveRuntime();
     const env: NodeJS.ProcessEnv = {
@@ -110,12 +110,9 @@ export class ServerManager {
       NODE_ENV: process.env.NODE_ENV || "development",
       HOME: os.homedir(),
       CODEX_HOME: process.env.CODEX_HOME || path.join(os.homedir(), ".codex"),
-      CLAUDE_CONFIG_DIR:
-        process.env.CLAUDE_CONFIG_DIR ||
-        path.join(os.homedir(), ".claude"),
+      CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"),
       OPENCODE_CONFIG_DIR:
-        process.env.OPENCODE_CONFIG_DIR ||
-        path.join(os.homedir(), ".config", "opencode"),
+        process.env.OPENCODE_CONFIG_DIR || path.join(os.homedir(), ".config", "opencode"),
     };
 
     const args =
@@ -150,25 +147,19 @@ export class ServerManager {
     });
 
     this.process.on("exit", (code, signal) => {
-      this.outputChannel.appendLine(
-        `[trifecta] Server exited (code=${code}, signal=${signal})`,
-      );
+      this.outputChannel.appendLine(`[trifecta] Server exited (code=${code}, signal=${signal})`);
       this.process = null;
       this.connection = null;
     });
 
     this.process.on("error", (err) => {
-      this.outputChannel.appendLine(
-        `[trifecta] Server error: ${err.message}`,
-      );
+      this.outputChannel.appendLine(`[trifecta] Server error: ${err.message}`);
     });
 
     // Wait for health check
     await this.waitForReady(port);
 
-    this.outputChannel.appendLine(
-      `[trifecta] Server ready on http://127.0.0.1:${port}`,
-    );
+    this.outputChannel.appendLine(`[trifecta] Server ready on http://127.0.0.1:${port}`);
 
     const pairingToken = await this.parsePairingToken();
     this.outputChannel.appendLine(`[trifecta] Token: ${pairingToken ?? "none"}`);
@@ -177,15 +168,11 @@ export class ServerManager {
     // This prevents Cursor from stealing the single-use token and also
     // gives us a session token to pass into the webview (since httpOnly
     // cookies don't work in VS Code webviews).
-    const auth = pairingToken
-      ? await this.bootstrapAuth(port, pairingToken)
-      : null;
+    const auth = pairingToken ? await this.bootstrapAuth(port, pairingToken) : null;
     const wsToken = auth?.wsToken ?? null;
     const sessionToken = auth?.sessionToken ?? null;
     if (pairingToken && !wsToken) {
-      this.outputChannel.appendLine(
-        "[trifecta] Warning: failed to pre-consume pairing token",
-      );
+      this.outputChannel.appendLine("[trifecta] Warning: failed to pre-consume pairing token");
     }
 
     return { port, pairingToken, wsToken, sessionToken, wsUrl: null as never };
@@ -229,27 +216,20 @@ export class ServerManager {
     const base = `http://127.0.0.1:${port}`;
     try {
       // Step 1: Exchange pairing credential for session token
-      const bootstrapResp = await fetch(
-        `${base}/api/auth/bootstrap/bearer`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential: pairingToken }),
-        },
-      );
+      const bootstrapResp = await fetch(`${base}/api/auth/bootstrap/bearer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential: pairingToken }),
+      });
       if (!bootstrapResp.ok) {
-        this.outputChannel.appendLine(
-          `[trifecta] Bootstrap failed: ${bootstrapResp.status}`,
-        );
+        this.outputChannel.appendLine(`[trifecta] Bootstrap failed: ${bootstrapResp.status}`);
         return null;
       }
 
       const bootstrap = (await bootstrapResp.json()) as { sessionToken?: string };
       const sessionToken = bootstrap.sessionToken;
       if (!sessionToken) {
-        this.outputChannel.appendLine(
-          "[trifecta] No session token in bootstrap response",
-        );
+        this.outputChannel.appendLine("[trifecta] No session token in bootstrap response");
         return null;
       }
 
@@ -263,26 +243,20 @@ export class ServerManager {
         body: JSON.stringify({}),
       });
       if (!wsTokenResp.ok) {
-        this.outputChannel.appendLine(
-          `[trifecta] WS token request failed: ${wsTokenResp.status}`,
-        );
+        this.outputChannel.appendLine(`[trifecta] WS token request failed: ${wsTokenResp.status}`);
         return null;
       }
 
       const wsTokenData = (await wsTokenResp.json()) as { token?: string };
       const wsToken = wsTokenData.token;
       if (!wsToken) {
-        this.outputChannel.appendLine(
-          "[trifecta] No wsToken in response",
-        );
+        this.outputChannel.appendLine("[trifecta] No wsToken in response");
         return null;
       }
 
       return { wsToken, sessionToken };
     } catch (err) {
-      this.outputChannel.appendLine(
-        `[trifecta] Auth error: ${err}`,
-      );
+      this.outputChannel.appendLine(`[trifecta] Auth error: ${err}`);
       return null;
     }
   }
@@ -316,14 +290,12 @@ export class ServerManager {
       "  bun install && bun run build --filter=@belweave/trifecta\n\n" +
       'Or set "trifecta.serverPath" in VS Code settings.';
 
-    vscode.window
-      .showErrorMessage("Trifecta server not found", "Show Details")
-      .then((sel) => {
-        if (sel === "Show Details") {
-          this.outputChannel.show();
-          this.outputChannel.appendLine(message);
-        }
-      });
+    vscode.window.showErrorMessage("Trifecta server not found", "Show Details").then((sel) => {
+      if (sel === "Show Details") {
+        this.outputChannel.show();
+        this.outputChannel.appendLine(message);
+      }
+    });
 
     throw new Error(message);
   }
@@ -346,7 +318,10 @@ export class ServerManager {
             });
             proc.on("close", (code) => (code === 0 ? resolve() : reject()));
             proc.on("error", reject);
-            setTimeout(() => { proc.kill(); reject(new Error("timeout")); }, 3000);
+            setTimeout(() => {
+              proc.kill();
+              reject(new Error("timeout"));
+            }, 3000);
           });
           return "bun";
         } catch {
@@ -369,9 +344,7 @@ export class ServerManager {
       await sleep(250);
     }
 
-    throw new Error(
-      `Trifecta server did not become ready within 30s at ${url}`,
-    );
+    throw new Error(`Trifecta server did not become ready within 30s at ${url}`);
   }
 }
 

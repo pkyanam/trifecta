@@ -21,7 +21,9 @@ const makeServerConfigLayer = (overrides?: Partial<ServerConfigShape>) =>
         ...overrides,
       } satisfies ServerConfigShape;
     }),
-  ).pipe(Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "belweave-auth-server-test-" })));
+  ).pipe(
+    Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "belweave-auth-server-test-" })),
+  );
 
 const makeServerAuthLayer = (overrides?: Partial<ServerConfigShape>) =>
   ServerAuthLive.pipe(

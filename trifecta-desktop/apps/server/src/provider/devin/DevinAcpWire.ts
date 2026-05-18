@@ -76,9 +76,7 @@ export function normalizeDevinNewSessionResult(raw: unknown): unknown {
         if (!itemRec) return undefined;
         const value = typeof itemRec.value === "string" ? itemRec.value : "";
         const name =
-          typeof itemRec.name === "string" && itemRec.name.trim().length > 0
-            ? itemRec.name
-            : value;
+          typeof itemRec.name === "string" && itemRec.name.trim().length > 0 ? itemRec.name : value;
         if (!value) return undefined;
         return { modelId: value, name };
       })

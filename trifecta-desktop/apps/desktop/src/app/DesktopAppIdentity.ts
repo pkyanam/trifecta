@@ -50,7 +50,9 @@ const make = Effect.gen(function* () {
       onSome: (value) =>
         decodeAppPackageMetadata(value).pipe(
           Effect.map((parsed) =>
-            Option.fromNullishOr(parsed.belweaveCommitHash).pipe(Option.flatMap(normalizeCommitHash)),
+            Option.fromNullishOr(parsed.belweaveCommitHash).pipe(
+              Option.flatMap(normalizeCommitHash),
+            ),
           ),
           Effect.catch(() => Effect.succeed(Option.none<string>())),
         ),

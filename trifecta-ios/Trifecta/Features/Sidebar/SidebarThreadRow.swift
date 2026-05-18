@@ -156,7 +156,6 @@ struct SidebarThreadRow: View {
 
 private struct SidebarStatusDot: View {
     let thread: ThreadShell
-    @State private var pulse = false
 
     var body: some View {
         ZStack {
@@ -164,9 +163,6 @@ private struct SidebarStatusDot: View {
                 Circle()
                     .fill(color.opacity(0.22))
                     .frame(width: 18, height: 18)
-                    .scaleEffect(pulse ? 1.45 : 0.7)
-                    .opacity(pulse ? 0.05 : 0.9)
-                    .animation(.easeOut(duration: 1.15).repeatForever(autoreverses: false), value: pulse)
             }
 
             Circle()
@@ -174,7 +170,6 @@ private struct SidebarStatusDot: View {
                 .frame(width: 8, height: 8)
         }
         .frame(width: 18, height: 18)
-        .onAppear { pulse = true }
     }
 
     private var isRunning: Bool {

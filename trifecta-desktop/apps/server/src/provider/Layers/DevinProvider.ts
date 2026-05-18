@@ -94,24 +94,26 @@ const probeDevinProvider = Effect.fn("probeDevinProvider")(function* (input: {
   return yield* Effect.gen(function* () {
     const acp = yield* AcpClient.AcpClient;
 
-    const rawInit = yield* acp.raw.request(AGENT_METHODS.initialize, {
-      protocolVersion: 1 as const,
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-      },
-      clientInfo: {
-        name: "trifecta-desktop",
-        version: packageJson.version,
-      },
-    }).pipe(
-      Effect.mapError(
-        (e) =>
-          new DevinAcpProbeError({
-            message: `ACP initialize transport failed: ${String((e as { message?: string }).message ?? e)}`,
-          }),
-      ),
-    );
+    const rawInit = yield* acp.raw
+      .request(AGENT_METHODS.initialize, {
+        protocolVersion: 1 as const,
+        clientCapabilities: {
+          fs: { readTextFile: false, writeTextFile: false },
+          terminal: false,
+        },
+        clientInfo: {
+          name: "trifecta-desktop",
+          version: packageJson.version,
+        },
+      })
+      .pipe(
+        Effect.mapError(
+          (e) =>
+            new DevinAcpProbeError({
+              message: `ACP initialize transport failed: ${String((e as { message?: string }).message ?? e)}`,
+            }),
+        ),
+      );
 
     const initialized = yield* decodeDevinInitializeResponse(rawInit).pipe(
       Effect.mapError(
@@ -122,17 +124,19 @@ const probeDevinProvider = Effect.fn("probeDevinProvider")(function* (input: {
       ),
     );
 
-    const rawSession = yield* acp.raw.request(AGENT_METHODS.session_new, {
-      cwd: input.cwd,
-      mcpServers: [],
-    }).pipe(
-      Effect.mapError(
-        (e) =>
-          new DevinAcpProbeError({
-            message: `ACP session/new transport failed: ${String((e as { message?: string }).message ?? e)}`,
-          }),
-      ),
-    );
+    const rawSession = yield* acp.raw
+      .request(AGENT_METHODS.session_new, {
+        cwd: input.cwd,
+        mcpServers: [],
+      })
+      .pipe(
+        Effect.mapError(
+          (e) =>
+            new DevinAcpProbeError({
+              message: `ACP session/new transport failed: ${String((e as { message?: string }).message ?? e)}`,
+            }),
+        ),
+      );
 
     const session = yield* decodeDevinNewSessionResponse(rawSession).pipe(
       Effect.mapError(

@@ -13,6 +13,7 @@ const LEGACY_PERSISTED_STATE_KEYS = [
   "codething:renderer-state:v3",
   "codething:renderer-state:v2",
   "codething:renderer-state:v1",
+  "trifecta:ui-state:v1",
 ] as const;
 
 export interface PersistedUiState {

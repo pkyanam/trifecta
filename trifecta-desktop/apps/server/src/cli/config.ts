@@ -84,7 +84,9 @@ export const tailscaleServePortFlag = Flag.integer("tailscale-serve-port").pipe(
 const EnvServerConfig = Config.all({
   logLevel: Config.logLevel("BELWEAVE_LOG_LEVEL").pipe(Config.withDefault("Info")),
   traceMinLevel: Config.logLevel("BELWEAVE_TRACE_MIN_LEVEL").pipe(Config.withDefault("Info")),
-  traceTimingEnabled: Config.boolean("BELWEAVE_TRACE_TIMING_ENABLED").pipe(Config.withDefault(true)),
+  traceTimingEnabled: Config.boolean("BELWEAVE_TRACE_TIMING_ENABLED").pipe(
+    Config.withDefault(true),
+  ),
   traceFile: Config.string("BELWEAVE_TRACE_FILE").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
@@ -103,14 +105,19 @@ const EnvServerConfig = Config.all({
   otlpExportIntervalMs: Config.int("BELWEAVE_OTLP_EXPORT_INTERVAL_MS").pipe(
     Config.withDefault(10_000),
   ),
-  otlpServiceName: Config.string("BELWEAVE_OTLP_SERVICE_NAME").pipe(Config.withDefault("belweave-server")),
+  otlpServiceName: Config.string("BELWEAVE_OTLP_SERVICE_NAME").pipe(
+    Config.withDefault("belweave-server"),
+  ),
   mode: Config.schema(RuntimeMode, "BELWEAVE_MODE").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
   port: Config.port("BELWEAVE_PORT").pipe(Config.option, Config.map(Option.getOrUndefined)),
   host: Config.string("BELWEAVE_HOST").pipe(Config.option, Config.map(Option.getOrUndefined)),
-  belweaveHome: Config.string("BELWEAVE_HOME").pipe(Config.option, Config.map(Option.getOrUndefined)),
+  belweaveHome: Config.string("BELWEAVE_HOME").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
   devUrl: Config.url("VITE_DEV_SERVER_URL").pipe(Config.option, Config.map(Option.getOrUndefined)),
   noBrowser: Config.boolean("BELWEAVE_NO_BROWSER").pipe(
     Config.option,

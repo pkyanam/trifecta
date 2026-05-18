@@ -70,6 +70,16 @@ export interface ProviderRegistryShape {
   }) => Effect.Effect<ReadonlyArray<ServerProvider>>;
 
   /**
+   * Update the rate-limit snapshot for a configured provider instance.
+   * Merges the supplied unknown payload into the provider snapshot's
+   * `rateLimits` field and publishes the updated list via `streamChanges`.
+   */
+  readonly setRateLimits: (
+    instanceId: ProviderInstanceId,
+    rateLimits: unknown,
+  ) => Effect.Effect<void>;
+
+  /**
    * Stream of provider snapshot updates — one emission per aggregated
    * change. The array contains the full current state.
    */

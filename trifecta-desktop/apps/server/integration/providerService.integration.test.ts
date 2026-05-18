@@ -12,6 +12,10 @@ import * as Stream from "effect/Stream";
 
 import { ProviderAdapterRegistry } from "../src/provider/Services/ProviderAdapterRegistry.ts";
 import { makeAdapterRegistryMock } from "../src/provider/testUtils/providerAdapterRegistryMock.ts";
+import {
+  ProviderRegistry,
+  type ProviderRegistryShape,
+} from "../src/provider/Services/ProviderRegistry.ts";
 import { ProviderSessionDirectoryLive } from "../src/provider/Layers/ProviderSessionDirectory.ts";
 import {
   NoOpProviderEventLoggers,
@@ -37,6 +41,17 @@ import {
   codexTurnToolFixture,
   codexTurnTextFixture,
 } from "./fixtures/providerRuntime.ts";
+
+const providerRegistryMock: ProviderRegistryShape = {
+  getProviders: Effect.succeed([]),
+  refresh: () => Effect.succeed([]),
+  refreshInstance: () => Effect.succeed([]),
+  getProviderMaintenanceCapabilitiesForInstance: (_instanceId, _provider) =>
+    Effect.succeed({ provider: _provider, packageName: null, update: null }),
+  setProviderMaintenanceActionState: () => Effect.succeed([]),
+  setRateLimits: () => Effect.void,
+  streamChanges: Stream.empty,
+};
 
 const codexInstanceId = ProviderInstanceId.make("codex");
 
@@ -74,7 +89,10 @@ const makeIntegrationFixture = Effect.gen(function* () {
     Layer.succeed(ProviderEventLoggers, NoOpProviderEventLoggers),
   ).pipe(Layer.provide(SqlitePersistenceMemory));
 
-  const layer = makeProviderServiceLive().pipe(Layer.provide(shared));
+  const layer = makeProviderServiceLive().pipe(
+    Layer.provide(Layer.succeed(ProviderRegistry, providerRegistryMock)),
+    Layer.provide(shared),
+  );
 
   return {
     cwd,

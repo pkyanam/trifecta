@@ -73,8 +73,7 @@ export function isRetriableGeminiHeadlessRequestFailure(error: unknown): boolean
 /** Persisted on `ProviderSession.resumeCursor` / `ProviderTurnStartResult.resumeCursor`. */
 const GEMINI_HEADLESS_RESUME_CURSOR_V = 1 as const;
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function looksLikeUuid(s: string): boolean {
   return UUID_RE.test(s.trim());
@@ -168,7 +167,10 @@ function escapeRegExp(s: string): string {
 }
 
 /** Exported for unit tests — Gemini CLI lists resumable sessions as `N. title [uuid]`. */
-export function parseGeminiSessionResumeIndex(listOutput: string, sessionId: string): string | undefined {
+export function parseGeminiSessionResumeIndex(
+  listOutput: string,
+  sessionId: string,
+): string | undefined {
   const sessionIdPattern = escapeRegExp(sessionId.trim());
   const linePattern = new RegExp(`^\\s*(\\d+)\\.\\s+.*\\[${sessionIdPattern}\\]\\s*$`, "im");
   const match = linePattern.exec(listOutput);
@@ -353,7 +355,10 @@ export const makeGeminiHeadlessAdapter = Effect.fn("makeGeminiHeadlessAdapter")(
         );
 
         if (exitCode !== 0) return undefined;
-        return parseGeminiSessionResumeIndex(`${stdout.text}\n${stderr.text}`, session.cliSessionId);
+        return parseGeminiSessionResumeIndex(
+          `${stdout.text}\n${stderr.text}`,
+          session.cliSessionId,
+        );
       }).pipe(Effect.orElseSucceed(() => undefined));
 
       const runHeadlessCli = Effect.gen(function* () {
@@ -460,7 +465,8 @@ export const makeGeminiHeadlessAdapter = Effect.fn("makeGeminiHeadlessAdapter")(
           type: "content.delta",
           payload: {
             streamKind: "assistant_text",
-            delta: "Gemini returned no stdout for this headless run. Check stderr in the server logs or run the same command in a terminal.",
+            delta:
+              "Gemini returned no stdout for this headless run. Check stderr in the server logs or run the same command in a terminal.",
           },
         });
       }
@@ -532,9 +538,11 @@ export const makeGeminiHeadlessAdapter = Effect.fn("makeGeminiHeadlessAdapter")(
     const turnFiber = yield* turnEffect;
     session.activeTurnFiber = turnFiber as Fiber.Fiber<void, never>;
     yield* Fiber.join(turnFiber).pipe(
-      Effect.ensuring(Effect.sync(() => {
-        session.activeTurnFiber = undefined;
-      })),
+      Effect.ensuring(
+        Effect.sync(() => {
+          session.activeTurnFiber = undefined;
+        }),
+      ),
     );
 
     return { threadId: turnInput.threadId, turnId };
@@ -619,8 +627,7 @@ export const makeGeminiHeadlessAdapter = Effect.fn("makeGeminiHeadlessAdapter")(
   const rollbackThread: ProviderAdapterShape<ProviderAdapterError>["rollbackThread"] = (
     threadId,
     _numTurns,
-  ) =>
-    readThread(threadId);
+  ) => readThread(threadId);
 
   const stopAll: ProviderAdapterShape<ProviderAdapterError>["stopAll"] = () =>
     Effect.forEach(Array.from(sessions.values()), stopSessionInternal, {
@@ -629,10 +636,7 @@ export const makeGeminiHeadlessAdapter = Effect.fn("makeGeminiHeadlessAdapter")(
     }).pipe(Effect.asVoid);
 
   yield* Effect.acquireRelease(Effect.void, () =>
-    stopAll().pipe(
-      Effect.andThen(Queue.shutdown(runtimeEventQueue)),
-      Effect.ignore,
-    ),
+    stopAll().pipe(Effect.andThen(Queue.shutdown(runtimeEventQueue)), Effect.ignore),
   );
 
   return {

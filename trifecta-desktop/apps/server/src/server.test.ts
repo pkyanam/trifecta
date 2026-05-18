@@ -18,6 +18,7 @@ import {
   type OrchestrationThreadShell,
   type SshAuditEvent,
   type SshHostProfile,
+  type SshKnownHostEntry,
   TerminalNotRunningError,
   type OrchestrationCommand,
   type OrchestrationEvent,
@@ -92,6 +93,7 @@ import { ServerSettingsService, type ServerSettingsShape } from "./serverSetting
 import { TerminalManager, type TerminalManagerShape } from "./terminal/Services/Manager.ts";
 import { SshAuditLog, type SshAuditLogShape } from "./ssh/Services/SshAuditLog.ts";
 import { SshHostProfiles, type SshHostProfilesShape } from "./ssh/Services/SshHostProfiles.ts";
+import { SshKnownHosts, type SshKnownHostsShape } from "./ssh/Services/SshKnownHosts.ts";
 import {
   SshSessionManager,
   type SshSessionManagerShape,
@@ -347,6 +349,7 @@ const buildAppUnderTest = (options?: {
     terminalManager?: Partial<TerminalManagerShape>;
     sshAuditLog?: Partial<SshAuditLogShape>;
     sshHostProfiles?: Partial<SshHostProfilesShape>;
+    sshKnownHosts?: Partial<SshKnownHostsShape>;
     sshSessionManager?: Partial<SshSessionManagerShape>;
     sshTokenAuthority?: Partial<SshTokenAuthorityShape>;
     orchestrationEngine?: Partial<OrchestrationEngineShape>;
@@ -361,7 +364,9 @@ const buildAppUnderTest = (options?: {
 }) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
-    const tempBaseDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "belweave-router-test-" });
+    const tempBaseDir = yield* fileSystem.makeTempDirectoryScoped({
+      prefix: "belweave-router-test-",
+    });
     const baseDir = options?.config?.baseDir ?? tempBaseDir;
     const devUrl = options?.config?.devUrl;
     const derivedPaths = yield* deriveServerPaths(baseDir, devUrl);
@@ -557,6 +562,19 @@ const buildAppUnderTest = (options?: {
             updatedAt: DateTime.formatIso(TEST_EPOCH),
           }),
         ...options?.layers?.sshHostProfiles,
+      }),
+      Layer.mock(SshKnownHosts)({
+        list: () => Effect.succeed([]),
+        find: () => Effect.succeed(Option.none()),
+        upsert: (input) =>
+          Effect.succeed({
+            id: `ssh-known-${crypto.randomUUID()}` as SshKnownHostEntry["id"],
+            firstSeenAt: DateTime.formatIso(TEST_EPOCH),
+            lastSeenAt: DateTime.formatIso(TEST_EPOCH),
+            ...input,
+          }),
+        remove: () => Effect.void,
+        ...options?.layers?.sshKnownHosts,
       }),
       Layer.mock(SshSessionManager)({
         open: () =>
@@ -1026,7 +1044,9 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const staticDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "belweave-router-static-" });
+      const staticDir = yield* fileSystem.makeTempDirectoryScoped({
+        prefix: "belweave-router-static-",
+      });
       const indexPath = path.join(staticDir, "index.html");
       yield* fileSystem.writeFileString(indexPath, "<html>router-static-ok</html>");
 
@@ -2207,7 +2227,9 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const workspaceDir = yield* fs.makeTempDirectoryScoped({ prefix: "belweave-ws-auth-required-" });
+      const workspaceDir = yield* fs.makeTempDirectoryScoped({
+        prefix: "belweave-ws-auth-required-",
+      });
       yield* fs.writeFileString(
         path.join(workspaceDir, "needle-file.ts"),
         "export const needle = 1;",
@@ -2417,7 +2439,9 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const workspaceDir = yield* fs.makeTempDirectoryScoped({ prefix: "belweave-ws-project-search-" });
+      const workspaceDir = yield* fs.makeTempDirectoryScoped({
+        prefix: "belweave-ws-project-search-",
+      });
       yield* fs.writeFileString(
         path.join(workspaceDir, "needle-file.ts"),
         "export const needle = 1;",
@@ -2527,7 +2551,9 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const workspaceDir = yield* fs.makeTempDirectoryScoped({ prefix: "belweave-ws-project-write-" });
+      const workspaceDir = yield* fs.makeTempDirectoryScoped({
+        prefix: "belweave-ws-project-write-",
+      });
 
       yield* buildAppUnderTest();
 
@@ -2552,7 +2578,9 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const parentDir = yield* fs.makeTempDirectoryScoped({ prefix: "belweave-ws-project-create-" });
+      const parentDir = yield* fs.makeTempDirectoryScoped({
+        prefix: "belweave-ws-project-create-",
+      });
       const missingWorkspaceRoot = path.join(parentDir, "nested", "new-project");
 
       yield* buildAppUnderTest();
@@ -2585,7 +2613,9 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
   it.effect("routes websocket rpc projects.writeFile errors", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const workspaceDir = yield* fs.makeTempDirectoryScoped({ prefix: "belweave-ws-project-write-" });
+      const workspaceDir = yield* fs.makeTempDirectoryScoped({
+        prefix: "belweave-ws-project-write-",
+      });
 
       yield* buildAppUnderTest();
 

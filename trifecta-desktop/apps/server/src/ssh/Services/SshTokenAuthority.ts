@@ -3,11 +3,7 @@ import type * as DateTime from "effect/DateTime";
 import type * as Duration from "effect/Duration";
 import type * as Effect from "effect/Effect";
 
-import type {
-  AuthSessionId,
-  SshSessionId,
-  SshSessionTokenInvalidError,
-} from "@belweave/contracts";
+import type { AuthSessionId, SshSessionId, SshSessionTokenInvalidError } from "@belweave/contracts";
 
 export interface SshTokenIssueInput {
   readonly authSessionId: AuthSessionId;
@@ -41,7 +37,6 @@ export interface SshTokenAuthorityShape {
   readonly revokeForSession: (sshSessionId: SshSessionId) => Effect.Effect<void>;
 }
 
-export class SshTokenAuthority extends Context.Service<
-  SshTokenAuthority,
-  SshTokenAuthorityShape
->()("belweave/ssh/Services/SshTokenAuthority") {}
+export class SshTokenAuthority extends Context.Service<SshTokenAuthority, SshTokenAuthorityShape>()(
+  "belweave/ssh/Services/SshTokenAuthority",
+) {}

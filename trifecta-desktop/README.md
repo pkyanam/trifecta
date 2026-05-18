@@ -10,12 +10,14 @@ Companion mobile apps for <a href="../trifecta-ios/">iOS</a> and <a href="../tri
 > Trifecta supports multiple coding agents. Install and authenticate at least one before use:
 >
 > **Native providers:**
+>
 > - [Codex](https://developers.openai.com/codex/cli): `codex login`
 > - [Claude Code](https://claude.com/product/claude-code): `claude auth login`
 > - [OpenCode](https://opencode.ai): `opencode auth login`
 > - [Gemini CLI](https://github.com/google-gemini/gemini-cli): `npm i -g @google/gemini-cli` + set `GEMINI_API_KEY`
 >
 > **ACP providers (Agent Client Protocol):**
+>
 > - [Cursor](https://cursor.sh): comes with the Cursor IDE (`cursor auth login`)
 > - [Hermes Agent](https://github.com/NousResearch/hermes-agent): `hermes setup`
 > - [Devin](https://devin.ai): `devin acp`
@@ -71,14 +73,14 @@ yay -S belweave-bin
 
 ### Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Runtime | Electron 41 (desktop), Node.js (server) |
-| Framework | Effect-TS (functional effect system) |
-| Build | Turborepo, tsdown, Vite 8 |
-| Web UI | React 19, Tailwind CSS 4, Zustand, Lexical |
-| Linting | oxlint + oxfmt (Oxidation toolchain) |
-| Agents | 8 providers via JSON-RPC or ACP over stdio |
+| Layer     | Technology                                 |
+| --------- | ------------------------------------------ |
+| Runtime   | Electron 41 (desktop), Node.js (server)    |
+| Framework | Effect-TS (functional effect system)       |
+| Build     | Turborepo, tsdown, Vite 8                  |
+| Web UI    | React 19, Tailwind CSS 4, Zustand, Lexical |
+| Linting   | oxlint + oxfmt (Oxidation toolchain)       |
+| Agents    | 8 providers via JSON-RPC or ACP over stdio |
 
 ## Some notes
 

@@ -90,4 +90,6 @@ export interface ProjectionPendingApprovalRepositoryShape {
 export class ProjectionPendingApprovalRepository extends Context.Service<
   ProjectionPendingApprovalRepository,
   ProjectionPendingApprovalRepositoryShape
->()("belweave/persistence/Services/ProjectionPendingApprovals/ProjectionPendingApprovalRepository") {}
+>()(
+  "belweave/persistence/Services/ProjectionPendingApprovals/ProjectionPendingApprovalRepository",
+) {}

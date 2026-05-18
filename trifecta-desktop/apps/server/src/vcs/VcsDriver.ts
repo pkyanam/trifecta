@@ -69,4 +69,6 @@ export interface VcsDriverShape {
   readonly initRepository: (input: VcsInitInput) => Effect.Effect<void, VcsError>;
 }
 
-export class VcsDriver extends Context.Service<VcsDriver, VcsDriverShape>()("belweave/vcs/VcsDriver") {}
+export class VcsDriver extends Context.Service<VcsDriver, VcsDriverShape>()(
+  "belweave/vcs/VcsDriver",
+) {}

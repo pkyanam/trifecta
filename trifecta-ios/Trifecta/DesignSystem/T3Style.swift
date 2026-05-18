@@ -101,17 +101,9 @@ struct T3Glass: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
 
-        if #available(iOS 26.0, *) {
-            content
-                .background(tint, in: shape)
-                .glassEffect(.regular, in: shape)
-                .overlay(shape.stroke(stroke, lineWidth: 0.5))
-        } else {
-            content
-                .background(.ultraThinMaterial, in: shape)
-                .overlay(shape.fill(tint))
-                .overlay(shape.stroke(stroke, lineWidth: 0.5))
-        }
+        content
+            .background(tint, in: shape)
+            .overlay(shape.stroke(stroke, lineWidth: 0.5))
     }
 }
 

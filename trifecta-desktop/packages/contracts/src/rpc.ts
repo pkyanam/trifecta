@@ -84,6 +84,7 @@ import {
   SshSendInputInput,
   SshSessionInput,
   SshSessionSnapshot,
+  SshSetupShellProfileResult,
   SshTerminalEvent,
 } from "./sshSession.ts";
 import {
@@ -164,6 +165,7 @@ export const WS_METHODS = {
   sshCloseSession: "ssh.closeSession",
   sshIssueSessionToken: "ssh.issueSessionToken",
   sshListAudit: "ssh.listAudit",
+  sshSetupShellProfile: "ssh.setupShellProfile",
 
   // Server meta
   serverGetConfig: "server.getConfig",
@@ -474,6 +476,12 @@ export const WsSshListAuditRpc = Rpc.make(WS_METHODS.sshListAudit, {
   error: SshError,
 });
 
+export const WsSshSetupShellProfileRpc = Rpc.make(WS_METHODS.sshSetupShellProfile, {
+  payload: Schema.Struct({}),
+  success: SshSetupShellProfileResult,
+  error: SshError,
+});
+
 export const WsSubscribeSshTerminalRpc = Rpc.make(WS_METHODS.subscribeSshTerminal, {
   payload: SshSessionInput,
   success: SshTerminalEvent,
@@ -611,6 +619,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsSshCloseSessionRpc,
   WsSshIssueSessionTokenRpc,
   WsSshListAuditRpc,
+  WsSshSetupShellProfileRpc,
   WsSubscribeSshTerminalRpc,
   WsSubscribeServerConfigRpc,
   WsSubscribeServerLifecycleRpc,

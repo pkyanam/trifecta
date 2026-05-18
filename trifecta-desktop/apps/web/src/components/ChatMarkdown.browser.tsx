@@ -103,7 +103,8 @@ describe("ChatMarkdown", () => {
   });
 
   it("disambiguates duplicate file basenames inline", async () => {
-    const firstPath = "/Users/yashsingh/p/belweave/apps/web/src/components/chat/MessagesTimeline.tsx";
+    const firstPath =
+      "/Users/yashsingh/p/belweave/apps/web/src/components/chat/MessagesTimeline.tsx";
     const secondPath = "/Users/yashsingh/p/belweave/apps/web/src/components/MessagesTimeline.tsx";
     const screen = await render(
       <ChatMarkdown

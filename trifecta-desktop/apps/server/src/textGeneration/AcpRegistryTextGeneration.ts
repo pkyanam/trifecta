@@ -28,7 +28,11 @@ import {
   buildPrContentPrompt,
   buildThreadTitlePrompt,
 } from "./TextGenerationPrompts.ts";
-import { sanitizeCommitSubject, sanitizePrTitle, sanitizeThreadTitle } from "./TextGenerationUtils.ts";
+import {
+  sanitizeCommitSubject,
+  sanitizePrTitle,
+  sanitizeThreadTitle,
+} from "./TextGenerationUtils.ts";
 import type {
   BranchNameGenerationInput,
   BranchNameGenerationResult,
@@ -63,18 +67,16 @@ const runAcpRegistryPrompt = Effect.fn("runAcpRegistryPrompt")(function* (
       shell: process.platform === "win32",
     });
 
-    const handle = yield* spawner
-      .spawn(command)
-      .pipe(
-        Effect.provideService(Scope.Scope, scope),
-        Effect.mapError(
-          (err) =>
-            new TextGenerationError({
-              operation: "generateText",
-              detail: `Failed to spawn ${spawnCommand}: ${err.message}`,
-            }),
-        ),
-      );
+    const handle = yield* spawner.spawn(command).pipe(
+      Effect.provideService(Scope.Scope, scope),
+      Effect.mapError(
+        (err) =>
+          new TextGenerationError({
+            operation: "generateText",
+            detail: `Failed to spawn ${spawnCommand}: ${err.message}`,
+          }),
+      ),
+    );
 
     const acpLayer = AcpClient.layerChildProcess(handle);
     const acpContext = yield* Layer.build(acpLayer).pipe(
@@ -108,17 +110,15 @@ const runAcpRegistryPrompt = Effect.fn("runAcpRegistryPrompt")(function* (
         ),
       );
 
-    const sessionResult = yield* acp.agent
-      .createSession({ cwd, mcpServers: [] })
-      .pipe(
-        Effect.mapError(
-          (err) =>
-            new TextGenerationError({
-              operation: "generateText",
-              detail: `ACP session/new failed: ${String(err)}`,
-            }),
-        ),
-      );
+    const sessionResult = yield* acp.agent.createSession({ cwd, mcpServers: [] }).pipe(
+      Effect.mapError(
+        (err) =>
+          new TextGenerationError({
+            operation: "generateText",
+            detail: `ACP session/new failed: ${String(err)}`,
+          }),
+      ),
+    );
 
     let collected = "";
     yield* acp.handleSessionUpdate((notification) =>
@@ -198,77 +198,75 @@ const runAcpRegistryJsonPrompt = Effect.fn("runAcpRegistryJsonPrompt")(function*
   );
 });
 
-export const makeAcpRegistryTextGeneration = Effect.fn("makeAcpRegistryTextGeneration")(
-  function* (
-    config: AcpRegistrySettings,
-    environment?: NodeJS.ProcessEnv,
-  ): Effect.fn.Return<TextGenerationShape, never, ChildProcessSpawner.ChildProcessSpawner> {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const spawnCommand = config.command || "npx";
-    const spawnArgs = parseCommandArgs(config.commandArgs);
-    const env = environment ?? process.env;
+export const makeAcpRegistryTextGeneration = Effect.fn("makeAcpRegistryTextGeneration")(function* (
+  config: AcpRegistrySettings,
+  environment?: NodeJS.ProcessEnv,
+): Effect.fn.Return<TextGenerationShape, never, ChildProcessSpawner.ChildProcessSpawner> {
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const spawnCommand = config.command || "npx";
+  const spawnArgs = parseCommandArgs(config.commandArgs);
+  const env = environment ?? process.env;
 
-    const runJson = <S extends Schema.Top>(cwd: string, promptText: string, outputSchema: S) =>
-      runAcpRegistryJsonPrompt(spawnCommand, spawnArgs, cwd, promptText, outputSchema, env).pipe(
-        Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
-      );
+  const runJson = <S extends Schema.Top>(cwd: string, promptText: string, outputSchema: S) =>
+    runAcpRegistryJsonPrompt(spawnCommand, spawnArgs, cwd, promptText, outputSchema, env).pipe(
+      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+    );
 
-    return {
-      generateCommitMessage: (input: CommitMessageGenerationInput) =>
-        Effect.gen(function* () {
-          const { prompt, outputSchema } = buildCommitMessagePrompt({
-            branch: input.branch,
-            stagedSummary: input.stagedSummary,
-            stagedPatch: input.stagedPatch,
-            includeBranch: input.includeBranch ?? false,
-          });
-          const generated = yield* runJson(input.cwd, prompt, outputSchema);
-          const result: CommitMessageGenerationResult = {
-            subject: sanitizeCommitSubject(generated.subject),
-            body: generated.body.trim(),
-            ...("branch" in generated && typeof generated.branch === "string"
-              ? { branch: sanitizeFeatureBranchName(generated.branch) }
-              : {}),
-          };
-          return result;
-        }),
+  return {
+    generateCommitMessage: (input: CommitMessageGenerationInput) =>
+      Effect.gen(function* () {
+        const { prompt, outputSchema } = buildCommitMessagePrompt({
+          branch: input.branch,
+          stagedSummary: input.stagedSummary,
+          stagedPatch: input.stagedPatch,
+          includeBranch: input.includeBranch ?? false,
+        });
+        const generated = yield* runJson(input.cwd, prompt, outputSchema);
+        const result: CommitMessageGenerationResult = {
+          subject: sanitizeCommitSubject(generated.subject),
+          body: generated.body.trim(),
+          ...("branch" in generated && typeof generated.branch === "string"
+            ? { branch: sanitizeFeatureBranchName(generated.branch) }
+            : {}),
+        };
+        return result;
+      }),
 
-      generatePrContent: (input: PrContentGenerationInput) =>
-        Effect.gen(function* () {
-          const { prompt, outputSchema } = buildPrContentPrompt({
-            baseBranch: input.baseBranch,
-            headBranch: input.headBranch,
-            commitSummary: input.commitSummary,
-            diffSummary: input.diffSummary,
-            diffPatch: input.diffPatch,
-          });
-          const generated = yield* runJson(input.cwd, prompt, outputSchema);
-          const result: PrContentGenerationResult = {
-            title: sanitizePrTitle(generated.title),
-            body: generated.body.trim(),
-          };
-          return result;
-        }),
+    generatePrContent: (input: PrContentGenerationInput) =>
+      Effect.gen(function* () {
+        const { prompt, outputSchema } = buildPrContentPrompt({
+          baseBranch: input.baseBranch,
+          headBranch: input.headBranch,
+          commitSummary: input.commitSummary,
+          diffSummary: input.diffSummary,
+          diffPatch: input.diffPatch,
+        });
+        const generated = yield* runJson(input.cwd, prompt, outputSchema);
+        const result: PrContentGenerationResult = {
+          title: sanitizePrTitle(generated.title),
+          body: generated.body.trim(),
+        };
+        return result;
+      }),
 
-      generateBranchName: (input: BranchNameGenerationInput) =>
-        Effect.gen(function* () {
-          const { prompt, outputSchema } = buildBranchNamePrompt({ message: input.message });
-          const generated = yield* runJson(input.cwd, prompt, outputSchema);
-          const branch = sanitizeFeatureBranchName(
-            sanitizeBranchFragment(generated.branch.trim().split("\n")[0] ?? ""),
-          );
-          const result: BranchNameGenerationResult = { branch: branch || "feature/acp-branch" };
-          return result;
-        }),
+    generateBranchName: (input: BranchNameGenerationInput) =>
+      Effect.gen(function* () {
+        const { prompt, outputSchema } = buildBranchNamePrompt({ message: input.message });
+        const generated = yield* runJson(input.cwd, prompt, outputSchema);
+        const branch = sanitizeFeatureBranchName(
+          sanitizeBranchFragment(generated.branch.trim().split("\n")[0] ?? ""),
+        );
+        const result: BranchNameGenerationResult = { branch: branch || "feature/acp-branch" };
+        return result;
+      }),
 
-      generateThreadTitle: (input: ThreadTitleGenerationInput) =>
-        Effect.gen(function* () {
-          const { prompt, outputSchema } = buildThreadTitlePrompt({ message: input.message });
-          const generated = yield* runJson(input.cwd, prompt, outputSchema);
-          const title = sanitizeThreadTitle(generated.title.trim().split("\n")[0] ?? "");
-          const result: ThreadTitleGenerationResult = { title: title || "ACP session" };
-          return result;
-        }),
-    } satisfies TextGenerationShape;
-  },
-);
+    generateThreadTitle: (input: ThreadTitleGenerationInput) =>
+      Effect.gen(function* () {
+        const { prompt, outputSchema } = buildThreadTitlePrompt({ message: input.message });
+        const generated = yield* runJson(input.cwd, prompt, outputSchema);
+        const title = sanitizeThreadTitle(generated.title.trim().split("\n")[0] ?? "");
+        const result: ThreadTitleGenerationResult = { title: title || "ACP session" };
+        return result;
+      }),
+  } satisfies TextGenerationShape;
+});

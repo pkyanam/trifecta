@@ -12,23 +12,23 @@ import {
 
 describe("normalizeGitRemoteUrl", () => {
   it("canonicalizes equivalent GitHub remotes across protocol variants", () => {
-    expect(normalizeGitRemoteUrl("git@github.com:Belweave/T3Code.git")).toBe(
-      "github.com/belweave/belweave",
+    expect(normalizeGitRemoteUrl("git@github.com:Belweave/Trifecta.git")).toBe(
+      "github.com/belweave/trifecta",
     );
-    expect(normalizeGitRemoteUrl("https://github.com/Belweave/T3Code.git")).toBe(
-      "github.com/belweave/belweave",
+    expect(normalizeGitRemoteUrl("https://github.com/Belweave/Trifecta.git")).toBe(
+      "github.com/belweave/trifecta",
     );
-    expect(normalizeGitRemoteUrl("ssh://git@github.com/Belweave/T3Code")).toBe(
-      "github.com/belweave/belweave",
+    expect(normalizeGitRemoteUrl("ssh://git@github.com/Belweave/Trifecta")).toBe(
+      "github.com/belweave/trifecta",
     );
   });
 
   it("preserves nested group paths for providers like GitLab", () => {
-    expect(normalizeGitRemoteUrl("git@gitlab.com:Belweave/platform/T3Code.git")).toBe(
-      "gitlab.com/belweave/platform/belweave",
+    expect(normalizeGitRemoteUrl("git@gitlab.com:Belweave/platform/Trifecta.git")).toBe(
+      "gitlab.com/belweave/platform/trifecta",
     );
-    expect(normalizeGitRemoteUrl("https://gitlab.com/Belweave/platform/T3Code.git")).toBe(
-      "gitlab.com/belweave/platform/belweave",
+    expect(normalizeGitRemoteUrl("https://gitlab.com/Belweave/platform/Trifecta.git")).toBe(
+      "gitlab.com/belweave/platform/trifecta",
     );
   });
 
@@ -45,11 +45,11 @@ describe("normalizeGitRemoteUrl", () => {
 describe("parseGitHubRepositoryNameWithOwnerFromRemoteUrl", () => {
   it("extracts the owner and repository from common GitHub remote shapes", () => {
     expect(
-      parseGitHubRepositoryNameWithOwnerFromRemoteUrl("git@github.com:Belweave/T3Code.git"),
-    ).toBe("Belweave/T3Code");
+      parseGitHubRepositoryNameWithOwnerFromRemoteUrl("git@github.com:Belweave/Trifecta.git"),
+    ).toBe("Belweave/Trifecta");
     expect(
-      parseGitHubRepositoryNameWithOwnerFromRemoteUrl("https://github.com/Belweave/T3Code.git"),
-    ).toBe("Belweave/T3Code");
+      parseGitHubRepositoryNameWithOwnerFromRemoteUrl("https://github.com/Belweave/Trifecta.git"),
+    ).toBe("Belweave/Trifecta");
   });
 });
 

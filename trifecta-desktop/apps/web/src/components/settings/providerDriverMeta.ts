@@ -10,7 +10,17 @@ import {
   ProviderDriverKind,
 } from "@belweave/contracts";
 import type * as Schema from "effect/Schema";
-import { ACPRegistryIcon, ClaudeAI, CursorIcon, DevinIcon, Gemini, HermesIcon, type Icon, OpenAI, OpenCodeIcon } from "../Icons";
+import {
+  ACPRegistryIcon,
+  ClaudeAI,
+  CursorIcon,
+  DevinIcon,
+  Gemini,
+  HermesIcon,
+  type Icon,
+  OpenAI,
+  OpenCodeIcon,
+} from "../Icons";
 
 type ProviderSettingsSchema = {
   readonly fields: Readonly<Record<string, Schema.Top>>;
