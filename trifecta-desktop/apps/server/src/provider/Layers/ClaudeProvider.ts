@@ -3,6 +3,7 @@ import {
   type ModelCapabilities,
   type ModelSelection,
   ProviderDriverKind,
+  type ServerProviderAuth,
   type ServerProviderModel,
   type ServerProviderSlashCommand,
 } from "@belweave/contracts";
@@ -29,8 +30,10 @@ import {
   buildBooleanOptionDescriptor,
   buildSelectOptionDescriptor,
   buildServerProvider,
+  AUTH_PROBE_TIMEOUT_MS,
   DEFAULT_TIMEOUT_MS,
   detailFromResult,
+  extractAuthBoolean,
   isCommandMissingCause,
   parseGenericCliVersion,
   providerModelsFromSettings,
@@ -514,6 +517,124 @@ const runClaudeCommand = Effect.fn("runClaudeCommand")(function* (
   return yield* spawnAndCollect(claudeSettings.binaryPath, command);
 });
 
+function parseClaudeAuthStatusOutput(
+  output: string,
+  fallbackCapabilities: ClaudeCapabilitiesProbe | undefined,
+): ServerProviderAuth | undefined {
+  const trimmed = output.trim();
+  const parsed = (() => {
+    if (!trimmed) return undefined;
+    try {
+      return JSON.parse(trimmed) as unknown;
+    } catch {
+      return undefined;
+    }
+  })();
+
+  const record =
+    parsed && typeof parsed === "object" && !globalThis.Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  const account =
+    record?.account &&
+    typeof record.account === "object" &&
+    !globalThis.Array.isArray(record.account)
+      ? (record.account as Record<string, unknown>)
+      : undefined;
+  const parsedEmail =
+    typeof account?.email === "string"
+      ? nonEmptyProbeString(account.email)
+      : typeof record?.email === "string"
+        ? nonEmptyProbeString(record.email)
+        : undefined;
+  const parsedAuthMethod =
+    typeof record?.authMethod === "string"
+      ? record.authMethod
+      : typeof record?.tokenSource === "string"
+        ? record.tokenSource
+        : undefined;
+  const authMetadata = claudeAuthMetadata({
+    subscriptionType: fallbackCapabilities?.subscriptionType,
+    authMethod: fallbackCapabilities?.tokenSource ?? parsedAuthMethod,
+  });
+  const email = fallbackCapabilities?.email ?? parsedEmail;
+  const parsedAuthenticated = extractAuthBoolean(parsed);
+  const parsedStatus =
+    typeof record?.status === "string"
+      ? record.status.toLowerCase().replace(/[\s_-]+/g, "")
+      : undefined;
+
+  if (parsedAuthenticated === true) {
+    return {
+      status: "authenticated",
+      ...(email ? { email } : {}),
+      ...(authMetadata ? authMetadata : {}),
+    };
+  }
+  if (parsedAuthenticated === false) {
+    return { status: "unauthenticated" };
+  }
+  if (
+    parsedStatus === "authenticated" ||
+    parsedStatus === "loggedin" ||
+    parsedStatus === "signedin"
+  ) {
+    return {
+      status: "authenticated",
+      ...(email ? { email } : {}),
+      ...(authMetadata ? authMetadata : {}),
+    };
+  }
+  if (
+    parsedStatus === "unauthenticated" ||
+    parsedStatus === "notauthenticated" ||
+    parsedStatus === "notloggedin" ||
+    parsedStatus === "loggedout"
+  ) {
+    return { status: "unauthenticated" };
+  }
+
+  const combined = trimmed.toLowerCase();
+  if (
+    /\b(not authenticated|not logged in|not signed in|login required|logged out)\b/u.test(combined)
+  ) {
+    return { status: "unauthenticated" };
+  }
+  if (/\b(logged in|authenticated|signed in)\b/u.test(combined)) {
+    const textEmail = trimmed.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu)?.[0];
+    const resolvedEmail = email ?? textEmail;
+    return {
+      status: "authenticated",
+      ...(resolvedEmail ? { email: resolvedEmail } : {}),
+      ...(authMetadata ? authMetadata : {}),
+    };
+  }
+
+  return undefined;
+}
+
+const probeClaudeCliAuthStatus = Effect.fn("probeClaudeCliAuthStatus")(function* (
+  claudeSettings: ClaudeSettings,
+  fallbackCapabilities: ClaudeCapabilitiesProbe | undefined,
+  environment: NodeJS.ProcessEnv = process.env,
+): Effect.fn.Return<
+  ServerProviderAuth | undefined,
+  never,
+  ChildProcessSpawner.ChildProcessSpawner | Path.Path
+> {
+  const authProbe = yield* runClaudeCommand(claudeSettings, ["auth", "status"], environment).pipe(
+    Effect.timeoutOption(AUTH_PROBE_TIMEOUT_MS),
+    Effect.result,
+  );
+
+  if (Result.isFailure(authProbe) || Option.isNone(authProbe.success)) {
+    return undefined;
+  }
+
+  const result = authProbe.success.value;
+  return parseClaudeAuthStatusOutput(`${result.stdout}\n${result.stderr}`, fallbackCapabilities);
+});
+
 export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(function* (
   claudeSettings: ClaudeSettings,
   resolveCapabilities?: (
@@ -628,6 +749,44 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
   const dedupedSlashCommands = dedupeSlashCommands(slashCommands);
 
   if (!capabilities) {
+    const cliAuth = yield* probeClaudeCliAuthStatus(claudeSettings, capabilities, environment).pipe(
+      Effect.orElseSucceed(() => undefined),
+    );
+
+    if (cliAuth?.status === "authenticated") {
+      return buildServerProvider({
+        presentation: CLAUDE_PRESENTATION,
+        enabled: claudeSettings.enabled,
+        checkedAt,
+        models,
+        slashCommands: dedupedSlashCommands,
+        probe: {
+          installed: true,
+          version: parsedVersion,
+          status: "ready",
+          auth: cliAuth,
+          ...(opus47UpgradeMessage ? { message: opus47UpgradeMessage } : {}),
+        },
+      });
+    }
+
+    if (cliAuth?.status === "unauthenticated") {
+      return buildServerProvider({
+        presentation: CLAUDE_PRESENTATION,
+        enabled: claudeSettings.enabled,
+        checkedAt,
+        models,
+        slashCommands: dedupedSlashCommands,
+        probe: {
+          installed: true,
+          version: parsedVersion,
+          status: "warning",
+          auth: cliAuth,
+          message: "Claude Agent CLI is not authenticated. Run `claude auth login` and try again.",
+        },
+      });
+    }
+
     return buildServerProvider({
       presentation: CLAUDE_PRESENTATION,
       enabled: claudeSettings.enabled,

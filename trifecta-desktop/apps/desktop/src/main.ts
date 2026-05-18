@@ -35,6 +35,7 @@ import * as DesktopLifecycle from "./app/DesktopLifecycle.ts";
 import * as DesktopLocalStorageMigration from "./app/DesktopLocalStorageMigration.ts";
 import * as DesktopObservability from "./app/DesktopObservability.ts";
 import * as DesktopServerExposure from "./backend/DesktopServerExposure.ts";
+import * as WindowsFirewall from "./backend/WindowsFirewall.ts";
 import * as DesktopClientSettings from "./settings/DesktopClientSettings.ts";
 import * as DesktopSavedEnvironments from "./settings/DesktopSavedEnvironments.ts";
 import * as DesktopAppSettings from "./settings/DesktopAppSettings.ts";
@@ -140,6 +141,7 @@ const desktopApplicationLayer = Layer.mergeAll(
   DesktopApplicationMenu.layer,
   DesktopShellEnvironment.layer,
   desktopSshLayer,
+  WindowsFirewall.layer,
 ).pipe(Layer.provideMerge(DesktopUpdates.layer), Layer.provideMerge(desktopBackendLayer));
 
 const desktopRuntimeLayer = ElectronProtocol.layerSchemePrivileges.pipe(

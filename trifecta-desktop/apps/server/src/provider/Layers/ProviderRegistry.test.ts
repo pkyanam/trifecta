@@ -1618,6 +1618,66 @@ it.layer(
       ),
     );
 
+    it.effect(
+      "falls back to claude auth status when the initialization result is unavailable",
+      () =>
+        Effect.gen(function* () {
+          const status = yield* checkClaudeProviderStatus(
+            defaultClaudeSettings,
+            noClaudeCapabilities,
+          );
+          assert.strictEqual(status.status, "ready");
+          assert.strictEqual(status.auth.status, "authenticated");
+          assert.strictEqual(status.auth.email, "claude@example.com");
+        }).pipe(
+          Effect.provide(
+            mockSpawnerLayer((args) => {
+              const joined = args.join(" ");
+              if (joined === "--version") return { stdout: "1.0.0\n", stderr: "", code: 0 };
+              if (joined === "auth status")
+                return {
+                  stdout:
+                    '{"loggedIn":true,"authMethod":"claude.ai","account":{"email":"claude@example.com"}}\n',
+                  stderr: "",
+                  code: 0,
+                };
+              throw new Error(`Unexpected args: ${joined}`);
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "reports unauthenticated when the Claude auth status fallback says logged out",
+      () =>
+        Effect.gen(function* () {
+          const status = yield* checkClaudeProviderStatus(
+            defaultClaudeSettings,
+            noClaudeCapabilities,
+          );
+          assert.strictEqual(status.status, "warning");
+          assert.strictEqual(status.auth.status, "unauthenticated");
+          assert.strictEqual(
+            status.message,
+            "Claude Agent CLI is not authenticated. Run `claude auth login` and try again.",
+          );
+        }).pipe(
+          Effect.provide(
+            mockSpawnerLayer((args) => {
+              const joined = args.join(" ");
+              if (joined === "--version") return { stdout: "1.0.0\n", stderr: "", code: 0 };
+              if (joined === "auth status")
+                return {
+                  stdout: '{"loggedIn":false}\n',
+                  stderr: "",
+                  code: 1,
+                };
+              throw new Error(`Unexpected args: ${joined}`);
+            }),
+          ),
+        ),
+    );
+
     it.effect("runs Claude status probes with the configured Claude HOME", () => {
       const claudeHome = "/tmp/belweave-claude-home";
       const recorded = recordingMockSpawnerLayer((args) => {
@@ -1818,8 +1878,8 @@ it.layer(
             if (joined === "--version") return { stdout: "1.0.0\n", stderr: "", code: 0 };
             if (joined === "auth status")
               return {
-                stdout: '{"loggedIn":false}\n',
-                stderr: "",
+                stdout: "",
+                stderr: "auth status unavailable",
                 code: 1,
               };
             throw new Error(`Unexpected args: ${joined}`);
