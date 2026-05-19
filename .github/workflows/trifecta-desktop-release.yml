@@ -191,9 +191,39 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Bun
+        if: runner.os != 'Windows'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: trifecta-desktop/package.json
+
+      - name: Setup Bun (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $package = Get-Content package.json | ConvertFrom-Json
+          $version = $package.packageManager -replace '^bun@', ''
+          if (-not $version) {
+            throw "Could not resolve Bun version from package.json packageManager."
+          }
+
+          $url = "https://github.com/oven-sh/bun/releases/download/bun-v$version/bun-windows-x64.zip"
+          $zipPath = Join-Path $env:RUNNER_TEMP "bun-windows-x64.zip"
+          $extractPath = Join-Path $env:RUNNER_TEMP "bun-windows-x64"
+          $binDir = Join-Path $env:USERPROFILE ".bun\bin"
+
+          Invoke-WebRequest -Uri $url -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+          New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+
+          $bun = Get-ChildItem -Path $extractPath -Filter bun.exe -Recurse | Select-Object -First 1
+          if (-not $bun) {
+            throw "Downloaded Bun archive did not contain bun.exe."
+          }
+
+          Copy-Item $bun.FullName (Join-Path $binDir "bun.exe") -Force
+          Copy-Item $bun.FullName (Join-Path $binDir "bunx.exe") -Force
+          Add-Content -Path $env:GITHUB_PATH -Value $binDir
+          & (Join-Path $binDir "bun.exe") --version
 
       - name: Setup Node
         uses: actions/setup-node@v6
