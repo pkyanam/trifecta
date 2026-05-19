@@ -107,4 +107,46 @@ describe("hostedPairing", () => {
     expect(isHostedStaticApp(new URL("https://nightly.app.trifecta.belweave.ai/"))).toBe(true);
     expect(isHostedStaticApp(new URL("https://backend.example.com/"))).toBe(false);
   });
+
+  it("treats browser-only HTTPS custom domains as hosted static apps", () => {
+    vi.stubEnv("VITE_HOSTED_APP_URL", "");
+    vi.stubEnv("VITE_HTTP_URL", "");
+    vi.stubEnv("VITE_WS_URL", "");
+    vi.stubGlobal("window", {
+      location: new URL("https://agentmeld.com/"),
+      desktopBridge: undefined,
+    });
+
+    expect(isHostedStaticApp(new URL("https://agentmeld.com/"))).toBe(true);
+    vi.stubGlobal("window", {
+      location: new URL("https://www.agentmeld.com/"),
+      desktopBridge: undefined,
+    });
+    expect(isHostedStaticApp(new URL("https://www.agentmeld.com/"))).toBe(true);
+    vi.stubGlobal("window", {
+      location: new URL("https://trifecta-web-app.vercel.app/"),
+      desktopBridge: undefined,
+    });
+    expect(isHostedStaticApp(new URL("https://trifecta-web-app.vercel.app/"))).toBe(true);
+  });
+
+  it("does not treat loopback or desktop-managed origins as hosted static apps", () => {
+    vi.stubEnv("VITE_HOSTED_APP_URL", "");
+    vi.stubEnv("VITE_HTTP_URL", "");
+    vi.stubEnv("VITE_WS_URL", "");
+    vi.stubGlobal("window", {
+      location: new URL("https://backend.example.com/"),
+      desktopBridge: {
+        getLocalEnvironmentBootstrap: () => null,
+      },
+    });
+
+    expect(isHostedStaticApp(new URL("https://backend.example.com/"))).toBe(false);
+
+    vi.stubGlobal("window", {
+      location: new URL("http://localhost:5735/"),
+      desktopBridge: undefined,
+    });
+    expect(isHostedStaticApp(new URL("http://localhost:5735/"))).toBe(false);
+  });
 });
