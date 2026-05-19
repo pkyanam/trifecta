@@ -1,5 +1,6 @@
 import {
   AcpRegistrySettings,
+  AntigravitySettings,
   ClaudeSettings,
   CodexSettings,
   CursorSettings,
@@ -90,6 +91,12 @@ export const PROVIDER_CLIENT_DEFINITIONS: readonly ProviderClientDefinition[] = 
     label: "Gemini",
     icon: Gemini,
     settingsSchema: GeminiSettings,
+  },
+  {
+    value: ProviderDriverKind.make("antigravity"),
+    label: "Antigravity",
+    icon: Gemini,
+    settingsSchema: AntigravitySettings,
   },
   {
     value: ProviderDriverKind.make("acpRegistry"),

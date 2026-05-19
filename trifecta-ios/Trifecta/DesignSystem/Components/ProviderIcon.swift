@@ -20,6 +20,8 @@ struct ProviderIcon: View {
                 CursorMark()
             case .gemini:
                 GeminiMark()
+            case .antigravity:
+                AssetProviderMark(name: "AntigravityIcon", invertInDarkMode: false)
             case .copilot:
                 CopilotMark()
             case .hermes:
@@ -38,7 +40,7 @@ struct ProviderIcon: View {
 }
 
 enum ProviderIconKind {
-    case claude, openai, opencode, cursor, gemini, copilot, hermes, devin, other
+    case claude, openai, opencode, cursor, gemini, antigravity, copilot, hermes, devin, other
 
     static func from(driver: String) -> ProviderIconKind {
         switch driver {
@@ -52,6 +54,8 @@ enum ProviderIconKind {
             return .cursor
         case "gemini", "googleGemini", "google":
             return .gemini
+        case "antigravity":
+            return .antigravity
         case "copilot", "githubCopilot", "githubcopilot", "github_copilot":
             return .copilot
         case "hermesAgent", "hermes":
@@ -212,6 +216,7 @@ private enum ProviderIconArt {
         ProviderIcon(driver: "cursor", size: 24)
         ProviderIcon(driver: "opencode", size: 24)
         ProviderIcon(driver: "gemini", size: 24)
+        ProviderIcon(driver: "antigravity", size: 24)
         ProviderIcon(driver: "copilot", size: 24)
         ProviderIcon(driver: "unknown", size: 24)
     }

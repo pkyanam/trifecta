@@ -232,7 +232,7 @@ extension ServerProvider {
             return "OpenCode"
         case "openaiChat", "openAIChat", "openai":
             return "OpenAI"
-        case "gemini", "googleGemini":
+        case "gemini", "googleGemini", "antigravity":
             return "Google"
         default:
             return driver.providerDisplayName
@@ -287,6 +287,8 @@ extension ServerProvider {
             return "auto"
         case "opencode":
             return "openai/gpt-5"
+        case "antigravity":
+            return "auto"
         default:
             return "gpt-5.4"
         }

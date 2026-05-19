@@ -60,7 +60,7 @@ yarn-error.log*
 .turbo
 
 # server build output (for deployment)
-server/
+/server/
 
 # trifecta desktop generated artifacts
 trifecta-desktop/.bun/
@@ -80,3 +80,6 @@ trifecta-desktop/apps/web/.playwright/
 trifecta-desktop/apps/web/playwright-report/
 trifecta-desktop/apps/web/src/components/__screenshots__/
 trifecta-desktop/**/__screenshots__/
+trifecta-desktop/apps/server/caches/
+trifecta-desktop/apps/server/userdata/
+trifecta-desktop/apps/server/worktrees/

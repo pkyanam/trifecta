@@ -430,6 +430,30 @@ export const GeminiSettings = makeProviderSettingsSchema(
 );
 export type GeminiSettings = typeof GeminiSettings.Type;
 
+export const AntigravitySettings = makeProviderSettingsSchema(
+  {
+    enabled: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(false)),
+      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
+    ),
+    binaryPath: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Antigravity CLI path",
+        description:
+          "Optional override. By default Trifecta runs the `agy` CLI on your PATH. Antigravity CLI does not currently expose ACP mode, so Trifecta uses print mode (`agy -p …`) and carries a bounded chat transcript between turns.",
+        providerSettingsForm: {
+          control: "text",
+          placeholder: "/opt/homebrew/bin/agy",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+  },
+  { order: ["binaryPath"] },
+);
+export type AntigravitySettings = typeof AntigravitySettings.Type;
+
 export const AcpRegistrySettings = makeProviderSettingsSchema(
   {
     enabled: Schema.Boolean.pipe(
@@ -508,6 +532,7 @@ export const ServerSettings = Schema.Struct({
     hermesAgent: HermesSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     devinAgent: DevinSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     gemini: GeminiSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+    antigravity: AntigravitySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     acpRegistry: AcpRegistrySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   }).pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   // New driver-agnostic instance map. Keyed by `ProviderInstanceId`; values
@@ -601,6 +626,11 @@ const GeminiSettingsPatch = Schema.Struct({
   useHeadlessPromptTransport: Schema.optionalKey(Schema.Boolean),
 });
 
+const AntigravitySettingsPatch = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  binaryPath: Schema.optionalKey(TrimmedString),
+});
+
 const AcpRegistrySettingsPatch = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
   agentId: Schema.optionalKey(TrimmedString),
@@ -630,6 +660,7 @@ export const ServerSettingsPatch = Schema.Struct({
       hermesAgent: Schema.optionalKey(HermesSettingsPatch),
       devinAgent: Schema.optionalKey(DevinSettingsPatch),
       gemini: Schema.optionalKey(GeminiSettingsPatch),
+      antigravity: Schema.optionalKey(AntigravitySettingsPatch),
       acpRegistry: Schema.optionalKey(AcpRegistrySettingsPatch),
     }),
   ),

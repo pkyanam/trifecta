@@ -144,6 +144,10 @@ function createBaseServerConfig(): ServerConfig {
           apiKey: "",
           useHeadlessPromptTransport: true,
         },
+        antigravity: {
+          enabled: true,
+          binaryPath: "",
+        },
         acpRegistry: {
           enabled: true,
           agentId: "",

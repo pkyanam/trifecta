@@ -20,6 +20,7 @@ export const PROVIDER_ICON_BY_PROVIDER: Partial<Record<ProviderDriverKind, Icon>
   [ProviderDriverKind.make("hermesAgent")]: HermesIcon,
   [ProviderDriverKind.make("devinAgent")]: DevinIcon,
   [ProviderDriverKind.make("gemini")]: Gemini,
+  [ProviderDriverKind.make("antigravity")]: Gemini,
   [ProviderDriverKind.make("acpRegistry")]: ACPRegistryIcon,
 };
 

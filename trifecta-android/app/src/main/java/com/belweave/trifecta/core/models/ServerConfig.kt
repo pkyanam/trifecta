@@ -136,7 +136,7 @@ data class ServerProvider(
             "cursor" -> "Cursor"
             "opencode" -> "OpenCode"
             "openaiChat", "openAIChat", "openai" -> "OpenAI"
-            "gemini", "googleGemini" -> "Google"
+            "gemini", "googleGemini", "antigravity" -> "Google"
             else -> driver.providerDisplayName()
         }
 
@@ -187,6 +187,7 @@ data class ServerProvider(
             "claudeAgent" -> "claude-sonnet-4-6"
             "cursor" -> "auto"
             "opencode" -> "openai/gpt-5"
+            "antigravity" -> "auto"
             else -> "gpt-5.4"
         }
 

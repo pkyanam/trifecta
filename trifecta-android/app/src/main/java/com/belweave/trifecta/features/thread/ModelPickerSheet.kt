@@ -529,6 +529,7 @@ private fun ProviderIcon(
             )
             ProviderIconKind.OpenCode -> drawOpenCodeMark(dark = dark, alpha = alpha)
             ProviderIconKind.Gemini -> drawGeminiMark(alpha = alpha)
+            ProviderIconKind.Antigravity -> Unit
             ProviderIconKind.Copilot -> drawScaledPath(
                 path = ProviderIconArt.copilotPath(),
                 viewBox = Size(256f, 208f),
@@ -541,12 +542,13 @@ private fun ProviderIcon(
 }
 
 private enum class ProviderIconKind {
-    Claude, OpenAI, OpenCode, Cursor, Gemini, Copilot, Hermes, Devin, Other;
+    Claude, OpenAI, OpenCode, Cursor, Gemini, Antigravity, Copilot, Hermes, Devin, Other;
 
     @DrawableRes
     fun imageRes(): Int? = when (this) {
         Hermes -> R.drawable.hermes_logo
         Devin -> R.drawable.devin_logo_square
+        Antigravity -> R.drawable.antigravity_icon
         else -> null
     }
 
@@ -557,6 +559,7 @@ private enum class ProviderIconKind {
             "opencode" -> OpenCode
             "cursor" -> Cursor
             "gemini", "googleGemini", "google" -> Gemini
+            "antigravity" -> Antigravity
             "copilot", "githubCopilot", "githubcopilot", "github_copilot" -> Copilot
             "hermesAgent", "hermes" -> Hermes
             "devinAgent", "devin" -> Devin
@@ -600,7 +603,8 @@ private fun providerRailVisualOffsetX(driver: String): Dp = when (ProviderIconKi
     ProviderIconKind.Claude,
     ProviderIconKind.OpenAI,
     ProviderIconKind.Cursor -> (-6).dp
-    ProviderIconKind.Gemini -> (-5).dp
+    ProviderIconKind.Gemini,
+    ProviderIconKind.Antigravity -> (-5).dp
     ProviderIconKind.OpenCode -> 6.dp
     ProviderIconKind.Copilot -> (-5).dp
     ProviderIconKind.Hermes,
