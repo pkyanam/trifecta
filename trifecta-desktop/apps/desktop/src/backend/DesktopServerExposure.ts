@@ -78,6 +78,8 @@ const normalizeOptionalHost = (value: string | undefined): string | undefined =>
 const isUsableLanIpv4Address = (address: string): boolean =>
   !address.startsWith("127.") && !address.startsWith("169.254.");
 
+const isIpv4Family = (family: string | number): boolean => family === "IPv4" || family === 4;
+
 const isHttpsEndpointUrl = (value: string): boolean => {
   try {
     return new URL(value).protocol === "https:";
@@ -100,7 +102,7 @@ const resolveLanAdvertisedHost = (
 
     for (const address of interfaceAddresses) {
       if (address.internal) continue;
-      if (address.family !== "IPv4") continue;
+      if (!isIpv4Family(address.family)) continue;
       if (!isUsableLanIpv4Address(address.address)) continue;
       return address.address;
     }

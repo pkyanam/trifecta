@@ -31,6 +31,16 @@ const lanNetworkInterfaces: DesktopNetworkInterfaces = {
   ],
 };
 
+const numericLanNetworkInterfaces: DesktopNetworkInterfaces = {
+  ethernet: [
+    {
+      address: "192.168.1.21",
+      family: 4,
+      internal: false,
+    },
+  ],
+};
+
 const tailnetNetworkInterfaces: DesktopNetworkInterfaces = {
   tailscale0: [
     {
@@ -160,6 +170,20 @@ describe("DesktopServerExposure", () => {
         const error = yield* serverExposure.setMode("network-accessible").pipe(Effect.flip);
         assert.ok(error._tag === "DesktopServerExposureNoNetworkAddressError");
         assert.equal(error.port, 4173);
+      }),
+    ),
+  );
+
+  it.effect("accepts numeric IPv4 network interface families", () =>
+    withHarness(
+      numericLanNetworkInterfaces,
+      Effect.gen(function* () {
+        const serverExposure = yield* DesktopServerExposure.DesktopServerExposure;
+        yield* serverExposure.configureFromSettings({ port: 4173 });
+
+        const change = yield* serverExposure.setMode("network-accessible");
+        assert.equal(change.state.endpointUrl, "http://192.168.1.21:4173");
+        assert.equal(change.state.advertisedHost, "192.168.1.21");
       }),
     ),
   );

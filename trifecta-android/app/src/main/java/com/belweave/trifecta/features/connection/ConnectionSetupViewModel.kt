@@ -28,10 +28,28 @@ class ConnectionSetupViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<State> = _state.asStateFlow()
 
     fun updateServerUrl(value: String) {
+        val parsed = PairingFlow.parsePairingURL(value)
+        if (parsed != null) {
+            _state.value = _state.value.copy(
+                serverUrl = PairingFlow.serverBaseURL(parsed.first).toString(),
+                token = parsed.second,
+                errorMessage = null
+            )
+            return
+        }
         _state.value = _state.value.copy(serverUrl = value, errorMessage = null)
     }
 
     fun updateToken(value: String) {
+        val parsed = PairingFlow.parsePairingURL(value)
+        if (parsed != null) {
+            _state.value = _state.value.copy(
+                serverUrl = PairingFlow.serverBaseURL(parsed.first).toString(),
+                token = parsed.second,
+                errorMessage = null
+            )
+            return
+        }
         _state.value = _state.value.copy(token = value, errorMessage = null)
     }
 
@@ -72,18 +90,20 @@ class ConnectionSetupViewModel(app: Application) : AndroidViewModel(app) {
     fun connect() {
         val cur = _state.value
         if (cur.isWorking) return
-        val trimmed = cur.serverUrl.trim()
+        val normalized = normalizePairingInputs(cur.serverUrl, cur.token)
+        val trimmed = normalized.serverUrl.trim()
         val uri = runCatching { URI(trimmed) }.getOrNull()
         if (uri == null || uri.scheme == null || uri.host == null) {
             _state.value = cur.copy(errorMessage = "Invalid server URL")
             return
         }
-        val token = cur.token.trim()
+        val token = normalized.token.trim()
         if (token.isEmpty()) {
             _state.value = cur.copy(errorMessage = "Pairing token required")
             return
         }
-        _state.value = cur.copy(isWorking = true, errorMessage = null)
+        val readyState = cur.copy(serverUrl = trimmed, token = token, errorMessage = null)
+        _state.value = readyState.copy(isWorking = true)
         viewModelScope.launch {
             try {
                 val baseUrl = PairingFlow.serverBaseURL(uri)
@@ -98,5 +118,23 @@ class ConnectionSetupViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
         }
+    }
+
+    private data class NormalizedPairingInputs(val serverUrl: String, val token: String)
+
+    private fun normalizePairingInputs(serverUrl: String, token: String): NormalizedPairingInputs {
+        PairingFlow.parsePairingURL(token)?.let { parsed ->
+            return NormalizedPairingInputs(
+                serverUrl = PairingFlow.serverBaseURL(parsed.first).toString(),
+                token = parsed.second
+            )
+        }
+        PairingFlow.parsePairingURL(serverUrl)?.let { parsed ->
+            return NormalizedPairingInputs(
+                serverUrl = PairingFlow.serverBaseURL(parsed.first).toString(),
+                token = parsed.second
+            )
+        }
+        return NormalizedPairingInputs(serverUrl = serverUrl, token = token)
     }
 }
