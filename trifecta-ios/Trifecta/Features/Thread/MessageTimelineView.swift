@@ -33,6 +33,7 @@ struct MessageTimelineView: View {
                     .padding(.top, T3Spacing.lg)
                     .padding(.bottom, T3Spacing.xxl)
                 }
+                .t3ScrollEdgeSoftFade()
                 .background(T3Color.surfaceGrouped)
                 .contentShape(Rectangle())
                 .scrollDismissesKeyboard(.interactively)
@@ -129,24 +130,45 @@ struct MessageTimelineView: View {
                 proxy.scrollTo(bottomAnchor, anchor: .bottom)
             }
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: hasActivity ? "arrow.down.circle.fill" : "arrow.down")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(label)
-                    .font(.system(size: 13, weight: .semibold))
+            Group {
+                if #available(iOS 26.0, *) {
+                    HStack(spacing: 5) {
+                        Image(systemName: hasActivity ? "arrow.down.circle.fill" : "arrow.down")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(label)
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(hasActivity ? Color.white : accentColor)
+                    .padding(.horizontal, T3Spacing.md)
+                    .padding(.vertical, 8)
+                    .glassEffect(
+                        hasActivity
+                        ? Glass.regular.tint(accentColor.opacity(0.92)).interactive()
+                        : Glass.regular.interactive(),
+                        in: Capsule()
+                    )
+                    .shadow(color: .black.opacity(0.20), radius: 10, y: 3)
+                } else {
+                    HStack(spacing: 5) {
+                        Image(systemName: hasActivity ? "arrow.down.circle.fill" : "arrow.down")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(label)
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(hasActivity ? Color.white : accentColor)
+                    .padding(.horizontal, T3Spacing.md)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(hasActivity ? accentColor : T3Color.surfaceElevated)
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(hasActivity ? Color.clear : T3Color.separator, lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.20), radius: 10, y: 3)
+                }
             }
-            .foregroundStyle(hasActivity ? .white : accentColor)
-            .padding(.horizontal, T3Spacing.md)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(hasActivity ? accentColor : T3Color.surfaceElevated)
-            )
-            .overlay(
-                Capsule()
-                    .stroke(hasActivity ? Color.clear : T3Color.separator, lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.20), radius: 10, y: 3)
         }
         .buttonStyle(T3ScaleButtonStyle())
         .accessibilityLabel(label)
@@ -184,12 +206,10 @@ struct MessageTimelineView: View {
                 .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(accentColor)
                 .frame(width: 48, height: 48)
-                .background(T3Color.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                        .stroke(T3Color.separator, lineWidth: 0.5)
-                )
+                .t3Glass(radius: T3Radius.md,
+                         tint: T3GlassChrome.panelTint(),
+                         stroke: T3Color.separator,
+                         interactive: false)
             VStack(spacing: T3Spacing.xs) {
                 Text("Ready")
                     .font(T3Typography.headline)

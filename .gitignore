@@ -4,9 +4,6 @@ t3code-original/
 # reference repos (development only)
 _reference/
 
-#temp folders
-trifecta-ios-new/
-
 # temporary local assets
 tempAssetsDoNotCommit/
 

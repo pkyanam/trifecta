@@ -33,6 +33,7 @@ struct ConnectionSetupView: View {
                         .frame(maxWidth: 560, alignment: .leading)
                         .frame(maxWidth: .infinity)
                     }
+                    .t3ScrollEdgeSoftFade()
                     .scrollIndicators(.hidden)
                 }
             }

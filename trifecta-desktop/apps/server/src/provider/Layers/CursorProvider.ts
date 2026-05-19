@@ -6,6 +6,7 @@ import type {
   ServerProvider,
   ServerProviderAuth,
   ServerProviderModel,
+  ServerProviderSkill,
   ServerProviderState,
 } from "@belweave/contracts";
 import { ProviderDriverKind } from "@belweave/contracts";
@@ -41,6 +42,7 @@ import {
   enrichProviderSnapshotWithVersionAdvisory,
   type ProviderMaintenanceCapabilities,
 } from "../providerMaintenance.ts";
+import { discoverLocalAgentSkills } from "../localAgentSkills.ts";
 import { AcpSessionRuntime } from "../acp/AcpSessionRuntime.ts";
 
 const PROVIDER = ProviderDriverKind.make("cursor");
@@ -694,7 +696,7 @@ export function getCursorFallbackModels(
   return providerModelsFromSettings([], PROVIDER, cursorSettings.customModels, EMPTY_CAPABILITIES);
 }
 
-/** Timeout for `agent about` — it's slower than a simple `--version` probe. */
+/** Timeout for `cursor-agent about` — it's slower than a simple `--version` probe. */
 const ABOUT_TIMEOUT_MS = 8_000;
 
 /** Strip ANSI escape sequences so we can parse plain key-value lines. */
@@ -704,7 +706,7 @@ function stripAnsi(text: string): string {
 }
 
 /**
- * Extract a value from `agent about` key-value output.
+ * Extract a value from `cursor-agent about` key-value output.
  * Lines look like: `CLI Version         2026.03.20-44cb435`
  */
 function extractAboutField(plain: string, key: string): string | undefined {
@@ -733,6 +735,8 @@ export function buildCursorProviderSnapshot(input: {
   readonly parsed: CursorAboutResult;
   readonly discoveredModels?: ReadonlyArray<ServerProviderModel>;
   readonly discoveryWarning?: string;
+  /** Local `SKILL.md` trees when the Cursor runtime does not enumerate skills. */
+  readonly skills?: ReadonlyArray<ServerProviderSkill>;
 }): ServerProviderDraft {
   const message = joinProviderMessages(input.parsed.message, input.discoveryWarning);
   return buildServerProvider({
@@ -745,6 +749,7 @@ export function buildCursorProviderSnapshot(input: {
       input.cursorSettings.customModels,
       EMPTY_CAPABILITIES,
     ),
+    ...(input.skills && input.skills.length > 0 ? { skills: [...input.skills] } : {}),
     probe: {
       installed: true,
       version: input.parsed.version,
@@ -898,12 +903,12 @@ export function getCursorParameterizedModelPickerUnsupportedMessage(input: {
     return undefined;
   }
 
-  return `${reasons.join(". ")}. Run \`agent set-channel lab && agent update\` and use Cursor Agent CLI 2026.04.08 or newer.`;
+  return `${reasons.join(". ")}. Run \`cursor-agent set-channel lab && cursor-agent update\` and use Cursor Agent CLI 2026.04.08 or newer.`;
 }
 
 /**
- * Parse the output of `agent about` to extract version and authentication
- * status in a single probe.
+ * Parse the output of `cursor-agent about` to extract version and
+ * authentication status in a single probe.
  *
  * Example output (logged in):
  * ```
@@ -940,7 +945,7 @@ export function parseCursorAboutOutput(result: CommandResult): CursorAboutResult
         version,
         status: "error",
         auth: { status: "unauthenticated" },
-        message: "Cursor Agent is not authenticated. Run `agent login` and try again.",
+        message: "Cursor Agent is not authenticated. Run `cursor-agent login` and try again.",
       };
     }
 
@@ -973,7 +978,7 @@ export function parseCursorAboutOutput(result: CommandResult): CursorAboutResult
         version,
         status: "error",
         auth: { status: "unauthenticated" },
-        message: "Cursor Agent is not authenticated. Run `agent login` and try again.",
+        message: "Cursor Agent is not authenticated. Run `cursor-agent login` and try again.",
       };
     }
 
@@ -1001,7 +1006,8 @@ export function parseCursorAboutOutput(result: CommandResult): CursorAboutResult
       version: null,
       status: "warning",
       auth: { status: "unknown" },
-      message: "The `agent about` command is unavailable in this version of the Cursor Agent CLI.",
+      message:
+        "The `cursor-agent about` command is unavailable in this version of the Cursor Agent CLI.",
     };
   }
 
@@ -1033,16 +1039,58 @@ export function parseCursorAboutOutput(result: CommandResult): CursorAboutResult
       version,
       status: "error",
       auth: { status: "unauthenticated" },
-      message: "Cursor Agent is not authenticated. Run `agent login` and try again.",
+      message: "Cursor Agent is not authenticated. Run `cursor-agent login` and try again.",
     };
   }
 
-  // Any non-empty email value means authenticated.
   return {
     version,
     status: "ready",
     auth: { status: "authenticated", email: userEmail },
   };
+}
+
+const NON_CURSOR_CLI_SIGNATURES: ReadonlyArray<RegExp> = [
+  /\bgrok\b/,
+  /\bclaude code\b/,
+  /\bopencode\b/,
+  /\bhermes\b/,
+  /\bdevin\b/,
+  /\bgemini\b/,
+  /\bcodex\b/,
+];
+
+/**
+ * Detect when the binary configured as the Cursor Agent CLI is actually a
+ * different tool (typically because `agent` collides with another agent CLI
+ * earlier in PATH — Grok ships its own `agent` binary, for example).
+ *
+ * Trusts the response if it parses as Cursor's `about --format json` payload
+ * (presence of `cliVersion`) or the plain-text header `About Cursor CLI`.
+ * Otherwise, if the output matches the signature of a known unrelated CLI
+ * (Grok, Codex, Hermes, …) or a clap-style "unrecognized subcommand" error,
+ * surface a targeted message so the user knows to point `binaryPath` at the
+ * real `cursor-agent` executable.
+ */
+export function detectNonCursorBinaryMessage(result: CommandResult): string | undefined {
+  const jsonPayload = parseCursorAboutJsonPayload(result.stdout);
+  if (jsonPayload && typeof jsonPayload.cliVersion === "string") {
+    return undefined;
+  }
+  const combined = `${result.stdout}\n${result.stderr}`;
+  const lowered = combined.toLowerCase();
+  if (lowered.includes("cursor")) {
+    return undefined;
+  }
+  const matchesKnownOtherCli = NON_CURSOR_CLI_SIGNATURES.some((pattern) => pattern.test(lowered));
+  const looksLikeAnotherCli =
+    matchesKnownOtherCli ||
+    lowered.includes("unrecognized subcommand") ||
+    lowered.includes("unknown subcommand");
+  if (!looksLikeAnotherCli) {
+    return undefined;
+  }
+  return "The configured `binaryPath` does not appear to be the Cursor Agent CLI. Install Cursor (https://cursor.com/install) and set `binaryPath` to `cursor-agent`.";
 }
 
 const runCursorCommand = (
@@ -1089,6 +1137,7 @@ const runCursorAboutCommand = (
 export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(function* (
   cursorSettings: CursorSettings,
   environment: NodeJS.ProcessEnv = process.env,
+  skillDiscoveryCwd?: string,
 ): Effect.fn.Return<
   ServerProviderDraft,
   never,
@@ -1103,6 +1152,7 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
       enabled: false,
       checkedAt,
       models: fallbackModels,
+      skills: [],
       probe: {
         installed: false,
         version: null,
@@ -1113,7 +1163,12 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
     });
   }
 
-  // Single `agent about` probe: returns version + auth status in one call.
+  const cwdForSkills = skillDiscoveryCwd ?? process.cwd();
+  const localSkills = yield* discoverLocalAgentSkills({ cwd: cwdForSkills }).pipe(
+    Effect.catch(() => Effect.succeed([] as ReadonlyArray<ServerProviderSkill>)),
+  );
+
+  // Single `cursor-agent about` probe: returns version + auth status in one call.
   const aboutProbe = yield* runCursorAboutCommand(cursorSettings, environment).pipe(
     Effect.timeoutOption(ABOUT_TIMEOUT_MS),
     Effect.result,
@@ -1126,13 +1181,14 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
       enabled: cursorSettings.enabled,
       checkedAt,
       models: fallbackModels,
+      skills: localSkills,
       probe: {
         installed: !isCommandMissingCause(error),
         version: null,
         status: "error",
         auth: { status: "unknown" },
         message: isCommandMissingCause(error)
-          ? "Cursor Agent CLI (`agent`) is not installed or not on PATH."
+          ? "Cursor Agent CLI (`cursor-agent`) is not installed or not on PATH."
           : `Failed to execute Cursor Agent CLI health check: ${error instanceof Error ? error.message : String(error)}.`,
       },
     });
@@ -1144,12 +1200,31 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
       enabled: cursorSettings.enabled,
       checkedAt,
       models: fallbackModels,
+      skills: localSkills,
       probe: {
         installed: true,
         version: null,
         status: "error",
         auth: { status: "unknown" },
-        message: "Cursor Agent CLI is installed but timed out while running `agent about`.",
+        message: "Cursor Agent CLI is installed but timed out while running `cursor-agent about`.",
+      },
+    });
+  }
+
+  const wrongBinaryMessage = detectNonCursorBinaryMessage(aboutProbe.success.value);
+  if (wrongBinaryMessage) {
+    return buildServerProvider({
+      presentation: CURSOR_PRESENTATION,
+      enabled: cursorSettings.enabled,
+      checkedAt,
+      models: fallbackModels,
+      skills: localSkills,
+      probe: {
+        installed: true,
+        version: null,
+        status: "error",
+        auth: { status: "unknown" },
+        message: wrongBinaryMessage,
       },
     });
   }
@@ -1167,6 +1242,7 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
       enabled: cursorSettings.enabled,
       checkedAt,
       models: fallbackModels,
+      skills: localSkills,
       probe: {
         installed: true,
         version: parsed.version,
@@ -1204,6 +1280,7 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
     checkedAt,
     cursorSettings,
     parsed,
+    skills: localSkills,
     discoveredModels: Option.getOrElse(
       Option.filter(discoveredModels, (models) => models.length > 0),
       () => [] as const,

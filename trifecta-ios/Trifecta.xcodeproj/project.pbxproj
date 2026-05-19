@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		6089E1F02FBC5AA100D4A37A /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 6099A0112FADCC44007535A7 /* SwiftTerm */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		609943022FADCC44007535A7 /* Trifecta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Trifecta.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6089E1F02FBC5AA100D4A37A /* SwiftTerm in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -95,12 +100,12 @@
 			);
 			mainGroup = 609942F92FADCC44007535A7;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = 609943032FADCC44007535A7 /* Products */;
-			projectDirPath = "";
 			packageReferences = (
 				6099A0102FADCC44007535A7 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 609943032FADCC44007535A7 /* Products */;
+			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				609943012FADCC44007535A7 /* Trifecta */,

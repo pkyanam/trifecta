@@ -14,6 +14,7 @@ import {
   buildCursorCapabilitiesFromConfigOptions,
   buildCursorDiscoveredModelsFromConfigOptions,
   checkCursorProviderStatus,
+  detectNonCursorBinaryMessage,
   discoverCursorModelCapabilitiesViaAcp,
   discoverCursorModelsViaAcp,
   getCursorFallbackModels,
@@ -388,14 +389,14 @@ describe("buildCursorProviderSnapshot", () => {
           version: "2026.04.09-f2b0fcd",
           status: "error",
           auth: { status: "unauthenticated" },
-          message: "Cursor Agent is not authenticated. Run `agent login` and try again.",
+          message: "Cursor Agent is not authenticated. Run `cursor-agent login` and try again.",
         },
         discoveryWarning: "Cursor ACP model discovery failed. Check server logs for details.",
       }),
     ).toMatchObject({
       status: "error",
       message:
-        "Cursor Agent is not authenticated. Run `agent login` and try again. Cursor ACP model discovery failed. Check server logs for details.",
+        "Cursor Agent is not authenticated. Run `cursor-agent login` and try again. Cursor ACP model discovery failed. Check server logs for details.",
       models: [
         {
           slug: "claude-sonnet-4-6",
@@ -658,7 +659,7 @@ describe("parseCursorAboutOutput", () => {
       auth: {
         status: "unauthenticated",
       },
-      message: "Cursor Agent is not authenticated. Run `agent login` and try again.",
+      message: "Cursor Agent is not authenticated. Run `cursor-agent login` and try again.",
     });
   });
 
@@ -679,8 +680,75 @@ describe("parseCursorAboutOutput", () => {
       auth: {
         status: "unauthenticated",
       },
-      message: "Cursor Agent is not authenticated. Run `agent login` and try again.",
+      message: "Cursor Agent is not authenticated. Run `cursor-agent login` and try again.",
     });
+  });
+});
+
+describe("detectNonCursorBinaryMessage", () => {
+  it("flags Grok's `agent` binary as not Cursor", () => {
+    expect(
+      detectNonCursorBinaryMessage({
+        code: 2,
+        stdout: "",
+        stderr: "error: unrecognized subcommand 'about'\n\nUsage: agent [OPTIONS] [COMMAND]\n",
+      }),
+    ).toBe(
+      "The configured `binaryPath` does not appear to be the Cursor Agent CLI. Install Cursor (https://cursor.com/install) and set `binaryPath` to `cursor-agent`.",
+    );
+  });
+
+  it("flags output that names a known unrelated CLI", () => {
+    expect(
+      detectNonCursorBinaryMessage({
+        code: 0,
+        stdout: "grok 0.1.210 (8b63e9068c)",
+        stderr: "",
+      }),
+    ).toMatch(/does not appear to be the Cursor Agent CLI/);
+  });
+
+  it("returns undefined when stdout mentions Cursor", () => {
+    expect(
+      detectNonCursorBinaryMessage({
+        code: 0,
+        stdout: "About Cursor CLI\n\nCLI Version  2026.05.07-42ddaca",
+        stderr: "",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("trusts Cursor JSON payloads even when the JSON body lacks the substring 'cursor'", () => {
+    // Regression: modern `cursor-agent about --format json` returns
+    // `{"cliVersion": "...", "model": "Gemini 2.5 Flash", "userEmail": "..."}`
+    // with no literal "cursor" anywhere in the response.
+    expect(
+      detectNonCursorBinaryMessage({
+        code: 0,
+        stdout: JSON.stringify({
+          cliVersion: "2026.05.16-0338208",
+          model: "Gemini 2.5 Flash",
+          subscriptionTier: "Pro",
+          osPlatform: "darwin",
+          osArch: "arm64",
+          userEmail: "user@example.com",
+          terminalProgram: "unknown",
+          shell: "zsh",
+          lastRequestId: null,
+        }),
+        stderr: "",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined for an empty failure (lets the normal parser handle it)", () => {
+    expect(
+      detectNonCursorBinaryMessage({
+        code: 1,
+        stdout: "",
+        stderr: "",
+      }),
+    ).toBeUndefined();
   });
 });
 

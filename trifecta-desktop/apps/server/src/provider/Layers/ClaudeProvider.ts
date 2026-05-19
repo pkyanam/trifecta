@@ -6,6 +6,7 @@ import {
   type ServerProviderAuth,
   type ServerProviderModel,
   type ServerProviderSlashCommand,
+  type ServerProviderSkill,
 } from "@belweave/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -41,6 +42,7 @@ import {
   type ServerProviderDraft,
 } from "../providerSnapshot.ts";
 import { makeClaudeEnvironment } from "../Drivers/ClaudeHome.ts";
+import { discoverLocalAgentSkills } from "../localAgentSkills.ts";
 
 const DEFAULT_CLAUDE_MODEL_CAPABILITIES: ModelCapabilities = createModelCapabilities({
   optionDescriptors: [],
@@ -641,6 +643,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     claudeSettings: ClaudeSettings,
   ) => Effect.Effect<ClaudeCapabilitiesProbe | undefined>,
   environment: NodeJS.ProcessEnv = process.env,
+  skillDiscoveryCwd?: string,
 ): Effect.fn.Return<
   ServerProviderDraft,
   never,
@@ -660,6 +663,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
       enabled: false,
       checkedAt,
       models: allModels,
+      skills: [],
       probe: {
         installed: false,
         version: null,
@@ -669,6 +673,11 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
       },
     });
   }
+
+  const cwdForSkills = skillDiscoveryCwd ?? process.cwd();
+  const localSkills = yield* discoverLocalAgentSkills({ cwd: cwdForSkills }).pipe(
+    Effect.catch(() => Effect.succeed([] as ReadonlyArray<ServerProviderSkill>)),
+  );
 
   const versionProbe = yield* runClaudeCommand(claudeSettings, ["--version"], environment).pipe(
     Effect.timeoutOption(DEFAULT_TIMEOUT_MS),
@@ -682,6 +691,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
       enabled: claudeSettings.enabled,
       checkedAt,
       models: allModels,
+      skills: localSkills,
       probe: {
         installed: !isCommandMissingCause(error),
         version: null,
@@ -700,6 +710,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
       enabled: claudeSettings.enabled,
       checkedAt,
       models: allModels,
+      skills: localSkills,
       probe: {
         installed: true,
         version: null,
@@ -720,6 +731,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
       enabled: claudeSettings.enabled,
       checkedAt,
       models: allModels,
+      skills: localSkills,
       probe: {
         installed: true,
         version: parsedVersion,
@@ -760,6 +772,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         checkedAt,
         models,
         slashCommands: dedupedSlashCommands,
+        skills: localSkills,
         probe: {
           installed: true,
           version: parsedVersion,
@@ -777,6 +790,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         checkedAt,
         models,
         slashCommands: dedupedSlashCommands,
+        skills: localSkills,
         probe: {
           installed: true,
           version: parsedVersion,
@@ -793,6 +807,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
       checkedAt,
       models,
       slashCommands: dedupedSlashCommands,
+      skills: localSkills,
       probe: {
         installed: true,
         version: parsedVersion,
@@ -813,6 +828,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     checkedAt,
     models,
     slashCommands: dedupedSlashCommands,
+    skills: localSkills,
     probe: {
       installed: true,
       version: parsedVersion,

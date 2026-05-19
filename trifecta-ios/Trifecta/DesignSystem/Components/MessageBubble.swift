@@ -97,7 +97,10 @@ struct MessageBubble: View {
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .t3Glass(radius: T3Radius.lg, tint: T3Color.surfaceElevated.opacity(0.48))
+        .t3Glass(radius: T3Radius.lg,
+                 tint: T3Color.surfaceElevated.opacity(0.48),
+                 stroke: T3Color.separator,
+                 interactive: false)
         .contextMenu {
             if !text.isEmpty {
                 Button {

@@ -25,7 +25,10 @@ struct ActivityRow: View {
         .padding(.horizontal, T3Spacing.md)
         .padding(.vertical, T3Spacing.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .t3Glass(radius: 14, tint: T3Color.surfaceElevated.opacity(0.44))
+        .t3Glass(radius: 14,
+                 tint: T3GlassChrome.panelTint(),
+                 stroke: T3Color.separator,
+                 interactive: false)
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                 .fill(toneColor)

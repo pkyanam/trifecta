@@ -1348,7 +1348,7 @@ it.layer(
           Layer.provideMerge(OpenCodeRuntimeLive),
           Layer.provideMerge(
             mockCommandSpawnerLayer((command, args) => {
-              if (command === "agent") {
+              if (command === "cursor-agent") {
                 cursorSpawned = true;
               }
               const joined = args.join(" ");
@@ -1647,35 +1647,33 @@ it.layer(
         ),
     );
 
-    it.effect(
-      "reports unauthenticated when the Claude auth status fallback says logged out",
-      () =>
-        Effect.gen(function* () {
-          const status = yield* checkClaudeProviderStatus(
-            defaultClaudeSettings,
-            noClaudeCapabilities,
-          );
-          assert.strictEqual(status.status, "warning");
-          assert.strictEqual(status.auth.status, "unauthenticated");
-          assert.strictEqual(
-            status.message,
-            "Claude Agent CLI is not authenticated. Run `claude auth login` and try again.",
-          );
-        }).pipe(
-          Effect.provide(
-            mockSpawnerLayer((args) => {
-              const joined = args.join(" ");
-              if (joined === "--version") return { stdout: "1.0.0\n", stderr: "", code: 0 };
-              if (joined === "auth status")
-                return {
-                  stdout: '{"loggedIn":false}\n',
-                  stderr: "",
-                  code: 1,
-                };
-              throw new Error(`Unexpected args: ${joined}`);
-            }),
-          ),
+    it.effect("reports unauthenticated when the Claude auth status fallback says logged out", () =>
+      Effect.gen(function* () {
+        const status = yield* checkClaudeProviderStatus(
+          defaultClaudeSettings,
+          noClaudeCapabilities,
+        );
+        assert.strictEqual(status.status, "warning");
+        assert.strictEqual(status.auth.status, "unauthenticated");
+        assert.strictEqual(
+          status.message,
+          "Claude Agent CLI is not authenticated. Run `claude auth login` and try again.",
+        );
+      }).pipe(
+        Effect.provide(
+          mockSpawnerLayer((args) => {
+            const joined = args.join(" ");
+            if (joined === "--version") return { stdout: "1.0.0\n", stderr: "", code: 0 };
+            if (joined === "auth status")
+              return {
+                stdout: '{"loggedIn":false}\n',
+                stderr: "",
+                code: 1,
+              };
+            throw new Error(`Unexpected args: ${joined}`);
+          }),
         ),
+      ),
     );
 
     it.effect("runs Claude status probes with the configured Claude HOME", () => {

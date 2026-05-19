@@ -134,6 +134,30 @@ describe("ServerSettingsPatch string normalization", () => {
     });
   });
 
+  it('migrates legacy `cursor.binaryPath: "agent"` to `cursor-agent` on decode', () => {
+    const decoded = decodeServerSettings({
+      providers: {
+        cursor: {
+          enabled: true,
+          binaryPath: "agent",
+        },
+      },
+    });
+    expect(decoded.providers.cursor.binaryPath).toBe("cursor-agent");
+  });
+
+  it("preserves an explicit custom Cursor binary path that ends in `agent`", () => {
+    const decoded = decodeServerSettings({
+      providers: {
+        cursor: {
+          enabled: true,
+          binaryPath: "/usr/local/bin/agent",
+        },
+      },
+    });
+    expect(decoded.providers.cursor.binaryPath).toBe("/usr/local/bin/agent");
+  });
+
   it("trims encoded server settings values before validation", () => {
     const defaultSettings = decodeServerSettings({});
     const encoded = encodeServerSettings({
