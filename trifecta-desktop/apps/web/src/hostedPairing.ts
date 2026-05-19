@@ -1,6 +1,7 @@
 import { getPairingTokenFromUrl, setPairingTokenOnUrl } from "./pairingUrl";
 
 const DEFAULT_HOSTED_APP_URL = "https://app.trifecta.belweave.ai";
+const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
 
 export interface HostedPairingRequest {
   readonly host: string;
@@ -31,6 +32,15 @@ function originFromUrl(value: string): string | null {
   }
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+  return LOOPBACK_HOSTNAMES.has(
+    hostname
+      .trim()
+      .toLowerCase()
+      .replace(/^\[(.*)\]$/, "$1"),
+  );
+}
+
 function isHostedDomain(url: URL, hostedUrl: string): boolean {
   try {
     const hosted = new URL(hostedUrl);
@@ -53,6 +63,30 @@ function isHostedDomain(url: URL, hostedUrl: string): boolean {
   }
 }
 
+function isBrowserOnlyHostedOrigin(url: URL): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (url.origin !== window.location.origin) {
+    return false;
+  }
+
+  if (window.desktopBridge) {
+    return false;
+  }
+
+  if (url.protocol !== "https:") {
+    return false;
+  }
+
+  if (isLoopbackHostname(url.hostname)) {
+    return false;
+  }
+
+  return true;
+}
+
 export function isHostedStaticApp(url: URL = new URL(window.location.href)): boolean {
   if (configuredBackendUrl()) {
     return false;
@@ -62,7 +96,7 @@ export function isHostedStaticApp(url: URL = new URL(window.location.href)): boo
     return true;
   }
 
-  return isHostedDomain(url, configuredHostedAppUrl());
+  return isHostedDomain(url, configuredHostedAppUrl()) || isBrowserOnlyHostedOrigin(url);
 }
 
 export function readHostedPairingRequest(url: URL = new URL(window.location.href)) {
