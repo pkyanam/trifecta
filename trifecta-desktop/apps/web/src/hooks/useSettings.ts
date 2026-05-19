@@ -124,7 +124,7 @@ function persistClientSettings(settings: ClientSettings): void {
 
 const SERVER_SETTINGS_KEYS = new Set<string>(Struct.keys(ServerSettings.fields));
 
-function splitPatch(patch: Partial<UnifiedSettings>): {
+export function splitSettingsPatch(patch: Partial<UnifiedSettings>): {
   serverPatch: ServerSettingsPatch;
   clientPatch: ClientSettingsPatch;
 } {
@@ -169,6 +169,13 @@ export function useClientSettingsHydrated(): boolean {
 
 export function useSettings<T = UnifiedSettings>(selector?: (s: UnifiedSettings) => T): T {
   const serverSettings = useServerSettings();
+  return useSettingsWithServerSettings(serverSettings, selector);
+}
+
+export function useSettingsWithServerSettings<T = UnifiedSettings>(
+  serverSettings: ServerSettings,
+  selector?: (s: UnifiedSettings) => T,
+): T {
   const clientSettings = useSyncExternalStore(
     subscribeClientSettings,
     getClientSettingsSnapshot,
@@ -194,7 +201,7 @@ export function useSettings<T = UnifiedSettings>(selector?: (s: UnifiedSettings)
  */
 export function useUpdateSettings() {
   const updateSettings = useCallback((patch: Partial<UnifiedSettings>) => {
-    const { serverPatch, clientPatch } = splitPatch(patch);
+    const { serverPatch, clientPatch } = splitSettingsPatch(patch);
 
     if (Object.keys(serverPatch).length > 0) {
       const currentServerConfig = getServerConfig();

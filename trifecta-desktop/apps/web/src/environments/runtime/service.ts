@@ -7,6 +7,7 @@ import {
   type OrchestrationShellSnapshot,
   type OrchestrationShellStreamEvent,
   type ServerConfig,
+  type ServerConfigStreamEvent,
   type TerminalEvent,
   ThreadId,
 } from "@belweave/contracts";
@@ -1243,6 +1244,54 @@ async function refreshSavedEnvironmentMetadata(
     .rename(record.environmentId, serverConfig.environment.label);
 }
 
+function applySavedEnvironmentConfigEvent(
+  environmentId: EnvironmentId,
+  event: ServerConfigStreamEvent,
+): void {
+  const currentConfig = useSavedEnvironmentRuntimeStore.getState().byId[environmentId]?.serverConfig;
+  if (event.type === "snapshot") {
+    useSavedEnvironmentRuntimeStore.getState().patch(environmentId, {
+      descriptor: event.config.environment,
+      serverConfig: event.config,
+    });
+    return;
+  }
+  if (!currentConfig) {
+    return;
+  }
+
+  switch (event.type) {
+    case "keybindingsUpdated": {
+      useSavedEnvironmentRuntimeStore.getState().patch(environmentId, {
+        serverConfig: {
+          ...currentConfig,
+          keybindings: event.payload.keybindings,
+          issues: event.payload.issues,
+        },
+      });
+      return;
+    }
+    case "providerStatuses": {
+      useSavedEnvironmentRuntimeStore.getState().patch(environmentId, {
+        serverConfig: {
+          ...currentConfig,
+          providers: event.payload.providers,
+        },
+      });
+      return;
+    }
+    case "settingsUpdated": {
+      useSavedEnvironmentRuntimeStore.getState().patch(environmentId, {
+        serverConfig: {
+          ...currentConfig,
+          settings: event.payload.settings,
+        },
+      });
+      return;
+    }
+  }
+}
+
 function registerConnection(connection: EnvironmentConnection): EnvironmentConnection {
   const existing = environmentConnections.get(connection.environmentId);
   if (existing && existing !== connection) {
@@ -1374,6 +1423,9 @@ async function ensureSavedEnvironmentConnection(
             descriptor: config.environment,
             serverConfig: config,
           });
+        },
+        onConfigEvent: (event) => {
+          applySavedEnvironmentConfigEvent(activeRecord.environmentId, event);
         },
         onWelcome: (payload) => {
           useSavedEnvironmentRuntimeStore.getState().patch(activeRecord.environmentId, {

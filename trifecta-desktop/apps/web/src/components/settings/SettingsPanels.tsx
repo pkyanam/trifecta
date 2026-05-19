@@ -9,11 +9,14 @@ import {
   ProviderDriverKind,
   type ProviderInstanceConfig,
   type ProviderInstanceId,
+  type ServerSettingsPatch,
+  type ServerProviderUpdateInput,
   type ScopedThreadRef,
 } from "@belweave/contracts";
 import { scopeThreadRef } from "@belweave/client-runtime";
-import { DEFAULT_UNIFIED_SETTINGS } from "@belweave/contracts/settings";
+import { DEFAULT_UNIFIED_SETTINGS, type UnifiedSettings } from "@belweave/contracts/settings";
 import { createModelSelection } from "@belweave/shared/model";
+import { applyServerSettingsPatch } from "@belweave/shared/serverSettings";
 import * as Duration from "effect/Duration";
 import * as Equal from "effect/Equal";
 import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
@@ -29,7 +32,12 @@ import { TraitsPicker } from "../chat/TraitsPicker";
 import { isElectron } from "../../env";
 import { buildHostedChannelSelectionUrl, type HostedAppChannel } from "../../hostedPairing";
 import { useTheme } from "../../hooks/useTheme";
-import { useSettings, useUpdateSettings } from "../../hooks/useSettings";
+import {
+  splitSettingsPatch,
+  useSettings,
+  useSettingsWithServerSettings,
+  useUpdateSettings,
+} from "../../hooks/useSettings";
 import { useThreadActions } from "../../hooks/useThreadActions";
 import {
   setDesktopUpdateStateQueryData,
@@ -46,6 +54,10 @@ import {
 import { ensureLocalApi, readLocalApi } from "../../localApi";
 import { useShallow } from "zustand/react/shallow";
 import { selectProjectsAcrossEnvironments, useStore } from "../../store";
+import {
+  readEnvironmentConnection,
+  useSavedEnvironmentRuntimeStore,
+} from "../../environments/runtime";
 import { useArchivedThreadSnapshots } from "../../lib/archivedThreadsState";
 import { formatRelativeTime, formatRelativeTimeLabel } from "../../timestampFormat";
 import { Button } from "../ui/button";
@@ -914,10 +926,89 @@ export function GeneralSettingsPanel() {
   );
 }
 
+function useActiveProviderSettingsContext() {
+  const activeEnvironmentId = useStore((state) => state.activeEnvironmentId);
+  const remoteServerConfig = useSavedEnvironmentRuntimeStore((state) =>
+    activeEnvironmentId ? (state.byId[activeEnvironmentId]?.serverConfig ?? null) : null,
+  );
+  const primarySettings = useSettings();
+  const remoteSettings = useSettingsWithServerSettings(
+    remoteServerConfig?.settings ?? primarySettings,
+  );
+  const primaryUpdater = useUpdateSettings();
+  const primaryServerProviders = useServerProviders();
+
+  const updateSettings = useCallback(
+    (patch: Partial<UnifiedSettings>) => {
+      if (!activeEnvironmentId || !remoteServerConfig) {
+        primaryUpdater.updateSettings(patch);
+        return;
+      }
+
+      const { serverPatch, clientPatch } = splitSettingsPatch(patch);
+      if (Object.keys(serverPatch).length > 0) {
+        const nextSettings = applyServerSettingsPatch(
+          remoteServerConfig.settings,
+          serverPatch as ServerSettingsPatch,
+        );
+        useSavedEnvironmentRuntimeStore.getState().patch(activeEnvironmentId, {
+          serverConfig: {
+            ...remoteServerConfig,
+            settings: nextSettings,
+          },
+        });
+        void readEnvironmentConnection(activeEnvironmentId)?.client.server.updateSettings(
+          serverPatch as ServerSettingsPatch,
+        );
+      }
+      if (Object.keys(clientPatch).length > 0) {
+        primaryUpdater.updateSettings(clientPatch);
+      }
+    },
+    [activeEnvironmentId, primaryUpdater, remoteServerConfig],
+  );
+
+  const refreshProviders = useCallback(async () => {
+    if (!activeEnvironmentId || !remoteServerConfig) {
+      await ensureLocalApi().server.refreshProviders();
+      return;
+    }
+    await readEnvironmentConnection(activeEnvironmentId)?.client.server.refreshProviders();
+  }, [activeEnvironmentId, remoteServerConfig]);
+
+  const updateProvider = useCallback(
+    async (input: ServerProviderUpdateInput) => {
+      if (!activeEnvironmentId || !remoteServerConfig) {
+        await ensureLocalApi().server.updateProvider(input);
+        return;
+      }
+      const connection = readEnvironmentConnection(activeEnvironmentId);
+      if (!connection) {
+        throw new Error(`No websocket client registered for environment ${activeEnvironmentId}.`);
+      }
+      await connection.client.server.updateProvider(input);
+    },
+    [activeEnvironmentId, remoteServerConfig],
+  );
+
+  return {
+    settings: remoteServerConfig ? remoteSettings : primarySettings,
+    serverProviders: remoteServerConfig?.providers ?? primaryServerProviders,
+    updateSettings,
+    refreshProviders,
+    updateProvider,
+  };
+}
+
 export function ProviderSettingsPanel() {
-  const settings = useSettings();
-  const { updateSettings } = useUpdateSettings();
-  const serverProviders = useServerProviders();
+  const {
+    settings,
+    updateSettings,
+    serverProviders,
+    refreshProviders: refreshActiveProviders,
+    updateProvider: updateActiveProvider,
+  } =
+    useActiveProviderSettingsContext();
   const [isRefreshingProviders, setIsRefreshingProviders] = useState(false);
   const [isAddInstanceDialogOpen, setIsAddInstanceDialogOpen] = useState(false);
   const [updatingProviderDrivers, setUpdatingProviderDrivers] = useState<
@@ -956,8 +1047,7 @@ export function ProviderSettingsPanel() {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
     setIsRefreshingProviders(true);
-    void ensureLocalApi()
-      .server.refreshProviders()
+    void refreshActiveProviders()
       .catch((error: unknown) => {
         console.warn("Failed to refresh providers", error);
       })
@@ -965,7 +1055,7 @@ export function ProviderSettingsPanel() {
         refreshingRef.current = false;
         setIsRefreshingProviders(false);
       });
-  }, []);
+  }, [refreshActiveProviders]);
 
   const runProviderUpdate = useCallback(async (candidate: ProviderUpdateCandidate) => {
     let started = false;
@@ -983,7 +1073,7 @@ export function ProviderSettingsPanel() {
     }
 
     try {
-      await ensureLocalApi().server.updateProvider({
+      await updateActiveProvider({
         provider: candidate.driver,
         instanceId: candidate.instanceId,
       });
@@ -1008,7 +1098,7 @@ export function ProviderSettingsPanel() {
         return next;
       });
     }
-  }, []);
+  }, [updateActiveProvider]);
 
   interface InstanceRow {
     readonly instanceId: ProviderInstanceId;

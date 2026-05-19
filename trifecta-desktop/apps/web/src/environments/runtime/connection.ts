@@ -3,6 +3,7 @@ import type {
   OrchestrationShellSnapshot,
   OrchestrationShellStreamEvent,
   ServerConfig,
+  ServerConfigStreamEvent,
   ServerLifecycleWelcomePayload,
   TerminalEvent,
 } from "@belweave/contracts";
@@ -38,6 +39,7 @@ interface EnvironmentConnectionInput extends OrchestrationHandlers {
   readonly client: WsRpcClient;
   readonly refreshMetadata?: () => Promise<void>;
   readonly onConfigSnapshot?: (config: ServerConfig) => void;
+  readonly onConfigEvent?: (event: ServerConfigStreamEvent) => void;
   readonly onWelcome?: (payload: ServerLifecycleWelcomePayload) => void;
 }
 
@@ -113,12 +115,14 @@ export function createEnvironmentConnection(
     ? input.client.server.subscribeConfig(
         (event: Parameters<Parameters<WsRpcClient["server"]["subscribeConfig"]>[0]>[0]) => {
           if (event.type !== "snapshot") {
+            input.onConfigEvent?.(event);
             return;
           }
           observeEnvironmentIdentity(
             event.config.environment.environmentId,
             "server config snapshot",
           );
+          input.onConfigEvent?.(event);
           input.onConfigSnapshot?.(event.config);
         },
       )
