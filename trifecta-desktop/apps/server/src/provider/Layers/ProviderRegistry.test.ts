@@ -1388,6 +1388,7 @@ it.layer(
             providers.map((provider) => provider.instanceId).toSorted(),
             [
               "acpRegistry",
+              "antigravity",
               "claudeAgent",
               "codex",
               "cursor",
