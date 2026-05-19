@@ -36,6 +36,9 @@ struct ThinkingBlockView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .t3Glass(radius: T3Radius.md, tint: T3Color.surfaceMuted.opacity(0.44))
+        .t3Glass(radius: T3Radius.md,
+                 tint: T3GlassChrome.panelTint(),
+                 stroke: T3Color.separator,
+                 interactive: false)
     }
 }

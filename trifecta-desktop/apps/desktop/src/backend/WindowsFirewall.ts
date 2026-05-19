@@ -92,7 +92,7 @@ export function buildAddRuleCommand(input: {
     `try {`,
     `  $proc = Start-Process -FilePath '${POWERSHELL_EXECUTABLE}' ` +
       `-ArgumentList @('-NoProfile','-NonInteractive','-EncodedCommand','${innerEncoded}') ` +
-      `-Verb RunAs -Wait -WindowStyle Hidden -PassThru`,
+      `-Verb RunAs -Wait -PassThru`,
     `  exit $proc.ExitCode`,
     `} catch {`,
     `  Write-Error $_.Exception.Message`,

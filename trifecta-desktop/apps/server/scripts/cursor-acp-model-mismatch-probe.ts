@@ -60,7 +60,7 @@ const promptText = process.argv[4] ?? "helo";
 const targetReasoning = process.env.CURSOR_REASONING ?? "";
 const targetContext = process.env.CURSOR_CONTEXT ?? "";
 const targetFast = process.env.CURSOR_FAST ?? "";
-const agentBin = process.env.CURSOR_AGENT_BIN ?? "agent";
+const agentBin = process.env.CURSOR_AGENT_BIN ?? "cursor-agent";
 const promptWaitMs = Number(process.env.CURSOR_PROMPT_WAIT_MS ?? "4000");
 const requestTimeoutMs = Number(process.env.CURSOR_REQUEST_TIMEOUT_MS ?? "20000");
 

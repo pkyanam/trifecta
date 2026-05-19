@@ -60,9 +60,16 @@ struct SidebarPanel: View {
         .padding(.bottom, T3Spacing.lg)
         .frame(maxHeight: .infinity)
         .background {
-            Rectangle()
-                .fill(T3Color.surface.opacity(0.96))
-                .ignoresSafeArea()
+            Group {
+                if #available(iOS 26.0, *) {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                } else {
+                    Rectangle()
+                        .fill(T3Color.surface.opacity(0.96))
+                }
+            }
+            .ignoresSafeArea()
         }
         .overlay(alignment: .trailing) {
             Rectangle()
@@ -423,7 +430,10 @@ private struct SidebarHeader: View {
                     .stroke(T3Color.textPrimary, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .frame(width: 18, height: 12)
                     .frame(width: 42, height: 42)
-                    .t3Glass(radius: 21, tint: T3Color.surfaceElevated.opacity(0.45))
+                    .t3Glass(radius: 21,
+                             tint: T3GlassChrome.panelTint(),
+                             stroke: T3Color.separator,
+                             interactive: true)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close menu")
@@ -476,7 +486,10 @@ private struct SidebarSearchField: View {
             .padding(.trailing, 14)
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(T3Color.surfaceMuted.opacity(0.8), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .t3Glass(radius: 14,
+                     tint: T3GlassChrome.panelTint(),
+                     stroke: T3Color.separator,
+                     interactive: false)
 
             if focused {
                 Button("Cancel") {
@@ -501,13 +514,54 @@ private struct SidebarTopActionsRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 30) {
-            actionButton(.newChat, systemImage: "square.and.pencil", title: "New Chat", action: onNewChat)
-            actionButton(.quickChat, systemImage: "message", title: "Quick Chat", action: onQuickChat)
-            actionButton(.newProject, systemImage: "folder.badge.plus", title: "New Project", action: onNewProject)
+            if #available(iOS 26.0, *) {
+                GlassEffectContainer(spacing: 30) {
+                    HStack(alignment: .top, spacing: 30) {
+                        actionButtonGlass(.newChat, systemImage: "square.and.pencil", title: "New Chat", action: onNewChat)
+                        actionButtonGlass(.quickChat, systemImage: "message", title: "Quick Chat", action: onQuickChat)
+                        actionButtonGlass(.newProject, systemImage: "folder.badge.plus", title: "New Project", action: onNewProject)
+                    }
+                }
+            } else {
+                actionButton(.newChat, systemImage: "square.and.pencil", title: "New Chat", action: onNewChat)
+                actionButton(.quickChat, systemImage: "message", title: "Quick Chat", action: onQuickChat)
+                actionButton(.newProject, systemImage: "folder.badge.plus", title: "New Project", action: onNewProject)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .disabled(!isEnabled || pendingAction != nil)
         .opacity(isEnabled ? 1 : 0.42)
+    }
+
+    @available(iOS 26.0, *)
+    @ViewBuilder
+    private func actionButtonGlass(_ topAction: SidebarTopAction,
+                                   systemImage: String,
+                                   title: String,
+                                   action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                ZStack {
+                    if pendingAction == topAction {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: systemImage)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(T3Color.textPrimary)
+                            .frame(width: 55, height: 55)
+                            .glassEffect(Glass.regular.interactive(), in: Circle())
+                    }
+                }
+                .frame(height: 55)
+                Text(title)
+                    .font(T3Typography.caption)
+                    .foregroundStyle(T3Color.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func actionButton(_ topAction: SidebarTopAction,

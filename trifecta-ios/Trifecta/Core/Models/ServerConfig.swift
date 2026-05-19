@@ -1,7 +1,20 @@
 import Foundation
 
+struct ServerEnvironmentCapabilities: Decodable, Sendable {
+    let ssh: Bool?
+}
+
+struct ServerEnvironmentDescriptor: Decodable, Sendable {
+    let capabilities: ServerEnvironmentCapabilities?
+}
+
 struct ServerRuntimeConfig: Decodable, Sendable {
     let providers: [ServerProvider]
+    let environment: ServerEnvironmentDescriptor?
+
+    var sshEnabled: Bool {
+        environment?.capabilities?.ssh ?? true
+    }
 }
 
 struct ServerProviderSlashCommand: Decodable, Hashable, Sendable {

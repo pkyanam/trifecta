@@ -80,6 +80,19 @@ export const tailscaleServePortFlag = Flag.integer("tailscale-serve-port").pipe(
   Flag.withDescription("HTTPS port for Tailscale Serve when --tailscale-serve is enabled."),
   Flag.optional,
 );
+export const publicUrlFlag = Flag.string("public-url").pipe(
+  Flag.withSchema(Schema.URLFromString),
+  Flag.withDescription(
+    "Public URL for reverse proxy setups (e.g., https://trifecta.example.com). Used in pairing URLs instead of auto-detected address.",
+  ),
+  Flag.optional,
+);
+export const reviewPairingTokenFlag = Flag.string("review-pairing-token").pipe(
+  Flag.withDescription(
+    "Pre-configured pairing token for App Store review or automated testing. Bypasses normal token generation.",
+  ),
+  Flag.optional,
+);
 
 const EnvServerConfig = Config.all({
   logLevel: Config.logLevel("BELWEAVE_LOG_LEVEL").pipe(Config.withDefault("Info")),
@@ -143,6 +156,14 @@ const EnvServerConfig = Config.all({
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
+  publicUrl: Config.url("BELWEAVE_PUBLIC_URL").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
+  reviewPairingToken: Config.string("BELWEAVE_REVIEW_PAIRING_TOKEN").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
 });
 
 export interface CliServerFlags {
@@ -158,6 +179,8 @@ export interface CliServerFlags {
   readonly logWebSocketEvents: Option.Option<boolean>;
   readonly tailscaleServeEnabled: Option.Option<boolean>;
   readonly tailscaleServePort: Option.Option<number>;
+  readonly publicUrl: Option.Option<URL>;
+  readonly reviewPairingToken: Option.Option<string>;
 }
 
 export interface CliAuthLocationFlags {
@@ -192,6 +215,8 @@ export const sharedServerCommandFlags = {
   logWebSocketEvents: logWebSocketEventsFlag,
   tailscaleServeEnabled: tailscaleServeFlag,
   tailscaleServePort: tailscaleServePortFlag,
+  publicUrl: publicUrlFlag,
+  reviewPairingToken: reviewPairingTokenFlag,
 } as const;
 
 export const authLocationFlags = sharedServerLocationFlags;
@@ -237,6 +262,8 @@ export const resolveServerConfig = (
       logWebSocketEvents: flags.logWebSocketEvents ?? Option.none(),
       tailscaleServeEnabled: flags.tailscaleServeEnabled ?? Option.none(),
       tailscaleServePort: flags.tailscaleServePort ?? Option.none(),
+      publicUrl: flags.publicUrl ?? Option.none(),
+      reviewPairingToken: flags.reviewPairingToken ?? Option.none(),
     } satisfies CliServerFlags;
     const bootstrapFd = Option.getOrUndefined(normalizedFlags.bootstrapFd) ?? env.bootstrapFd;
     const bootstrapEnvelope =
@@ -344,7 +371,11 @@ export const resolveServerConfig = (
         Option.fromUndefinedOr(env.host),
         Option.fromUndefinedOr(bootstrap?.host),
       ),
-      () => (mode === "desktop" ? "127.0.0.1" : undefined),
+      () => {
+        if (mode === "desktop") return "127.0.0.1";
+        if (mode === "server") return "0.0.0.0";
+        return undefined;
+      },
     );
     const logLevel = Option.getOrElse(cliLogLevel, () => env.logLevel);
 
@@ -381,6 +412,17 @@ export const resolveServerConfig = (
       logWebSocketEvents,
       tailscaleServeEnabled,
       tailscaleServePort,
+      publicUrl: Option.getOrElse(
+        resolveOptionPrecedence(normalizedFlags.publicUrl, Option.fromUndefinedOr(env.publicUrl)),
+        () => undefined,
+      ),
+      reviewPairingToken: Option.getOrElse(
+        resolveOptionPrecedence(
+          normalizedFlags.reviewPairingToken,
+          Option.fromUndefinedOr(env.reviewPairingToken),
+        ),
+        () => undefined,
+      ),
     };
 
     return config;
@@ -404,6 +446,8 @@ export const resolveCliAuthConfig = (
       logWebSocketEvents: Option.none(),
       tailscaleServeEnabled: Option.none(),
       tailscaleServePort: Option.none(),
+      publicUrl: Option.none(),
+      reviewPairingToken: Option.none(),
     },
     cliLogLevel,
   );

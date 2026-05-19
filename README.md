@@ -14,7 +14,6 @@ The repository is organized as a Turborepo + Bun monorepo containing multiple to
 trifecta/
 ├── trifecta-desktop/          # Primary monorepo for desktop, web, server, IDE extension, and all shared packages (Turborepo root)
 ├── trifecta-ios/              # Native iOS client (SwiftUI + Xcode)
-├── trifecta-ios-new/          # Newer/experimental iOS implementation (parallel to trifecta-ios)
 ├── trifecta-android/          # Native Android client (Kotlin + Jetpack Compose)
 ├── trifecta-www/              # Marketing / landing website (Next.js)
 ├── t3code-original/           # Preserved original T3 Code / Theo's reference monorepo (subtree merge source)

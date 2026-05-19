@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -81,6 +82,7 @@ import kotlinx.coroutines.delay
 fun SettingsScreen(
     isDark: Boolean,
     onDismiss: () -> Unit,
+    onOpenSsh: () -> Unit,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val sessionState by viewModel.sessionState.collectAsState()
@@ -161,6 +163,8 @@ fun SettingsScreen(
                     onDensity = viewModel::setTranscriptDensity,
                     onComposer = viewModel::setComposerSize
                 )
+
+                SshSection(onOpenSsh = onOpenSsh)
 
                 ServerSection(
                     sessionState = sessionState,
@@ -269,6 +273,44 @@ fun SettingsScreen(
                 TextButton(onClick = { renamingProfile = null }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+private fun SshSection(onOpenSsh: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(T3Spacing.sm)) {
+        T3SectionHeader(title = "SSH")
+        T3Card(padding = T3Spacing.md) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(T3Radius.md))
+                    .background(T3Color.surfaceMuted)
+                    .border(0.5.dp, T3Color.separator, RoundedCornerShape(T3Radius.md))
+                    .clickable(onClick = onOpenSsh)
+                    .padding(horizontal = T3Spacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(T3Spacing.sm)
+            ) {
+                Icon(
+                    Icons.Outlined.Terminal,
+                    contentDescription = null,
+                    tint = T3Color.textSecondary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Open SSH client", style = T3Typography.body, color = T3Color.textPrimary)
+                    Text(
+                        "Host management, key verification, and live terminal",
+                        style = T3Typography.footnote,
+                        color = T3Color.textTertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
     }
 }
 

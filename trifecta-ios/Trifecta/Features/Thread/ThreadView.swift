@@ -821,16 +821,26 @@ struct ThreadHeaderView: View {
                 Label("Delete", systemImage: "trash")
             }
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(T3Color.textPrimary)
-                .frame(width: 34, height: 34)
-                .background(T3Color.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                        .stroke(T3Color.separator, lineWidth: 0.5)
-                )
+            Group {
+                if #available(iOS 26.0, *) {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(T3Color.textPrimary)
+                        .frame(width: 34, height: 34)
+                        .glassEffect(Glass.regular.interactive(), in: RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
+                } else {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(T3Color.textPrimary)
+                        .frame(width: 34, height: 34)
+                        .background(T3Color.surfaceElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
+                                .stroke(T3Color.separator, lineWidth: 0.5)
+                        )
+                }
+            }
         }
         .buttonStyle(.plain)
     }

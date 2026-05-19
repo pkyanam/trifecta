@@ -9,6 +9,7 @@ import type {
   RuntimeMode,
   ScopedThreadRef,
   ServerProvider,
+  ServerProviderSkill,
   ThreadId,
   TurnId,
 } from "@belweave/contracts";
@@ -32,7 +33,10 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDebouncedValue } from "@tanstack/react-pacer";
-import { projectSearchEntriesQueryOptions } from "~/lib/projectReactQuery";
+import {
+  projectListAgentSkillsQueryOptions,
+  projectSearchEntriesQueryOptions,
+} from "~/lib/projectReactQuery";
 import {
   clampCollapsedComposerCursor,
   type ComposerTrigger,
@@ -852,6 +856,30 @@ export const ChatComposer = memo(
     );
     const workspaceEntries = workspaceEntriesQuery.data?.entries ?? EMPTY_PROJECT_ENTRIES;
 
+    const isSkillComposerMenu = composerTriggerKind === "skill";
+    const workspaceAgentSkillsQuery = useQuery(
+      projectListAgentSkillsQueryOptions({
+        environmentId,
+        cwd: gitCwd,
+        enabled: isSkillComposerMenu,
+      }),
+    );
+
+    const mergedComposerSkills: ReadonlyArray<ServerProviderSkill> = useMemo(() => {
+      const fromProvider = selectedProviderStatus?.skills ?? [];
+      const fromWorkspace = workspaceAgentSkillsQuery.data?.skills ?? [];
+      const byPath = new Map<string, ServerProviderSkill>();
+      for (const skill of fromProvider) {
+        byPath.set(skill.path, skill);
+      }
+      for (const skill of fromWorkspace) {
+        if (!byPath.has(skill.path)) {
+          byPath.set(skill.path, skill);
+        }
+      }
+      return [...byPath.values()];
+    }, [selectedProviderStatus?.skills, workspaceAgentSkillsQuery.data?.skills]);
+
     const composerMenuItems = useMemo<ComposerCommandItem[]>(() => {
       if (!composerTrigger) return [];
       if (composerTrigger.kind === "path") {
@@ -906,11 +934,8 @@ export const ChatComposer = memo(
         return searchSlashCommandItems(slashCommandItems, query);
       }
       if (composerTrigger.kind === "skill") {
-        return searchProviderSkills(
-          selectedProviderStatus?.skills ?? [],
-          composerTrigger.query,
-        ).map((skill) => ({
-          id: `skill:${selectedProvider}:${skill.name}`,
+        return searchProviderSkills(mergedComposerSkills, composerTrigger.query).map((skill) => ({
+          id: `skill:${skill.path}`,
           type: "skill" as const,
           provider: selectedProvider,
           skill,
@@ -922,7 +947,7 @@ export const ChatComposer = memo(
         }));
       }
       return [];
-    }, [composerTrigger, selectedProvider, selectedProviderStatus, workspaceEntries]);
+    }, [composerTrigger, mergedComposerSkills, selectedProvider, workspaceEntries]);
 
     const composerMenuOpen = Boolean(composerTrigger);
     const composerMenuSearchKey = composerTrigger
@@ -987,10 +1012,12 @@ export const ChatComposer = memo(
     ]);
 
     const isComposerMenuLoading =
-      composerTriggerKind === "path" &&
-      ((pathTriggerQuery.length > 0 && composerPathQueryDebouncer.state.isPending) ||
-        workspaceEntriesQuery.isLoading ||
-        workspaceEntriesQuery.isFetching);
+      (composerTriggerKind === "path" &&
+        ((pathTriggerQuery.length > 0 && composerPathQueryDebouncer.state.isPending) ||
+          workspaceEntriesQuery.isLoading ||
+          workspaceEntriesQuery.isFetching)) ||
+      (composerTriggerKind === "skill" &&
+        (workspaceAgentSkillsQuery.isLoading || workspaceAgentSkillsQuery.isFetching));
     const composerMenuEmptyState = useMemo(() => {
       if (composerTriggerKind === "skill") {
         return "No skills found. Try / to browse provider commands.";
@@ -2245,7 +2272,7 @@ export const ChatComposer = memo(
                       ? composerTerminalContexts
                       : []
                   }
-                  skills={selectedProviderStatus?.skills ?? []}
+                  skills={mergedComposerSkills}
                   {...(showMobilePendingAnswerActions ? { className: "max-sm:pb-11" } : {})}
                   onRemoveTerminalContext={removeComposerTerminalContextFromDraft}
                   onChange={onPromptChange}

@@ -52,10 +52,12 @@ import kotlin.coroutines.resume
 class T3Client(private val connection: T3Connection) {
 
     private val mutex = Mutex()
+    private val orchestrationNamespaceMutex = Mutex()
     private val pendingResponses: MutableMap<String, Pending<JsonElement?>> = mutableMapOf()
     private val streamSubscribers: MutableMap<String, (JsonElement) -> Unit> = mutableMapOf()
     private val subscriptionTemplates: MutableMap<String, SubscriptionTemplate> = mutableMapOf()
     private val statusListeners = mutableListOf<(T3Connection.ConnectionStatus) -> Unit>()
+    @Volatile private var orchestrationNamespace: OrchestrationNamespace? = null
 
     @Volatile private var lastStatus: T3Connection.ConnectionStatus = T3Connection.ConnectionStatus.Offline
 
@@ -132,15 +134,21 @@ class T3Client(private val connection: T3Connection) {
     private suspend fun handle(msg: EffectRpcMessage) {
         when (msg) {
             is EffectRpcMessage.Exit -> {
-                val pending = mutex.withLock {
-                    pendingResponses.remove(msg.requestId).also {
-                        streamSubscribers.remove(msg.requestId)
-                        subscriptionTemplates.remove(msg.requestId)
-                    }
+                val (pending, streamTemplate) = mutex.withLock {
+                    val template = subscriptionTemplates[msg.requestId]
+                    val waiter = pendingResponses.remove(msg.requestId)
+                    streamSubscribers.remove(msg.requestId)
+                    subscriptionTemplates.remove(msg.requestId)
+                    waiter to template
                 }
                 if (pending != null) {
                     if (msg.success) pending.complete(msg.value)
                     else pending.completeException(T3Error.RequestFailed(msg.errorMessage ?: "unknown"))
+                } else if (streamTemplate != null && !msg.success) {
+                    Log.w(
+                        TAG,
+                        "Stream ${streamTemplate.method} failed: ${msg.errorMessage ?: "unknown"}"
+                    )
                 }
             }
             is EffectRpcMessage.Chunk -> {
@@ -224,7 +232,7 @@ class T3Client(private val connection: T3Connection) {
     // region High-level helpers
 
     suspend fun subscribeShell(onItem: (ShellStreamItem) -> Unit): StreamSubscription =
-        subscribe("orchestration.subscribeShell", JsonObject(emptyMap())) { value ->
+        subscribe(orchestrationMethod("subscribeShell"), JsonObject(emptyMap())) { value ->
             ShellStreamItem.fromJson(value)?.let(onItem)
                 ?: Log.w(TAG, "Discarded shell stream value: $value")
         }
@@ -234,7 +242,7 @@ class T3Client(private val connection: T3Connection) {
         onItem: (ThreadStreamItem) -> Unit
     ): StreamSubscription =
         subscribe(
-            "orchestration.subscribeThread",
+            orchestrationMethod("subscribeThread"),
             buildJsonObject { put("threadId", threadId.rawValue) }
         ) { value ->
             ThreadStreamItem.fromJson(value)?.let(onItem)
@@ -294,7 +302,7 @@ class T3Client(private val connection: T3Connection) {
             put("createdAt", now)
             modelSelection?.let { put("modelSelection", it.encoded()) }
         }
-        request("orchestration.dispatchCommand", payload)
+        request(orchestrationMethod("dispatchCommand"), payload)
     }
 
     suspend fun createThreadAndStart(
@@ -338,7 +346,7 @@ class T3Client(private val connection: T3Connection) {
             })
             put("createdAt", now)
         }
-        request("orchestration.dispatchCommand", payload)
+        request(orchestrationMethod("dispatchCommand"), payload)
         return threadId
     }
 
@@ -350,7 +358,7 @@ class T3Client(private val connection: T3Connection) {
             put("createdAt", Iso8601.format(Instant.now()))
             turnId?.let { put("turnId", it.rawValue) }
         }
-        request("orchestration.dispatchCommand", payload)
+        request(orchestrationMethod("dispatchCommand"), payload)
     }
 
     suspend fun setRuntimeMode(threadId: ThreadID, mode: RuntimeMode) {
@@ -361,7 +369,7 @@ class T3Client(private val connection: T3Connection) {
             put("runtimeMode", mode.raw)
             put("createdAt", Iso8601.format(Instant.now()))
         }
-        request("orchestration.dispatchCommand", payload)
+        request(orchestrationMethod("dispatchCommand"), payload)
     }
 
     suspend fun setInteractionMode(threadId: ThreadID, mode: ProviderInteractionMode) {
@@ -372,7 +380,7 @@ class T3Client(private val connection: T3Connection) {
             put("interactionMode", mode.raw)
             put("createdAt", Iso8601.format(Instant.now()))
         }
-        request("orchestration.dispatchCommand", payload)
+        request(orchestrationMethod("dispatchCommand"), payload)
     }
 
     suspend fun updateThreadModelSelection(threadId: ThreadID, modelSelection: ModelSelection) {
@@ -382,7 +390,7 @@ class T3Client(private val connection: T3Connection) {
             put("threadId", threadId.rawValue)
             put("modelSelection", modelSelection.encoded())
         }
-        request("orchestration.dispatchCommand", payload)
+        request(orchestrationMethod("dispatchCommand"), payload)
     }
 
     suspend fun renameThread(threadId: ThreadID, title: String) {
@@ -394,12 +402,12 @@ class T3Client(private val connection: T3Connection) {
             put("threadId", threadId.rawValue)
             put("title", trimmed)
         }
-        request("orchestration.dispatchCommand", payload)
+        request(orchestrationMethod("dispatchCommand"), payload)
     }
 
     suspend fun archiveThread(threadId: ThreadID) {
         request(
-            "orchestration.dispatchCommand",
+            orchestrationMethod("dispatchCommand"),
             buildJsonObject {
                 put("type", "thread.archive")
                 put("commandId", CommandID.new().rawValue)
@@ -410,7 +418,7 @@ class T3Client(private val connection: T3Connection) {
 
     suspend fun unarchiveThread(threadId: ThreadID) {
         request(
-            "orchestration.dispatchCommand",
+            orchestrationMethod("dispatchCommand"),
             buildJsonObject {
                 put("type", "thread.unarchive")
                 put("commandId", CommandID.new().rawValue)
@@ -421,7 +429,7 @@ class T3Client(private val connection: T3Connection) {
 
     suspend fun deleteThread(threadId: ThreadID) {
         request(
-            "orchestration.dispatchCommand",
+            orchestrationMethod("dispatchCommand"),
             buildJsonObject {
                 put("type", "thread.delete")
                 put("commandId", CommandID.new().rawValue)
@@ -432,7 +440,7 @@ class T3Client(private val connection: T3Connection) {
 
     suspend fun stopSession(threadId: ThreadID) {
         request(
-            "orchestration.dispatchCommand",
+            orchestrationMethod("dispatchCommand"),
             buildJsonObject {
                 put("type", "thread.session.stop")
                 put("commandId", CommandID.new().rawValue)
@@ -471,6 +479,52 @@ class T3Client(private val connection: T3Connection) {
     }
 
     private data class SubscriptionTemplate(val method: String, val payload: JsonElement)
+
+    private enum class OrchestrationNamespace {
+        Namespaced,
+        Legacy
+    }
+
+    private suspend fun orchestrationMethod(suffix: String): String {
+        val namespace = resolveOrchestrationNamespace()
+        return if (namespace == OrchestrationNamespace.Namespaced) {
+            "orchestration.$suffix"
+        } else {
+            suffix
+        }
+    }
+
+    private suspend fun resolveOrchestrationNamespace(): OrchestrationNamespace {
+        orchestrationNamespace?.let { return it }
+        return orchestrationNamespaceMutex.withLock {
+            orchestrationNamespace?.let { return@withLock it }
+            val namespace = detectOrchestrationNamespace()
+            orchestrationNamespace = namespace
+            namespace
+        }
+    }
+
+    private suspend fun detectOrchestrationNamespace(): OrchestrationNamespace {
+        val payload = JsonObject(emptyMap())
+        val namespaced = runCatching {
+            request("orchestration.getArchivedShellSnapshot", payload)
+        }.isSuccess
+        if (namespaced) {
+            Log.i(TAG, "Using namespaced orchestration RPC methods")
+            return OrchestrationNamespace.Namespaced
+        }
+
+        val legacy = runCatching {
+            request("getArchivedShellSnapshot", payload)
+        }.isSuccess
+        if (legacy) {
+            Log.i(TAG, "Using legacy orchestration RPC methods")
+            return OrchestrationNamespace.Legacy
+        }
+
+        Log.w(TAG, "Could not detect orchestration RPC namespace, defaulting to namespaced")
+        return OrchestrationNamespace.Namespaced
+    }
 
     private class Pending<T>(
         private val cont: kotlinx.coroutines.CancellableContinuation<T>

@@ -44,6 +44,7 @@ struct SettingsView: View {
                         .padding(.horizontal, T3Spacing.lg)
                         .padding(.bottom, T3Spacing.xxxl)
                     }
+                    .t3ScrollEdgeSoftFade()
                     .scrollIndicators(.hidden)
                 }
             }
@@ -55,8 +56,7 @@ struct SettingsView: View {
                         .fontWeight(.semibold)
                         .padding(.horizontal, T3Spacing.md)
                         .padding(.vertical, T3Spacing.sm)
-                        .background(T3Color.surfaceElevated, in: Capsule())
-                        .overlay(Capsule().stroke(T3Color.separator, lineWidth: 0.5))
+                        .t3AdaptiveCapsuleGlass(interactive: false, tint: T3GlassChrome.panelTint())
                         .padding(.top, T3Spacing.sm)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }

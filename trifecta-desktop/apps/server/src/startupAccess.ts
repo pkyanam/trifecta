@@ -134,15 +134,21 @@ export const issueHeadlessServeAccessInfo = Effect.fn("issueHeadlessServeAccessI
   const serverConfig = yield* ServerConfig;
   const httpServer = yield* HttpServer.HttpServer;
   const serverAuth = yield* ServerAuth;
-  const connectionString = resolveHeadlessConnectionString(
-    serverConfig.host,
-    resolveListeningPort(httpServer.address, serverConfig.port),
-  );
-  const issued = yield* serverAuth.issuePairingCredential({ role: "owner" });
+
+  // Use public URL if configured, otherwise auto-detect from network interfaces
+  const localPort = resolveListeningPort(httpServer.address, serverConfig.port);
+  const connectionString = serverConfig.publicUrl
+    ? serverConfig.publicUrl.toString().replace(/\/$/, "")
+    : resolveHeadlessConnectionString(serverConfig.host, localPort);
+
+  // Use review pairing token if configured, otherwise issue a new one
+  const token = serverConfig.reviewPairingToken
+    ? serverConfig.reviewPairingToken
+    : (yield* serverAuth.issuePairingCredential({ role: "owner" })).credential;
 
   return {
     connectionString,
-    token: issued.credential,
-    pairingUrl: buildPairingUrl(connectionString, issued.credential),
+    token,
+    pairingUrl: buildPairingUrl(connectionString, token),
   } satisfies HeadlessServeAccessInfo;
 });

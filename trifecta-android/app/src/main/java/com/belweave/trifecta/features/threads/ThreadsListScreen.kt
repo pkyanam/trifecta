@@ -63,6 +63,7 @@ fun ThreadsListScreen(
     onNewThread: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenArchived: () -> Unit,
+    onOpenSsh: () -> Unit,
     viewModel: ThreadListViewModel = viewModel()
 ) {
     val groups by viewModel.groupedThreads.collectAsState()
@@ -92,7 +93,8 @@ fun ThreadsListScreen(
             onNewThread = onNewThread,
             canCreate = canCreate,
             onOpenSettings = onOpenSettings,
-            onOpenArchived = onOpenArchived
+            onOpenArchived = onOpenArchived,
+            onOpenSsh = onOpenSsh
         )
 
         if (groups.isEmpty() && emptyProjects.isEmpty()) {
@@ -182,7 +184,8 @@ private fun HeaderBar(
     onNewThread: () -> Unit,
     canCreate: Boolean,
     onOpenSettings: () -> Unit,
-    onOpenArchived: () -> Unit
+    onOpenArchived: () -> Unit,
+    onOpenSsh: () -> Unit
 ) {
     var sortMenuOpen by remember { mutableStateOf(false) }
 
@@ -256,6 +259,15 @@ private fun HeaderBar(
             Icon(
                 Icons.Outlined.Archive,
                 contentDescription = "Archive",
+                tint = T3Color.textPrimary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        T3ToolbarChip(onClick = onOpenSsh) {
+            Icon(
+                Icons.Outlined.Terminal,
+                contentDescription = "SSH",
                 tint = T3Color.textPrimary,
                 modifier = Modifier.size(16.dp)
             )

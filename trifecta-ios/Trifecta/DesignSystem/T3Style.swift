@@ -1,8 +1,8 @@
 import SwiftUI
 
-// Reusable visual primitives that codify the Trifecta aesthetic:
-// flat dark surfaces, hairline borders, pill chips, and small-caps section
-// headers. Used across all feature screens to keep the design coherent.
+// Reusable visual primitives aligned with Apple's Liquid Glass design language on
+// iOS 26+ (.glassEffect, GlassEffectContainer, .buttonStyle(.glass)), with
+// ultra-thin materials and hairline strokes on earlier versions.
 
 enum T3Style {
     // Card with subtle border and slightly elevated surface.
@@ -15,12 +15,10 @@ enum T3Style {
             content()
                 .padding(padding)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(T3Color.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .stroke(T3Color.separator, lineWidth: 0.5)
-                )
+                .t3Glass(radius: radius,
+                         tint: T3GlassChrome.panelTint(),
+                         stroke: T3Color.separator,
+                         interactive: false)
         }
     }
 
@@ -57,13 +55,11 @@ enum T3Style {
             .foregroundStyle(emphasized ? tint : T3Color.textTertiary)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(
-                Capsule().fill(emphasized ? tint.opacity(0.16) : T3Color.surfaceElevated)
-            )
-            .overlay(
-                Capsule()
-                    .stroke(emphasized ? tint.opacity(0.30) : T3Color.separator,
-                            lineWidth: 0.5)
+            .t3AdaptiveCapsuleGlass(
+                interactive: false,
+                tint: emphasized ? tint.opacity(0.22) : T3GlassChrome.panelTint(),
+                fallbackFill: emphasized ? tint.opacity(0.16) : nil,
+                fallbackStroke: emphasized ? tint.opacity(0.30) : nil
             )
         }
     }
@@ -79,12 +75,10 @@ enum T3Style {
             Button(action: action) {
                 label()
                     .frame(width: size, height: size)
-                    .background(T3Color.surfaceElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                            .stroke(T3Color.separator, lineWidth: 0.5)
-                    )
+                    .t3Glass(radius: T3Radius.md,
+                             tint: T3GlassChrome.panelTint(),
+                             stroke: T3Color.separator,
+                             interactive: true)
             }
             .buttonStyle(T3ScaleButtonStyle())
         }
@@ -97,21 +91,35 @@ struct T3Glass: ViewModifier {
     var radius: CGFloat = T3Radius.lg
     var tint: Color = T3Color.surfaceElevated.opacity(0.72)
     var stroke: Color = T3Color.separator
+    var interactive: Bool = false
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
 
-        content
-            .background(tint, in: shape)
-            .overlay(shape.stroke(stroke, lineWidth: 0.5))
+        if #available(iOS 26.0, *), !reduceTransparency {
+            let glassTint = tint
+            let base = Glass.regular.tint(glassTint)
+            let glass: Glass = interactive ? base.interactive() : base
+            content
+                .glassEffect(glass, in: shape)
+        } else {
+            content
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(
+                    shape.stroke(stroke, lineWidth: 0.5)
+                )
+        }
     }
 }
 
 extension View {
     func t3Glass(radius: CGFloat = T3Radius.lg,
                  tint: Color = T3Color.surfaceElevated.opacity(0.72),
-                 stroke: Color = T3Color.separator) -> some View {
-        modifier(T3Glass(radius: radius, tint: tint, stroke: stroke))
+                 stroke: Color = T3Color.separator,
+                 interactive: Bool = false) -> some View {
+        modifier(T3Glass(radius: radius, tint: tint, stroke: stroke, interactive: interactive))
     }
 }
 
@@ -156,9 +164,8 @@ struct T3WordmarkLabel: View {
                     .tracking(0.4)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(T3Color.surfaceElevated)
-                    .clipShape(Capsule())
-                    .overlay(Capsule().stroke(T3Color.separator, lineWidth: 0.5))
+                    .t3AdaptiveCapsuleGlass(interactive: false,
+                                            tint: T3GlassChrome.panelTint())
                     .padding(.leading, 2)
             }
         }

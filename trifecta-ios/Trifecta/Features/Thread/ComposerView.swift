@@ -74,6 +74,7 @@ private enum ComposerMenuRow: Identifiable, Hashable {
 struct ComposerView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var accessibilityReduceTransparency
     @Bindable var store: ThreadStore
     @State private var draft: String = ""
     @State private var selectionEndUTF16: Int = 0
@@ -90,6 +91,14 @@ struct ComposerView: View {
 
     private let maxChars = 120_000
     private let maxAttachments = 8
+
+    /// Hairline rim was used for non–Liquid-Glass builds; native glass already provides edge definition.
+    private var fallbackComposerRimOpacity: Double {
+        if #available(iOS 26.0, *), !accessibilityReduceTransparency {
+            return 0
+        }
+        return 1
+    }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -109,11 +118,15 @@ struct ComposerView: View {
                     .padding(.bottom, 7)
             }
             .t3Glass(radius: 26,
-                     tint: composerFocused ? accentColor.opacity(0.12) : T3Color.surfaceElevated.opacity(0.62),
-                     stroke: composerFocused ? accentColor.opacity(0.44) : T3Color.separator)
+                     tint: composerFocused
+                     ? T3GlassChrome.panelTint(accentHighlight: accentColor.opacity(0.35))
+                     : T3GlassChrome.panelTint(),
+                     stroke: composerFocused ? accentColor.opacity(0.44) : T3Color.separator,
+                     interactive: true)
             .overlay(
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .stroke(.white.opacity(colorScheme == .dark ? 0.06 : 0.45), lineWidth: 0.5)
+                    .opacity(fallbackComposerRimOpacity)
             )
             .overlay(alignment: .topLeading) {
                 if !menuRows.isEmpty {
@@ -176,7 +189,10 @@ struct ComposerView: View {
             }
         }
         .frame(maxHeight: 200)
-        .t3Glass(radius: 18, tint: T3Color.surface.opacity(0.78))
+        .t3Glass(radius: 18,
+                 tint: T3GlassChrome.panelTint(),
+                 stroke: T3Color.separator,
+                 interactive: false)
         .shadow(color: .black.opacity(0.16), radius: 18, x: 0, y: 8)
     }
 

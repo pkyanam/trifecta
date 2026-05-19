@@ -50,6 +50,9 @@ import {
 } from "./orchestration.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 import {
+  ProjectListAgentSkillsError,
+  ProjectListAgentSkillsInput,
+  ProjectListAgentSkillsResult,
   ProjectSearchEntriesError,
   ProjectSearchEntriesInput,
   ProjectSearchEntriesResult,
@@ -123,6 +126,7 @@ export const WS_METHODS = {
   projectsRemove: "projects.remove",
   projectsSearchEntries: "projects.searchEntries",
   projectsWriteFile: "projects.writeFile",
+  projectsListAgentSkills: "projects.listAgentSkills",
 
   // Shell methods
   shellOpenInEditor: "shell.openInEditor",
@@ -297,6 +301,12 @@ export const WsProjectsWriteFileRpc = Rpc.make(WS_METHODS.projectsWriteFile, {
   payload: ProjectWriteFileInput,
   success: ProjectWriteFileResult,
   error: ProjectWriteFileError,
+});
+
+export const WsProjectsListAgentSkillsRpc = Rpc.make(WS_METHODS.projectsListAgentSkills, {
+  payload: ProjectListAgentSkillsInput,
+  success: ProjectListAgentSkillsResult,
+  error: ProjectListAgentSkillsError,
 });
 
 export const WsShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
@@ -587,6 +597,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsSourceControlPublishRepositoryRpc,
   WsProjectsSearchEntriesRpc,
   WsProjectsWriteFileRpc,
+  WsProjectsListAgentSkillsRpc,
   WsShellOpenInEditorRpc,
   WsFilesystemBrowseRpc,
   WsSubscribeVcsStatusRpc,

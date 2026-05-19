@@ -59,8 +59,7 @@ struct ConnectionPill: View {
         }
         .padding(.horizontal, T3Spacing.md)
         .padding(.vertical, T3Spacing.xs)
-        .background(Capsule().fill(T3Color.surfaceElevated))
-        .overlay { Capsule().stroke(T3Color.separator, lineWidth: 0.5) }
+        .t3AdaptiveCapsuleGlass(interactive: false, tint: T3GlassChrome.panelTint())
         .onAppear { startPulseIfNeeded() }
         .onChange(of: state) { _, _ in startPulseIfNeeded() }
     }

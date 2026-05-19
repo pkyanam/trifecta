@@ -242,12 +242,17 @@ export const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
 const resolveStartupBrowserTarget = Effect.gen(function* () {
   const serverConfig = yield* ServerConfig;
   const serverAuth = yield* ServerAuth;
+
+  // Use public URL if configured (for reverse proxy setups)
   const localUrl = `http://localhost:${serverConfig.port}`;
   const bindUrl =
     serverConfig.host && !isWildcardHost(serverConfig.host)
       ? `http://${formatHostForUrl(serverConfig.host)}:${serverConfig.port}`
       : localUrl;
-  const baseTarget = serverConfig.devUrl?.toString() ?? bindUrl;
+  const baseTarget =
+    serverConfig.publicUrl?.toString() ?? serverConfig.devUrl?.toString() ?? bindUrl;
+
+  // In server mode, always use the public URL for pairing
   return yield* Effect.succeed(serverConfig.mode === "desktop" ? baseTarget : undefined).pipe(
     Effect.flatMap((target) =>
       target ? Effect.succeed(target) : serverAuth.issueStartupPairingUrl(baseTarget),
@@ -258,7 +263,12 @@ const resolveStartupBrowserTarget = Effect.gen(function* () {
 const maybeOpenBrowser = (target: string) =>
   Effect.gen(function* () {
     const serverConfig = yield* ServerConfig;
-    if (serverConfig.noBrowser) {
+    // Skip browser in headless or server mode
+    if (
+      serverConfig.noBrowser ||
+      serverConfig.startupPresentation === "headless" ||
+      serverConfig.mode === "server"
+    ) {
       return;
     }
     const { openBrowser } = yield* Open;
@@ -430,7 +440,7 @@ export const makeServerRuntimeStartup = Effect.gen(function* () {
 
       yield* Effect.logDebug("startup phase: recording startup heartbeat");
       yield* launchStartupHeartbeat;
-      if (serverConfig.startupPresentation === "headless") {
+      if (serverConfig.startupPresentation === "headless" || serverConfig.mode === "server") {
         yield* Effect.logDebug("startup phase: headless access info");
         const accessInfo = yield* issueHeadlessServeAccessInfo();
         yield* runStartupPhase(

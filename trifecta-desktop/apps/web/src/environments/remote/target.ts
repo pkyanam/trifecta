@@ -7,8 +7,12 @@ export interface ResolvedRemotePairingTarget {
   readonly wsBaseUrl: string;
 }
 
+function normalizeUrlInput(rawValue: string): string {
+  return rawValue.trim().replace(/[\u2010-\u2015\u2212]/g, "-");
+}
+
 function normalizeRemoteBaseUrl(rawValue: string): URL {
-  const trimmed = rawValue.trim();
+  const trimmed = normalizeUrlInput(rawValue);
   if (!trimmed) {
     throw new Error("Enter a backend URL.");
   }
@@ -55,7 +59,7 @@ export function resolveRemotePairingTarget(input: {
   readonly host?: string;
   readonly pairingCode?: string;
 }): ResolvedRemotePairingTarget {
-  const pairingUrl = input.pairingUrl?.trim() ?? "";
+  const pairingUrl = input.pairingUrl ? normalizeUrlInput(input.pairingUrl) : "";
   if (pairingUrl.length > 0) {
     const url = new URL(pairingUrl, window.location.origin);
     const hostedPairingRequest = readHostedPairingRequest(url);

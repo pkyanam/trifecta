@@ -4,9 +4,6 @@ t3code-original/
 # reference repos (development only)
 _reference/
 
-#temp folders
-trifecta-ios-new/
-
 # temporary local assets
 tempAssetsDoNotCommit/
 
@@ -61,6 +58,9 @@ yarn-error.log*
 
 # turbo
 .turbo
+
+# server build output (for deployment)
+server/
 
 # trifecta desktop generated artifacts
 trifecta-desktop/.bun/

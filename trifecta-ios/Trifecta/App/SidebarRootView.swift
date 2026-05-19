@@ -257,7 +257,10 @@ struct T3BottomNavBar: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .t3Glass(radius: 28, tint: T3Color.surfaceElevated.opacity(0.48))
+        .t3Glass(radius: 28,
+                 tint: T3GlassChrome.panelTint(),
+                 stroke: T3Color.separator,
+                 interactive: false)
         .shadow(color: .black.opacity(0.14), radius: 16, x: 0, y: 6)
     }
 }

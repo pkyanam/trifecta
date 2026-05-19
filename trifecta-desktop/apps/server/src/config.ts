@@ -16,7 +16,7 @@ import * as Context from "effect/Context";
 
 export const DEFAULT_PORT = 3773;
 
-export const RuntimeMode = Schema.Literals(["web", "desktop"]);
+export const RuntimeMode = Schema.Literals(["web", "desktop", "server"]);
 export type RuntimeMode = typeof RuntimeMode.Type;
 
 export const StartupPresentation = Schema.Literals(["browser", "headless"]);
@@ -73,6 +73,10 @@ export interface ServerConfigShape extends ServerDerivedPaths {
   readonly logWebSocketEvents: boolean;
   readonly tailscaleServeEnabled: boolean;
   readonly tailscaleServePort: number;
+  /** Public URL for reverse proxy setups (e.g., Cloudflare tunnel). Used in pairing URLs. */
+  readonly publicUrl: URL | undefined;
+  /** Pre-configured pairing token for App Store review or automated testing. */
+  readonly reviewPairingToken: string | undefined;
 }
 
 export const deriveServerPaths = Effect.fn(function* (
@@ -175,6 +179,8 @@ export class ServerConfig extends Context.Service<ServerConfig, ServerConfigShap
           devUrl,
           noBrowser: false,
           startupPresentation: "browser",
+          publicUrl: undefined,
+          reviewPairingToken: undefined,
         } satisfies ServerConfigShape;
       }),
     );

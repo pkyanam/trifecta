@@ -102,12 +102,17 @@ export const DEFAULT_CLIENT_SETTINGS: ClientSettings = Schema.decodeSync(ClientS
 export const ThreadEnvMode = Schema.Literals(["local", "worktree"]);
 export type ThreadEnvMode = typeof ThreadEnvMode.Type;
 
-const makeBinaryPathSetting = (fallback: string) =>
+const makeBinaryPathSetting = (fallback: string, legacyAliases: ReadonlyArray<string> = []) =>
   TrimmedString.pipe(
     Schema.decodeTo(
       Schema.String,
       SchemaTransformation.transformOrFail({
-        decode: (value) => Effect.succeed(value || fallback),
+        decode: (value) => {
+          if (!value || legacyAliases.includes(value)) {
+            return Effect.succeed(fallback);
+          }
+          return Effect.succeed(value);
+        },
         encode: (value) => Effect.succeed(value),
       }),
     ),
@@ -252,11 +257,11 @@ export const CursorSettings = makeProviderSettingsSchema(
       Schema.withDecodingDefault(Effect.succeed(false)),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
-    binaryPath: makeBinaryPathSetting("agent").pipe(
+    binaryPath: makeBinaryPathSetting("cursor-agent", ["agent"]).pipe(
       Schema.annotateKey({
         title: "Binary path",
         description: "Path to the Cursor agent binary.",
-        providerSettingsForm: { placeholder: "agent", clearWhenEmpty: "omit" },
+        providerSettingsForm: { placeholder: "cursor-agent", clearWhenEmpty: "omit" },
       }),
     ),
     apiEndpoint: TrimmedString.pipe(

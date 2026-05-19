@@ -87,6 +87,31 @@ describe("remote environment api", () => {
     });
   });
 
+  it("normalizes smart dashes in manually entered backend hosts", () => {
+    expect(
+      resolveRemotePairingTarget({
+        host: "https://trifecta\u2013review.belweave.com",
+        pairingCode: "pairing-token",
+      }),
+    ).toEqual({
+      credential: "pairing-token",
+      httpBaseUrl: "https://trifecta-review.belweave.com/",
+      wsBaseUrl: "wss://trifecta-review.belweave.com/",
+    });
+  });
+
+  it("normalizes smart dashes in pasted pairing urls", () => {
+    expect(
+      resolveRemotePairingTarget({
+        pairingUrl: "https://trifecta\u2013review.belweave.com/pair#token=pairing-token",
+      }),
+    ).toEqual({
+      credential: "pairing-token",
+      httpBaseUrl: "https://trifecta-review.belweave.com/",
+      wsBaseUrl: "wss://trifecta-review.belweave.com/",
+    });
+  });
+
   it("bootstraps bearer auth against a remote backend", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
@@ -121,6 +146,27 @@ describe("remote environment api", () => {
         credential: "pairing-token",
       }),
     });
+  });
+
+  it("reports non-json remote auth success responses clearly", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("<!doctype html><html><body>Not the backend</body></html>", {
+        status: 200,
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+        },
+      }),
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await expect(
+      bootstrapRemoteBearerSession({
+        httpBaseUrl: "https://remote.example.com/",
+        credential: "pairing-token",
+      }),
+    ).rejects.toThrow(
+      "Remote auth endpoint returned text/html; charset=utf-8 instead of JSON (200)",
+    );
   });
 
   it("loads remote session state and websocket tokens over bearer auth", async () => {

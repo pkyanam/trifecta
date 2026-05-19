@@ -38,9 +38,10 @@ fun T3Card(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(radius))
-            .background(T3Color.surfaceElevated)
-            .border(BorderStroke(0.5.dp, T3Color.separator), RoundedCornerShape(radius))
+            .t3AdaptiveRoundedRectGlass(
+                cornerRadius = radius,
+                tint = t3GlassTint()
+            )
             .padding(padding)
     ) {
         content()
@@ -74,9 +75,10 @@ fun T3Pill(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .background(background)
-            .border(BorderStroke(0.5.dp, border), RoundedCornerShape(50))
+            .t3AdaptiveCapsuleGlass(
+                tint = background,
+                stroke = border
+            )
             .padding(horizontal = 8.dp, vertical = 3.dp)
     ) {
         if (leadingIcon != null) {
@@ -109,9 +111,10 @@ fun T3ToolbarChip(
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(T3Radius.md))
-            .background(T3Color.surfaceElevated)
-            .border(BorderStroke(0.5.dp, T3Color.separator), RoundedCornerShape(T3Radius.md))
+            .t3AdaptiveRoundedRectGlass(
+                cornerRadius = T3Radius.md,
+                tint = t3GlassTint()
+            )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -138,9 +141,10 @@ fun T3WordmarkLabel(
             Box(modifier = Modifier.width(6.dp))
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(T3Color.surfaceElevated)
-                    .border(BorderStroke(0.5.dp, T3Color.separator), RoundedCornerShape(50))
+                    .t3AdaptiveCapsuleGlass(
+                        tint = t3GlassTint(),
+                        stroke = T3Color.separator
+                    )
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(

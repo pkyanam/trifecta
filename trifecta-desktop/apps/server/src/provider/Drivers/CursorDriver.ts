@@ -1,5 +1,5 @@
 /**
- * CursorDriver — `ProviderDriver` for the Cursor Agent (`agent`) runtime.
+ * CursorDriver — `ProviderDriver` for the Cursor Agent (`cursor-agent`) runtime.
  *
  * Cursor exposes an ACP-based CLI. The driver is still a plain value, but
  * its snapshot uses `makeManagedServerProvider`'s optional `enrichSnapshot`
@@ -53,7 +53,7 @@ const UPDATE = makeStaticProviderMaintenanceResolver(
   makeProviderMaintenanceCapabilities({
     provider: DRIVER_KIND,
     packageName: null,
-    updateExecutable: "agent",
+    updateExecutable: "cursor-agent",
     updateArgs: ["update"],
     updateLockKey: "cursor-agent",
   }),
@@ -122,7 +122,12 @@ export const CursorDriver: ProviderDriver<CursorSettings, CursorDriverEnv> = {
       });
       const textGeneration = yield* makeCursorTextGeneration(effectiveConfig, processEnv);
 
-      const checkProvider = checkCursorProviderStatus(effectiveConfig, processEnv).pipe(
+      const serverConfig = yield* ServerConfig;
+      const checkProvider = checkCursorProviderStatus(
+        effectiveConfig,
+        processEnv,
+        serverConfig.cwd,
+      ).pipe(
         Effect.map(stampIdentity),
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
         Effect.provideService(FileSystem.FileSystem, fileSystem),

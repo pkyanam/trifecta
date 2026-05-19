@@ -83,6 +83,8 @@ const makeCliTestServerConfig = (baseDir: string) =>
       logWebSocketEvents: false,
       tailscaleServeEnabled: false,
       tailscaleServePort: 443,
+      publicUrl: undefined,
+      reviewPairingToken: undefined,
     } satisfies ServerConfigShape;
   });
 

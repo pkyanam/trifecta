@@ -22,25 +22,45 @@ struct PrimaryButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: T3Spacing.sm) {
-                if isLoading {
-                    ProgressView().controlSize(.small).tint(T3Color.onPrimary)
-                } else if let systemImage {
-                    Image(systemName: systemImage)
+        Group {
+            if #available(iOS 26.0, *) {
+                Button(action: action) {
+                    HStack(spacing: T3Spacing.sm) {
+                        if isLoading {
+                            ProgressView().controlSize(.small).tint(T3Color.onPrimary)
+                        } else if let systemImage {
+                            Image(systemName: systemImage)
+                        }
+                        Text(title)
+                            .font(T3Typography.bodyEmphasis)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 48)
                 }
-                Text(title)
-                    .font(T3Typography.bodyEmphasis)
+                .buttonStyle(.glassProminent)
+                .tint(T3Color.primary.opacity(isEnabled ? 1.0 : 0.45))
+                .disabled(!isEnabled || isLoading)
+            } else {
+                Button(action: action) {
+                    HStack(spacing: T3Spacing.sm) {
+                        if isLoading {
+                            ProgressView().controlSize(.small).tint(T3Color.onPrimary)
+                        } else if let systemImage {
+                            Image(systemName: systemImage)
+                        }
+                        Text(title)
+                            .font(T3Typography.bodyEmphasis)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .foregroundStyle(T3Color.onPrimary)
+                    .background(
+                        RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
+                            .fill(T3Color.primary.opacity(isEnabled ? 1.0 : 0.45))
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isEnabled || isLoading)
             }
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .foregroundStyle(T3Color.onPrimary)
-            .background(
-                RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                    .fill(T3Color.primary.opacity(isEnabled ? 1.0 : 0.45))
-            )
         }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled || isLoading)
     }
 }
 
@@ -50,22 +70,39 @@ struct SecondaryButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: T3Spacing.sm) {
-                if let systemImage {
-                    Image(systemName: systemImage)
+        Group {
+            if #available(iOS 26.0, *) {
+                Button(action: action) {
+                    HStack(spacing: T3Spacing.sm) {
+                        if let systemImage {
+                            Image(systemName: systemImage)
+                        }
+                        Text(title)
+                            .font(T3Typography.bodyEmphasis)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .foregroundStyle(T3Color.textPrimary)
                 }
-                Text(title)
-                    .font(T3Typography.bodyEmphasis)
+                .buttonStyle(.glass)
+            } else {
+                Button(action: action) {
+                    HStack(spacing: T3Spacing.sm) {
+                        if let systemImage {
+                            Image(systemName: systemImage)
+                        }
+                        Text(title)
+                            .font(T3Typography.bodyEmphasis)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .foregroundStyle(T3Color.textPrimary)
+                    .background(
+                        RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
+                            .fill(T3Color.surfaceElevated)
+                    )
+                }
+                .buttonStyle(.plain)
             }
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .foregroundStyle(T3Color.textPrimary)
-            .background(
-                RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                    .fill(T3Color.surfaceElevated)
-            )
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -82,37 +119,65 @@ struct T3ToolbarButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: T3Spacing.xs) {
-                if isLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(T3Color.textPrimary)
-                } else if let systemImage {
-                    Image(systemName: systemImage)
-                        .font(.system(size: 14, weight: .medium))
+        Group {
+            if #available(iOS 26.0, *) {
+                Button(action: action) {
+                    HStack(spacing: T3Spacing.xs) {
+                        if isLoading {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(T3Color.textPrimary)
+                        } else if let systemImage {
+                            Image(systemName: systemImage)
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        Text(title)
+                            .font(.system(size: 13, weight: .medium))
+                        if showsChevron {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                    }
+                    .padding(.horizontal, T3Spacing.md)
+                    .padding(.vertical, 8)
+                    .foregroundStyle(isEnabled ? T3Color.textPrimary : T3Color.textTertiary)
                 }
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                if showsChevron {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .semibold))
+                .buttonStyle(.glass)
+                .disabled(!isEnabled || isLoading)
+            } else {
+                Button(action: action) {
+                    HStack(spacing: T3Spacing.xs) {
+                        if isLoading {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(T3Color.textPrimary)
+                        } else if let systemImage {
+                            Image(systemName: systemImage)
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        Text(title)
+                            .font(.system(size: 13, weight: .medium))
+                        if showsChevron {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                    }
+                    .padding(.horizontal, T3Spacing.md)
+                    .padding(.vertical, 8)
+                    .foregroundStyle(isEnabled ? T3Color.textPrimary : T3Color.textTertiary)
+                    .background(
+                        RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
+                            .fill(T3Color.surfaceElevated)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
+                            .stroke(T3Color.separator, lineWidth: 0.5)
+                    )
                 }
+                .buttonStyle(.plain)
+                .disabled(!isEnabled || isLoading)
             }
-            .padding(.horizontal, T3Spacing.md)
-            .padding(.vertical, 8)
-            .foregroundStyle(isEnabled ? T3Color.textPrimary : T3Color.textTertiary)
-            .background(
-                RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                    .fill(T3Color.surfaceElevated)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                    .stroke(T3Color.separator, lineWidth: 0.5)
-            )
         }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled || isLoading)
     }
 }
 
@@ -124,22 +189,35 @@ struct T3ToolbarIconButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .medium))
-                .frame(width: 34, height: 34)
-                .foregroundStyle(isEnabled ? T3Color.textPrimary : T3Color.textTertiary)
-                .background(
-                    RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                        .fill(T3Color.surfaceElevated)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
-                        .stroke(T3Color.separator, lineWidth: 0.5)
-                )
+        Group {
+            if #available(iOS 26.0, *) {
+                Button(action: action) {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 15, weight: .medium))
+                        .frame(width: 34, height: 34)
+                        .foregroundStyle(isEnabled ? T3Color.textPrimary : T3Color.textTertiary)
+                }
+                .buttonStyle(.glass)
+                .disabled(!isEnabled)
+            } else {
+                Button(action: action) {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 15, weight: .medium))
+                        .frame(width: 34, height: 34)
+                        .foregroundStyle(isEnabled ? T3Color.textPrimary : T3Color.textTertiary)
+                        .background(
+                            RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
+                                .fill(T3Color.surfaceElevated)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: T3Radius.md, style: .continuous)
+                                .stroke(T3Color.separator, lineWidth: 0.5)
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isEnabled)
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled)
     }
 }
 

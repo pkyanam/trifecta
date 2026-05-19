@@ -30,6 +30,7 @@ import {
   OrchestrationGetSnapshotError,
   OrchestrationGetTurnDiffError,
   ORCHESTRATION_WS_METHODS,
+  ProjectListAgentSkillsError,
   ProjectSearchEntriesError,
   ProjectWriteFileError,
   OrchestrationReplayEventsError,
@@ -48,6 +49,7 @@ import { ServerConfig } from "./config.ts";
 import { Keybindings } from "./keybindings.ts";
 import { Open, resolveAvailableEditors } from "./open.ts";
 import { normalizeDispatchCommand } from "./orchestration/Normalizer.ts";
+import { discoverLocalAgentSkillsFromDisk } from "./provider/localAgentSkills.ts";
 import { OrchestrationEngineService } from "./orchestration/Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 import {
@@ -963,6 +965,21 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
             {
               "rpc.aggregate": "source-control",
             },
+          ),
+        [WS_METHODS.projectsListAgentSkills]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.projectsListAgentSkills,
+            Effect.tryPromise({
+              try: async () => ({
+                skills: await discoverLocalAgentSkillsFromDisk({ cwd: input.cwd }),
+              }),
+              catch: (cause) =>
+                new ProjectListAgentSkillsError({
+                  message: cause instanceof Error ? cause.message : String(cause),
+                  ...(cause instanceof Error ? { cause } : {}),
+                }),
+            }),
+            { "rpc.aggregate": "workspace" },
           ),
         [WS_METHODS.projectsSearchEntries]: (input) =>
           observeRpcEffect(

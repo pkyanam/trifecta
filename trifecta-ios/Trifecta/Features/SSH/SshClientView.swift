@@ -41,6 +41,8 @@ struct SshClientView: View {
         VStack(spacing: 0) {
             if env.connectionStatus != .connected {
                 disconnectedView
+            } else if env.serverConfig?.sshEnabled == false {
+                desktopOnlyView
             } else {
                 hostBar
                 Divider()
@@ -70,6 +72,7 @@ struct SshClientView: View {
             }
         }
         .task {
+            guard env.serverConfig?.sshEnabled != false else { return }
             await refreshHosts()
         }
         .sheet(isPresented: $showAddHost) {
@@ -206,6 +209,12 @@ struct SshClientView: View {
         ContentUnavailableView("Desktop server offline",
                                systemImage: "wifi.slash",
                                description: Text("Pair or reconnect to Trifecta Desktop before opening SSH."))
+    }
+
+    private var desktopOnlyView: some View {
+        ContentUnavailableView("Requires Trifecta Desktop",
+                               systemImage: "desktopcomputer",
+                               description: Text("SSH is only available when connected to Trifecta Desktop on your Mac. This server does not support SSH sessions."))
     }
 
     private var hostBar: some View {

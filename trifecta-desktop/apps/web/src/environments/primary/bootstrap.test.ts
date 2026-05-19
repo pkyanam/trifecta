@@ -72,6 +72,7 @@ describe("environmentBootstrap", () => {
       serverVersion: "0.0.0-test",
       capabilities: {
         repositoryIdentity: true,
+        ssh: false,
       },
     });
 
