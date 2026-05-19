@@ -65,7 +65,7 @@ function createBaseServerConfig(): ServerConfig {
       label: "Local environment",
       platform: { os: "darwin" as const, arch: "arm64" as const },
       serverVersion: "0.0.0-test",
-      capabilities: { repositoryIdentity: true },
+      capabilities: { repositoryIdentity: true, ssh: false },
     },
     auth: {
       policy: "loopback-browser",
@@ -267,7 +267,7 @@ function buildFixture(): TestFixture {
         label: "Local environment",
         platform: { os: "darwin" as const, arch: "arm64" as const },
         serverVersion: "0.0.0-test",
-        capabilities: { repositoryIdentity: true },
+        capabilities: { repositoryIdentity: true, ssh: false },
       },
       cwd: "/repo/project",
       projectName: "Project",

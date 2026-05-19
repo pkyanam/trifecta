@@ -154,6 +154,7 @@ const testEnvironmentDescriptor = {
   serverVersion: "0.0.0-test",
   capabilities: {
     repositoryIdentity: true,
+    ssh: false,
   },
 };
 const makeDefaultOrchestrationReadModel = () => {
@@ -396,6 +397,8 @@ const buildAppUnderTest = (options?: {
       logWebSocketEvents: false,
       tailscaleServeEnabled: false,
       tailscaleServePort: 443,
+      publicUrl: undefined,
+      reviewPairingToken: undefined,
       ...options?.config,
     };
     const layerConfig = Layer.succeed(ServerConfig, config);

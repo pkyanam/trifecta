@@ -33,7 +33,10 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDebouncedValue } from "@tanstack/react-pacer";
-import { projectListAgentSkillsQueryOptions, projectSearchEntriesQueryOptions } from "~/lib/projectReactQuery";
+import {
+  projectListAgentSkillsQueryOptions,
+  projectSearchEntriesQueryOptions,
+} from "~/lib/projectReactQuery";
 import {
   clampCollapsedComposerCursor,
   type ComposerTrigger,

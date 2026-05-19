@@ -57,11 +57,21 @@ data class ModelSelection(
             if (obj == null) return null
             val instance = obj.str("instanceId") ?: obj.str("provider") ?: return null
             val model = obj.str("model") ?: return null
-            val options = obj["options"]?.asArrayOrNull()?.mapNotNull { entry ->
-                val o = entry.asObjectOrNull() ?: return@mapNotNull null
-                val id = o.str("id") ?: return@mapNotNull null
-                val value = ProviderOptionValue.fromJson(o["value"]) ?: return@mapNotNull null
-                ProviderOptionSelection(id, value)
+            val options = when {
+                obj["options"]?.asArrayOrNull() != null -> obj["options"]?.asArrayOrNull()?.mapNotNull { entry ->
+                    val o = entry.asObjectOrNull() ?: return@mapNotNull null
+                    val id = o.str("id") ?: return@mapNotNull null
+                    val value = ProviderOptionValue.fromJson(o["value"]) ?: return@mapNotNull null
+                    ProviderOptionSelection(id, value)
+                }
+                obj.obj("options") != null -> obj.obj("options")
+                    ?.entries
+                    ?.mapNotNull { (id, value) ->
+                        val parsedValue = ProviderOptionValue.fromJson(value) ?: return@mapNotNull null
+                        ProviderOptionSelection(id, parsedValue)
+                    }
+                    ?.sortedBy { it.id }
+                else -> null
             }
             return ModelSelection(ProviderInstanceID(instance), model, options)
         }

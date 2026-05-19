@@ -28,6 +28,8 @@ import { ProjectFaviconResolver } from "./project/Services/ProjectFaviconResolve
 import { ServerAuth } from "./auth/Services/ServerAuth.ts";
 import { respondToAuthError } from "./auth/http.ts";
 import { ServerEnvironment } from "./environment/Services/ServerEnvironment.ts";
+import { HttpServer } from "effect/unstable/http";
+import * as DateTime from "effect/DateTime";
 import {
   browserApiCorsAllowedHeaders,
   browserApiCorsAllowedMethods,
@@ -321,4 +323,84 @@ export const staticAndDevRouteLayer = HttpRouter.add(
       contentType,
     });
   }),
+);
+
+/**
+ * Health check endpoint for container orchestration.
+ * Returns 200 OK when the server is healthy and accepting connections.
+ */
+export const healthCheckRouteLayer = HttpRouter.add(
+  "GET",
+  "/api/health",
+  Effect.gen(function* () {
+    const httpServer = yield* HttpServer.HttpServer;
+    const address = httpServer.address;
+    const isListening = typeof address === "object" && address !== null && "port" in address;
+    const now = yield* DateTime.now;
+
+    return HttpServerResponse.jsonUnsafe(
+      {
+        status: isListening ? "healthy" : "unhealthy",
+        timestamp: DateTime.formatIso(now),
+        address: isListening ? address : null,
+      },
+      {
+        status: isListening ? 200 : 503,
+        headers: browserApiCorsHeaders,
+      },
+    );
+  }),
+);
+
+/**
+ * Server status endpoint for headless deployments.
+ * Provides connection information including public URL, pairing URL, and auth status.
+ * Requires authentication to prevent information leakage.
+ */
+export const serverStatusRouteLayer = HttpRouter.add(
+  "GET",
+  "/api/server/status",
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const serverAuth = yield* ServerAuth;
+    const config = yield* ServerConfig;
+    const httpServer = yield* HttpServer.HttpServer;
+
+    // Authenticate the request
+    yield* serverAuth.authenticateHttpRequest(request);
+
+    const address = httpServer.address;
+    const localPort =
+      typeof address === "object" && address !== null && "port" in address
+        ? address.port
+        : config.port;
+
+    // Use public URL if configured, otherwise construct from host/port
+    const baseUrl = config.publicUrl
+      ? config.publicUrl.toString().replace(/\/$/, "")
+      : `http://${config.host ?? "localhost"}:${localPort}`;
+
+    // Generate pairing URL if we have a review token or can issue one
+    const pairingUrl = config.reviewPairingToken
+      ? `${baseUrl}/pair#token=${encodeURIComponent(config.reviewPairingToken)}`
+      : undefined;
+
+    return HttpServerResponse.jsonUnsafe(
+      {
+        version: 1,
+        mode: config.mode,
+        baseUrl,
+        localPort,
+        host: config.host,
+        pairingUrl,
+        hasReviewToken: !!config.reviewPairingToken,
+        tailscaleServeEnabled: config.tailscaleServeEnabled,
+        tailscaleServePort: config.tailscaleServeEnabled ? config.tailscaleServePort : undefined,
+      },
+      {
+        status: 200,
+        headers: browserApiCorsHeaders,
+      },
+    );
+  }).pipe(Effect.catchTag("AuthError", respondToAuthError)),
 );

@@ -78,6 +78,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          publicUrl: Option.none(),
+          reviewPairingToken: Option.none(),
         },
         Option.none(),
       ).pipe(
@@ -144,6 +146,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.some(true),
           tailscaleServeEnabled: Option.some(true),
           tailscaleServePort: Option.some(8443),
+          publicUrl: Option.none(),
+          reviewPairingToken: Option.none(),
         },
         Option.some("Debug"),
       ).pipe(
@@ -218,6 +222,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.some(false),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          publicUrl: Option.none(),
+          reviewPairingToken: Option.none(),
         },
         Option.none(),
       ).pipe(
@@ -293,6 +299,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          publicUrl: Option.none(),
+          reviewPairingToken: Option.none(),
         },
         Option.none(),
       ).pipe(
@@ -356,6 +364,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          publicUrl: Option.none(),
+          reviewPairingToken: Option.none(),
         },
         Option.none(),
       ).pipe(
@@ -415,6 +425,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          publicUrl: Option.none(),
+          reviewPairingToken: Option.none(),
         },
         Option.some("Debug"),
       ).pipe(
@@ -493,6 +505,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          publicUrl: Option.none(),
+          reviewPairingToken: Option.none(),
         },
         Option.none(),
       ).pipe(
@@ -550,6 +564,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          publicUrl: Option.none(),
+          reviewPairingToken: Option.none(),
         },
         Option.none(),
         {

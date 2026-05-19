@@ -5,7 +5,7 @@ import * as Crypto from "node:crypto";
 const SESSION_COOKIE_NAME = "belweave_session";
 
 export function resolveSessionCookieName(input: {
-  readonly mode: "web" | "desktop";
+  readonly mode: "web" | "desktop" | "server";
   readonly port: number;
 }): string {
   if (input.mode !== "desktop") {

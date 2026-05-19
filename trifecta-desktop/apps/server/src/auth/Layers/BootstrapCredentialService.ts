@@ -96,6 +96,19 @@ export const makeBootstrapCredentialService = Effect.gen(function* () {
     });
   }
 
+  if (config.reviewPairingToken) {
+    const now = yield* DateTime.now;
+    yield* seedGrant(config.reviewPairingToken, {
+      method: "one-time-token",
+      role: "owner",
+      subject: "review-bootstrap",
+      expiresAt: DateTime.add(now, {
+        milliseconds: Duration.toMillis(Duration.days(365)),
+      }),
+      remainingUses: "unbounded",
+    });
+  }
+
   const toBootstrapCredentialError = (message: string) => (cause: unknown) =>
     internalBootstrapCredentialError(message, cause);
 

@@ -6,6 +6,7 @@ import com.belweave.trifecta.core.models.asObjectOrNull
 import com.belweave.trifecta.core.models.bool
 import com.belweave.trifecta.core.models.intAt
 import com.belweave.trifecta.core.models.obj
+import com.belweave.trifecta.core.models.stringOrNull
 import com.belweave.trifecta.core.models.str
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -161,11 +162,11 @@ object EffectRpcDecoder {
                     )
                 } else {
                     val cause = exit.obj("cause") ?: JsonObject(emptyMap())
-                    val error = cause.obj("error")
-                    val errorMessage = error?.str("message")
-                        ?: cause.str("defect")
-                        ?: "Server error"
+                    val error = findErrorPayload(cause)
                     val errorTag = error?.str("_tag")
+                    val errorMessage = taggedErrorMessage(errorTag, error)
+                        ?: findErrorMessage(cause)
+                        ?: "Server error"
                     EffectRpcMessage.Exit(
                         requestId = id,
                         success = false,
@@ -180,4 +181,80 @@ object EffectRpcDecoder {
             else -> EffectRpcMessage.Unknown(element)
         }
     }
+
+    private fun findErrorPayload(value: JsonElement?): JsonObject? {
+        val obj = value.asObjectOrNull()
+        if (obj != null) {
+            obj.obj("error")?.let { return it }
+            obj.values.forEach { child ->
+                val found = findErrorPayload(child)
+                if (found != null) return found
+            }
+            return null
+        }
+        val arr = value.asArrayOrNull() ?: return null
+        arr.forEach { child ->
+            val found = findErrorPayload(child)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun findErrorMessage(value: JsonElement?): String? {
+        val obj = value.asObjectOrNull()
+        if (obj != null) {
+            val directKeys = listOf("message", "detail", "reason", "description", "errorDescription", "defect")
+            directKeys.forEach { key ->
+                val message = obj.str(key)
+                if (!message.isNullOrBlank() && !isRawFingerprint(message)) return message
+            }
+            listOf("error", "cause", "failure", "defect").forEach { key ->
+                findErrorMessage(obj[key])?.let { return it }
+            }
+            obj.values.forEach { child ->
+                findErrorMessage(child)?.let { return it }
+            }
+            return null
+        }
+        val arr = value.asArrayOrNull()
+        if (arr != null) {
+            arr.forEach { child ->
+                findErrorMessage(child)?.let { return it }
+            }
+            return null
+        }
+        val raw = value?.stringOrNull()
+        return if (!raw.isNullOrBlank() && !isRawFingerprint(raw)) raw else null
+    }
+
+    private fun taggedErrorMessage(tag: String?, error: JsonObject?): String? = when (tag) {
+        "SshHostProfileNotFoundError" ->
+            "SSH host profile was not found. Refresh the host list and try again."
+        "SshHostProfileConflictError" ->
+            "An SSH host with this label or address already exists."
+        "SshHostKeyMismatchError" -> {
+            val hostname = error?.str("hostname") ?: "host"
+            val port = error?.intAt("port") ?: 22
+            "Host key mismatch for $hostname:$port. Refusing to connect."
+        }
+        "SshSessionNotFoundError" ->
+            "SSH session is no longer active. Reconnect and try again."
+        "SshSessionTokenInvalidError" -> {
+            val reason = error?.str("reason") ?: "invalid"
+            "SSH session token rejected ($reason). Reconnect and try again."
+        }
+        "SshAuthorizationError" -> {
+            val reason = error?.str("reason") ?: "not authorized"
+            "SSH operation denied: $reason"
+        }
+        "SshSessionLimitError" -> {
+            val limit = error?.intAt("limit") ?: 0
+            if (limit > 0) "SSH session limit reached ($limit). Close another SSH session and try again."
+            else "SSH session limit reached. Close another SSH session and try again."
+        }
+        else -> null
+    }
+
+    private fun isRawFingerprint(value: String): Boolean =
+        value.startsWith("SHA256:") && !value.contains(" ")
 }

@@ -21,6 +21,14 @@ export function isRemoteEnvironmentAuthHttpError(
   return error instanceof RemoteEnvironmentAuthHttpError;
 }
 
+function describeJsonResponseMismatch(response: Response, text: string): string {
+  const contentType = response.headers.get("content-type") ?? "unknown content type";
+  const preview = text.trim().replace(/\s+/g, " ").slice(0, 80);
+  return `Remote auth endpoint returned ${contentType} instead of JSON (${response.status})${
+    preview ? `: ${preview}` : "."
+  }`;
+}
+
 function remoteEndpointUrl(httpBaseUrl: string, pathname: string): string {
   const url = new URL(httpBaseUrl);
   url.pathname = pathname;
@@ -85,7 +93,12 @@ async function fetchRemoteJson<T>(input: {
     );
   }
 
-  return (await response.json()) as T;
+  const text = await response.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch (error) {
+    throw new Error(describeJsonResponseMismatch(response, text), { cause: error });
+  }
 }
 
 export async function bootstrapRemoteBearerSession(input: {

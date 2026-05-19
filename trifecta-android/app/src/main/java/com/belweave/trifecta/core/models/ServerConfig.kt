@@ -223,7 +223,10 @@ private fun String.providerDisplayName(): String =
         .split(' ')
         .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 
-data class ServerRuntimeConfig(val providers: List<ServerProvider>) {
+data class ServerRuntimeConfig(
+    val providers: List<ServerProvider>,
+    val sshEnabled: Boolean = true
+) {
     fun provider(instanceId: ProviderInstanceID): ServerProvider? =
         providers.firstOrNull { it.instanceId == instanceId }
 
@@ -237,7 +240,8 @@ data class ServerRuntimeConfig(val providers: List<ServerProvider>) {
             val providers = obj.arr("providers")
                 ?.mapNotNull { ServerProvider.fromJson(it.asObjectOrNull() ?: return@mapNotNull null) }
                 ?: emptyList()
-            return ServerRuntimeConfig(providers)
+            val sshEnabled = obj.obj("environment")?.obj("capabilities")?.bool("ssh") ?: true
+            return ServerRuntimeConfig(providers = providers, sshEnabled = sshEnabled)
         }
     }
 }

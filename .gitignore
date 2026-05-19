@@ -59,6 +59,9 @@ yarn-error.log*
 # turbo
 .turbo
 
+# server build output (for deployment)
+server/
+
 # trifecta desktop generated artifacts
 trifecta-desktop/.bun/
 trifecta-desktop/.electron-runtime/

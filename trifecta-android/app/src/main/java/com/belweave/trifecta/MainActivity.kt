@@ -26,6 +26,7 @@ import com.belweave.trifecta.designsystem.T3Theme
 import com.belweave.trifecta.designsystem.TranscriptDensity
 import com.belweave.trifecta.features.connection.ConnectionSetupScreen
 import com.belweave.trifecta.features.newthread.NewThreadScreen
+import com.belweave.trifecta.features.ssh.SshScreen
 import com.belweave.trifecta.features.settings.SettingsScreen
 import com.belweave.trifecta.features.thread.ThreadScreen
 import com.belweave.trifecta.features.threads.ThreadsListScreen
@@ -81,6 +82,7 @@ private object Routes {
     const val Threads = "threads"
     const val NewThread = "new-thread"
     const val Settings = "settings"
+    const val Ssh = "ssh"
     const val Thread = "thread/{threadId}"
     fun thread(id: String) = "thread/$id"
 }
@@ -131,13 +133,20 @@ private fun AppNav(
                 },
                 onNewThread = { nav.navigate(Routes.NewThread) },
                 onOpenSettings = { nav.navigate(Routes.Settings) },
-                onOpenArchived = { nav.navigate(Routes.Settings) }
+                onOpenArchived = { nav.navigate(Routes.Settings) },
+                onOpenSsh = { nav.navigate(Routes.Ssh) }
             )
         }
         composable(Routes.Settings) {
             SettingsScreen(
                 isDark = isDark,
-                onDismiss = { nav.popBackStack() }
+                onDismiss = { nav.popBackStack() },
+                onOpenSsh = { nav.navigate(Routes.Ssh) }
+            )
+        }
+        composable(Routes.Ssh) {
+            SshScreen(
+                onBack = { nav.popBackStack() }
             )
         }
         composable(Routes.NewThread) {

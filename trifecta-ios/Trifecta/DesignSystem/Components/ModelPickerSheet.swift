@@ -121,22 +121,26 @@ struct ModelPickerSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            sheetHeader
-                .contentShape(Rectangle())
-                .onTapGesture { blurSearch() }
+        HStack(spacing: 0) {
+            if !isSearching {
+                pickerRail
 
-            HStack(spacing: 0) {
-                if !isSearching {
-                    pickerRail
-                    Divider()
-                        .overlay(T3Color.separator.opacity(0.55))
-                }
+                Divider()
+                    .overlay(T3Color.separator.opacity(0.55))
+                    .frame(maxHeight: .infinity)
+                    .ignoresSafeArea(edges: .vertical)
+            }
+
+            VStack(spacing: 0) {
+                sheetHeader
+                    .contentShape(Rectangle())
+                    .onTapGesture { blurSearch() }
 
                 mainColumn
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             T3Color.surfaceGrouped
                 .ignoresSafeArea(edges: .all)
@@ -175,7 +179,8 @@ struct ModelPickerSheet: View {
                 .buttonStyle(.plain)
         }
         .padding(.horizontal, T3Spacing.md)
-        .padding(.vertical, T3Spacing.sm)
+        .padding(.top, T3Spacing.xl)
+        .padding(.bottom, T3Spacing.sm)
     }
 
     /// Main list + search — keeps keyboard dismissal gestures off the sidebar rail.
@@ -244,11 +249,16 @@ struct ModelPickerSheet: View {
                 comingSoonCopilotRail
             }
             .padding(.horizontal, 6)
-            .padding(.vertical, 10)
-            .frame(width: railWidth)
+            .padding(.top, T3Spacing.xl)
+            .padding(.bottom, 10)
+            .frame(width: railWidth, alignment: .top)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .frame(width: railWidth)
-        .background(railBackground)
+        .background {
+            railBackground
+        }
+        .ignoresSafeArea(edges: .vertical)
     }
 
     private var railWidth: CGFloat { 54 }

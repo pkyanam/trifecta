@@ -172,7 +172,7 @@ describe("retainThreadDetailSubscription", () => {
             label: "Remote env",
             platform: { os: "darwin", arch: "arm64" },
             serverVersion: "0.0.0-test",
-            capabilities: { repositoryIdentity: true },
+            capabilities: { repositoryIdentity: true, ssh: false },
           },
         })),
       },
