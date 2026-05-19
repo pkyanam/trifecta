@@ -117,6 +117,11 @@ function createTestClient() {
         });
       }
     },
+    emitConfigEvent: (event: any) => {
+      for (const listener of configListeners) {
+        listener(event);
+      }
+    },
     emitShellSnapshot: (snapshotSequence: number) => {
       for (const listener of shellListeners) {
         listener({
@@ -234,6 +239,57 @@ describe("createEnvironmentConnection", () => {
       expect.objectContaining({ snapshotSequence: 2 }),
       environmentId,
     );
+
+    await connection.dispose();
+  });
+
+  it("forwards all observed config stream events", async () => {
+    const environmentId = EnvironmentId.make("env-1");
+    const { client, emitConfigEvent } = createTestClient();
+    const onConfigEvent = vi.fn();
+    const onConfigSnapshot = vi.fn();
+
+    const connection = createEnvironmentConnection({
+      kind: "saved",
+      knownEnvironment: {
+        id: "env-1",
+        label: "Remote env",
+        source: "manual",
+        target: {
+          httpBaseUrl: "http://example.test",
+          wsBaseUrl: "ws://example.test",
+        },
+        environmentId,
+      },
+      client,
+      onConfigEvent,
+      onConfigSnapshot,
+      applyShellEvent: vi.fn(),
+      syncShellSnapshot: vi.fn(),
+      applyTerminalEvent: vi.fn(),
+    });
+
+    const providerStatusesEvent = {
+      version: 1,
+      type: "providerStatuses",
+      payload: { providers: [] },
+    };
+    const snapshotEvent = {
+      version: 1,
+      type: "snapshot",
+      config: {
+        environment: {
+          environmentId,
+        },
+      },
+    };
+
+    emitConfigEvent(providerStatusesEvent);
+    emitConfigEvent(snapshotEvent);
+
+    expect(onConfigEvent).toHaveBeenNthCalledWith(1, providerStatusesEvent);
+    expect(onConfigEvent).toHaveBeenNthCalledWith(2, snapshotEvent);
+    expect(onConfigSnapshot).toHaveBeenCalledWith(snapshotEvent.config);
 
     await connection.dispose();
   });
