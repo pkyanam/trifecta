@@ -436,12 +436,62 @@ export const AntigravitySettings = makeProviderSettingsSchema(
       Schema.withDecodingDefault(Effect.succeed(false)),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
+    useSdkHarness: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(false)),
+      Schema.annotateKey({
+        title: "Use SDK harness (requires API key)",
+        description:
+          "Opt into the Google Antigravity SDK local harness for stateful conversations, streaming, tool events, approvals, and SDK-managed session resume. This path currently requires a Gemini API key; leave it off to use the OAuth-capable `agy -p` CLI fallback.",
+        providerSettingsForm: {
+          control: "switch",
+        },
+      }),
+    ),
+    apiKey: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "SDK API key",
+        description:
+          "Gemini API key used only when SDK harness mode is enabled. The Antigravity SDK currently does not support Google OAuth / AI Pro account login.",
+        providerSettingsForm: {
+          control: "password",
+          placeholder: "AIza…",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+    pythonPath: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Python path",
+        description:
+          "Optional override for the Python executable used to run the Antigravity SDK bridge. The selected Python environment must have `google-antigravity` installed from PyPI.",
+        providerSettingsForm: {
+          control: "text",
+          placeholder: "/opt/homebrew/bin/python3",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
+    saveDirectory: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "SDK save directory",
+        description:
+          "Optional directory for Antigravity SDK conversation state. Leave empty to use `~/.trifecta/antigravity-sdk`.",
+        providerSettingsForm: {
+          control: "text",
+          placeholder: "~/.trifecta/antigravity-sdk",
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
     binaryPath: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
         title: "Antigravity CLI path",
         description:
-          "Optional override. By default Trifecta runs the `agy` CLI on your PATH. Antigravity CLI does not currently expose ACP mode, so Trifecta uses print mode (`agy -p …`) and carries a bounded chat transcript between turns.",
+          "Optional override for print-mode fallback. By default Trifecta runs the `agy` CLI on your PATH when the SDK harness is disabled.",
         providerSettingsForm: {
           control: "text",
           placeholder: "/opt/homebrew/bin/agy",
@@ -450,7 +500,7 @@ export const AntigravitySettings = makeProviderSettingsSchema(
       }),
     ),
   },
-  { order: ["binaryPath"] },
+  { order: ["useSdkHarness", "apiKey", "pythonPath", "saveDirectory", "binaryPath"] },
 );
 export type AntigravitySettings = typeof AntigravitySettings.Type;
 
@@ -628,6 +678,10 @@ const GeminiSettingsPatch = Schema.Struct({
 
 const AntigravitySettingsPatch = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
+  useSdkHarness: Schema.optionalKey(Schema.Boolean),
+  apiKey: Schema.optionalKey(TrimmedString),
+  pythonPath: Schema.optionalKey(TrimmedString),
+  saveDirectory: Schema.optionalKey(TrimmedString),
   binaryPath: Schema.optionalKey(TrimmedString),
 });
 

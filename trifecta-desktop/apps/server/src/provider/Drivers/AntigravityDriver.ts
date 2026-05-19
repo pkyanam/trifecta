@@ -9,12 +9,13 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import type { TextGenerationShape } from "../../textGeneration/TextGeneration.ts";
 import { ProviderDriverError } from "../Errors.ts";
 import { makeAntigravityHeadlessAdapter } from "../Layers/AntigravityHeadlessAdapter.ts";
+import { makeAntigravitySdkAdapter } from "../Layers/AntigravitySdkAdapter.ts";
 import {
   checkAntigravityProviderStatus,
   makePendingAntigravityProvider,
 } from "../Layers/AntigravityProvider.ts";
 import { makeManagedServerProvider } from "../makeManagedServerProvider.ts";
-import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMaintenance.ts";
+import { makeProviderMaintenanceCapabilities } from "../providerMaintenance.ts";
 import {
   defaultProviderContinuationIdentity,
   type ProviderDriver,
@@ -28,9 +29,14 @@ const decodeAntigravitySettings = Schema.decodeSync(AntigravitySettings);
 const DRIVER_KIND = ProviderDriverKind.make("antigravity");
 const SNAPSHOT_REFRESH_INTERVAL = Duration.minutes(5);
 const DEFAULT_ANTIGRAVITY_CLI_COMMAND = "agy";
+const DEFAULT_PYTHON_COMMAND = "python3";
 
 function antigravityCli(config: AntigravitySettings): string {
   return config.binaryPath?.trim() || DEFAULT_ANTIGRAVITY_CLI_COMMAND;
+}
+
+function antigravityPython(config: AntigravitySettings): string {
+  return config.pythonPath?.trim() || DEFAULT_PYTHON_COMMAND;
 }
 
 const unsupportedTextGeneration: TextGenerationShape = {
@@ -106,11 +112,20 @@ export const AntigravityDriver: ProviderDriver<AntigravitySettings, AntigravityD
         continuationGroupKey: continuationIdentity.continuationKey,
       });
 
-      const adapter = yield* makeAntigravityHeadlessAdapter({
-        antigravityCli: antigravityCli(effectiveConfig),
-        environment: processEnv,
-        instanceId,
-      });
+      const adapter =
+        effectiveConfig.useSdkHarness === false
+          ? yield* makeAntigravityHeadlessAdapter({
+              antigravityCli: antigravityCli(effectiveConfig),
+              environment: processEnv,
+              instanceId,
+            })
+          : yield* makeAntigravitySdkAdapter({
+              pythonPath: antigravityPython(effectiveConfig),
+              saveDirectory: effectiveConfig.saveDirectory?.trim() || undefined,
+              apiKey: effectiveConfig.apiKey?.trim() || undefined,
+              environment: processEnv,
+              instanceId,
+            });
 
       const checkProvider = checkAntigravityProviderStatus(effectiveConfig, processEnv).pipe(
         Effect.map(stampIdentity),
@@ -118,9 +133,12 @@ export const AntigravityDriver: ProviderDriver<AntigravitySettings, AntigravityD
       );
 
       const snapshot = yield* makeManagedServerProvider<AntigravitySettings>({
-        maintenanceCapabilities: makeManualOnlyProviderMaintenanceCapabilities({
+        maintenanceCapabilities: makeProviderMaintenanceCapabilities({
           provider: DRIVER_KIND,
-          packageName: null,
+          packageName: "google-antigravity",
+          updateExecutable: antigravityPython(effectiveConfig),
+          updateArgs: ["-m", "pip", "install", "--upgrade", "google-antigravity"],
+          updateLockKey: `python-pip:${antigravityPython(effectiveConfig)}`,
         }),
         getSettings: Effect.succeed(effectiveConfig),
         streamSettings: Stream.never,

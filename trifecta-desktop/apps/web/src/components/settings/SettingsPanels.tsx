@@ -1057,15 +1057,20 @@ export function ProviderSettingsPanel() {
       });
   }, [refreshActiveProviders]);
 
-  const runProviderUpdate = useCallback(async (candidate: ProviderUpdateCandidate) => {
+  const runProviderMaintenance = useCallback(async (input: {
+    readonly driver: ProviderDriverKind;
+    readonly instanceId: ProviderInstanceId;
+    readonly label: string;
+    readonly failureVerb: string;
+  }) => {
     let started = false;
     setUpdatingProviderDrivers((previous) => {
-      if (previous.has(candidate.driver)) {
+      if (previous.has(input.driver)) {
         return previous;
       }
       started = true;
       const next = new Set(previous);
-      next.add(candidate.driver);
+      next.add(input.driver);
       return next;
     });
     if (!started) {
@@ -1074,31 +1079,42 @@ export function ProviderSettingsPanel() {
 
     try {
       await updateActiveProvider({
-        provider: candidate.driver,
-        instanceId: candidate.instanceId,
+        provider: input.driver,
+        instanceId: input.instanceId,
       });
     } catch (error) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: `Could not update ${PROVIDER_DISPLAY_NAMES[candidate.driver] ?? candidate.driver}`,
+          title: `Could not ${input.failureVerb} ${input.label}`,
           description:
             error instanceof Error
               ? error.message
-              : "The provider update command could not be started.",
+              : "The provider command could not be started.",
         }),
       );
     } finally {
       setUpdatingProviderDrivers((previous) => {
-        if (!previous.has(candidate.driver)) {
+        if (!previous.has(input.driver)) {
           return previous;
         }
         const next = new Set(previous);
-        next.delete(candidate.driver);
+        next.delete(input.driver);
         return next;
       });
     }
   }, [updateActiveProvider]);
+
+  const runProviderUpdate = useCallback(
+    async (candidate: ProviderUpdateCandidate) =>
+      runProviderMaintenance({
+        driver: candidate.driver,
+        instanceId: candidate.instanceId,
+        label: PROVIDER_DISPLAY_NAMES[candidate.driver] ?? candidate.driver,
+        failureVerb: "update",
+      }),
+    [runProviderMaintenance],
+  );
 
   interface InstanceRow {
     readonly instanceId: ProviderInstanceId;
@@ -1331,6 +1347,7 @@ export function ProviderSettingsPanel() {
           const showInlineUpdateButton =
             updateCandidate !== undefined &&
             hasOneClickUpdateProviderCandidate(updateCandidate, serverProviders);
+          const showSdkSetupAction = row.driver === ProviderDriverKind.make("antigravity");
           const canRunInlineUpdate =
             updateCandidate !== undefined &&
             canOneClickUpdateProviderCandidate(updateCandidate, serverProviders) &&
@@ -1407,7 +1424,38 @@ export function ProviderSettingsPanel() {
                     }
                   : undefined
               }
-              isUpdating={showInlineUpdateButton ? isDriverUpdateRunning : undefined}
+              setupAction={
+                showSdkSetupAction
+                  ? {
+                      label: "Antigravity SDK setup",
+                      description:
+                        "Installs or upgrades the Google Antigravity SDK in the selected Python environment. SDK harness mode still requires an API key in the settings above.",
+                      command: `${
+                        typeof row.instance.config === "object" &&
+                        row.instance.config !== null &&
+                        typeof (row.instance.config as { pythonPath?: unknown }).pythonPath ===
+                          "string" &&
+                        (row.instance.config as { pythonPath?: string }).pythonPath?.trim()
+                          ? (row.instance.config as { pythonPath: string }).pythonPath.trim()
+                          : "python3"
+                      } -m pip install --upgrade google-antigravity`,
+                      onRun: () => {
+                        if (isDriverUpdateRunning) {
+                          return;
+                        }
+                        void runProviderMaintenance({
+                          driver: row.driver,
+                          instanceId: row.instanceId,
+                          label: "Antigravity SDK",
+                          failureVerb: "install",
+                        });
+                      },
+                    }
+                  : undefined
+              }
+              isUpdating={
+                showInlineUpdateButton || showSdkSetupAction ? isDriverUpdateRunning : undefined
+              }
             />
           );
         })}

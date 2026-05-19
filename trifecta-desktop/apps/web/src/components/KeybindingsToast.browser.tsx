@@ -146,6 +146,10 @@ function createBaseServerConfig(): ServerConfig {
         },
         antigravity: {
           enabled: true,
+          useSdkHarness: false,
+          apiKey: "",
+          pythonPath: "",
+          saveDirectory: "",
           binaryPath: "",
         },
         acpRegistry: {

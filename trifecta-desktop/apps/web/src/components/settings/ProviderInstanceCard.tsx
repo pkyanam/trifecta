@@ -419,6 +419,14 @@ interface ProviderInstanceCardProps {
   readonly onFavoriteModelsChange: (next: ReadonlyArray<string>) => void;
   readonly onModelOrderChange: (next: ReadonlyArray<string>) => void;
   readonly onRunUpdate?: (() => void) | undefined;
+  readonly setupAction?:
+    | {
+        readonly label: string;
+        readonly description: string;
+        readonly command: string;
+        readonly onRun: () => void;
+      }
+    | undefined;
   readonly isUpdating?: boolean | undefined;
 }
 
@@ -463,6 +471,7 @@ export function ProviderInstanceCard({
   onFavoriteModelsChange,
   onModelOrderChange,
   onRunUpdate,
+  setupAction,
   isUpdating = false,
 }: ProviderInstanceCardProps) {
   const enabled = instance.enabled ?? true;
@@ -491,8 +500,8 @@ export function ProviderInstanceCard({
     onCopy: ({ providerName }) => {
       toastManager.add({
         type: "success",
-        title: `${providerName} update command copied`,
-        description: "Run it in a terminal when you are ready to update.",
+        title: `${providerName} command copied`,
+        description: "Run it in a terminal when you are ready.",
       });
     },
     onError: (error, { providerName }) => {
@@ -834,6 +843,54 @@ export function ProviderInstanceCard({
                 variant="card"
                 onChange={updateConfig}
               />
+            ) : null}
+
+            {setupAction ? (
+              <div className="border-t border-border/60 px-4 py-3 sm:px-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-xs font-medium text-foreground">{setupAction.label}</p>
+                    <p className="text-xs leading-snug text-muted-foreground">
+                      {setupAction.description}
+                    </p>
+                    <code className="block overflow-x-auto whitespace-nowrap rounded-md border border-border/70 bg-muted/40 px-2 py-1 font-mono text-[11px] text-foreground [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {setupAction.command}
+                    </code>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            size="icon-xs"
+                            variant="ghost"
+                            onClick={() =>
+                              void copyToClipboard(setupAction.command, {
+                                providerName: displayName,
+                              })
+                            }
+                            aria-label={`Copy ${displayName} setup command`}
+                          >
+                            <CopyIcon className="size-3.5" />
+                          </Button>
+                        }
+                      />
+                      <TooltipPopup side="top">Copy command</TooltipPopup>
+                    </Tooltip>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      disabled={isUpdating}
+                      onClick={setupAction.onRun}
+                    >
+                      {isUpdating ? <LoaderIcon className="animate-spin" /> : <DownloadIcon />}
+                      {isUpdating ? "Installing" : "Install"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
             ) : null}
 
             {driverOption !== undefined ? (
