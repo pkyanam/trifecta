@@ -39,7 +39,7 @@ class PairingFlow(private val httpClient: OkHttpClient = defaultClient()) {
         withContext(Dispatchers.IO) {
             val url = serverBaseURL(serverURL).toHttpUrlOrNull()
                 ?.newBuilder()
-                ?.addPathSegments(".well-known/t3/environment")
+                ?.addPathSegments(".well-known/belweave/environment")
                 ?.build()
                 ?: throw T3Error.PairingFailed("Invalid server URL")
 

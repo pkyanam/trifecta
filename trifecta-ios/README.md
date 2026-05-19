@@ -92,7 +92,7 @@ A single long-lived WebSocket carries all communication:
 ### Auth Flow
 
 1. Desktop app emits a pairing URL
-2. iOS parses the URL and fetches `/.well-known/t3/environment`
+2. iOS parses the URL and fetches `/.well-known/belweave/environment`
 3. POST `/api/auth/bootstrap/bearer` exchanges the credential for a bearer token
 4. Bearer token is saved to Keychain (`kSecClassGenericPassword`)
 5. On every WebSocket connect, a fresh `wsToken` is minted via `POST /api/auth/ws-token`

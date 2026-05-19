@@ -96,7 +96,7 @@ A single long-lived OkHttp WebSocket carries all communication:
 
 1. Desktop app emits a pairing URL
 2. Android parses the URL (also supports `trifecta://` deep links)
-3. GET `/.well-known/t3/environment` for server info
+3. GET `/.well-known/belweave/environment` for server info
 4. POST `/api/auth/bootstrap/bearer` exchanges credential for bearer token
 5. Bearer token saved to `EncryptedSharedPreferences`
 6. Fresh `wsToken` minted before every WebSocket connect

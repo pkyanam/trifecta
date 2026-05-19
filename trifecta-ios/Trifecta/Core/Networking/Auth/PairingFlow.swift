@@ -10,23 +10,7 @@ enum PairingFlow {
     }
 
     static func fetchEnvironment(serverURL: URL) async throws -> EnvironmentDescriptor {
-        let baseURL = serverBaseURL(from: serverURL)
-        let urls = [
-            baseURL.appendingPathComponent(".well-known/belweave/environment"),
-            baseURL.appendingPathComponent(".well-known/t3/environment")
-        ]
-        var lastFailure: Error?
-        for url in urls {
-            do {
-                return try await fetchEnvironment(url: url)
-            } catch {
-                lastFailure = error
-            }
-        }
-        throw lastFailure ?? T3Error.pairingFailed("Invalid environment descriptor")
-    }
-
-    private static func fetchEnvironment(url: URL) async throws -> EnvironmentDescriptor {
+        let url = serverBaseURL(from: serverURL).appendingPathComponent(".well-known/belweave/environment")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = 10
