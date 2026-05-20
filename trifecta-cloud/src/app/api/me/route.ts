@@ -7,5 +7,7 @@ export async function GET() {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const isAdmin = await getIsAdmin();
-  return NextResponse.json({ isAdmin });
+  // Return userId so the UI can display it for admin provisioning.
+  // This is the user's own ID — safe to expose to themselves.
+  return NextResponse.json({ isAdmin, userId });
 }
