@@ -1,66 +1,165 @@
-import Image from "next/image"
+"use client"
+
 import Link from "next/link"
+import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
+import { Sun, Moon, Menu, X } from "lucide-react"
 
 export function Nav() {
+  const { theme, setTheme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-white/[0.04] bg-[#050505]/80 backdrop-blur-xl">
+    <nav className="relative z-50 w-full border-b border-border/40 bg-background/50 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="relative h-6 w-6 overflow-hidden rounded-lg">
-            <Image
-              src="/trifecta-logo.png"
-              alt="trifecta"
-              fill
-              className="object-cover"
-              priority
-            />
-          </div>
-          <span className="text-[11px] font-medium tracking-[0.25em] text-[#ececec] uppercase">
-            trifecta
+        {/* Brand */}
+        <Link href="/" className="flex items-center gap-2">
+          <span className="text-base font-bold tracking-tight text-foreground">
+            Trifecta
           </span>
         </Link>
-        <div className="hidden items-center gap-8 text-xs text-[#666] md:flex">
-          <Link href="/" className="transition-colors hover:text-[#ececec]">product</Link>
-          <Link href="/developers" className="transition-colors hover:text-[#ececec]">developers</Link>
-          <Link href="/docs" className="transition-colors hover:text-[#ececec]">docs</Link>
-        </div>
-        <div className="hidden md:flex">
+
+        {/* Right navigation items */}
+        <div className="hidden items-center gap-5 md:flex">
           <Link
             href="https://github.com/pkyanam/trifecta"
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.08] px-4 text-[11px] text-[#ececec] transition-colors hover:border-white/[0.15] hover:bg-white/[0.02]"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
-            get trifecta
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#666]">
-              <path d="M2.5 6H9.5M9.5 6L6.5 3M9.5 6L6.5 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            GitHub
           </Link>
+          <Link
+            href="https://testflight.apple.com/join/M5FkR4R8"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            iOS (TestFlight)
+          </Link>
+          <Link
+            href="https://forms.gle/WPHxw8axUs6QanXBA"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Android (Beta)
+          </Link>
+
+          <span className="h-4 w-px bg-border/60 mx-1" />
+
+          {/* Launch Web App Button */}
+          <Link
+            href="https://app.trifecta.belweave.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-9 items-center justify-center rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground hover:opacity-90 active:scale-95 transition-all shadow-sm"
+          >
+            Launch Web App
+          </Link>
+
+          {/* Theme Switcher */}
+          {mounted && (
+            <button
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground"
+              aria-label="Toggle theme"
+            >
+              {resolvedTheme === "dark" ? (
+                <Sun className="h-4 w-4 text-amber-500" />
+              ) : (
+                <Moon className="h-4 w-4 text-neutral-600" />
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* Mobile controls */}
+        <div className="flex items-center gap-2 md:hidden">
+          {mounted && (
+            <button
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground"
+            >
+              {resolvedTheme === "dark" ? <Sun className="h-4 w-4 text-amber-500" /> : <Moon className="h-4 w-4 text-neutral-600" />}
+            </button>
+          )}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground"
+          >
+            {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile drawer */}
+      {mobileMenuOpen && (
+        <div className="border-b border-border bg-background px-6 py-4 md:hidden animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex flex-col gap-3 font-semibold text-sm">
+            <Link
+              href="https://github.com/pkyanam/trifecta"
+              target="_blank"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground py-1"
+            >
+              GitHub
+            </Link>
+            <Link
+              href="https://app.trifecta.belweave.com"
+              target="_blank"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-muted-foreground hover:text-foreground py-1"
+            >
+              Launch Web App
+            </Link>
+            <Link
+              href="https://testflight.apple.com/join/M5FkR4R8"
+              target="_blank"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-muted-foreground hover:text-foreground py-1"
+            >
+              iOS (TestFlight)
+            </Link>
+            <Link
+              href="https://forms.gle/WPHxw8axUs6QanXBA"
+              target="_blank"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-muted-foreground hover:text-foreground py-1"
+            >
+              Android (Beta)
+            </Link>
+          </div>
+        </div>
+      )}
     </nav>
   )
 }
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/[0.04] bg-[#050505]">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-6 sm:flex-row">
-        <div className="flex items-center gap-2.5">
-          <div className="relative h-5 w-5 overflow-hidden rounded-md">
-            <Image
-              src="/trifecta-logo.png"
-              alt="trifecta"
-              fill
-              className="object-cover"
-            />
-          </div>
-          <span className="text-[10px] font-medium tracking-[0.2em] text-[#ececec] uppercase">
-            trifecta
-          </span>
-          <span className="text-[9px] tracking-[0.15em] text-[#333] uppercase">by belweave</span>
+    <footer className="border-t border-border/30 bg-background py-10">
+      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 sm:flex-row text-sm text-muted-foreground font-semibold">
+        <div>
+          <span>© 2026 Belweave · Apache 2.0 licensed</span>
         </div>
-        <p className="text-[10px] text-[#333]">
-          &copy; {new Date().getFullYear()} belweave. all rights reserved.
-        </p>
+        <div className="flex items-center gap-6">
+          <Link href="https://github.com/pkyanam/trifecta" target="_blank" className="hover:text-foreground transition-colors">
+            GitHub
+          </Link>
+          <Link href="https://discord.gg/jn4EGJjrvv" target="_blank" className="hover:text-foreground transition-colors">
+            Discord
+          </Link>
+          <Link href="https://app.trifecta.belweave.com" target="_blank" className="hover:text-foreground transition-colors">
+            Web App
+          </Link>
+        </div>
       </div>
     </footer>
   )

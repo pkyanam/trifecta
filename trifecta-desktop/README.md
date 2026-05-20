@@ -1,27 +1,25 @@
-# Trifecta
+# Trifecta Desktop
 
-Trifecta is a coding agent platform with a desktop server, web UI, and native mobile clients. It supports **eight** coding agents behind a single unified interface.
+The core of the Trifecta platform: a Node.js server that orchestrates AI coding agents, the web UI it serves, an Electron desktop app, and a VS Code / Cursor extension — all in one Turborepo + Bun monorepo.
 
-Companion mobile apps for <a href="../trifecta-ios/">iOS</a> and <a href="../trifecta-android/">Android</a> are also available — they work with Belweave-powered Trifecta Desktop servers.
+It wraps **nine** coding agents behind a single interface, and pairs with the companion [iOS](../trifecta-ios) and [Android](../trifecta-android) apps over the same protocol.
 
-## Installation
+## Install
 
-> [!WARNING]
-> Trifecta supports multiple coding agents. Install and authenticate at least one before use:
->
-> **Native providers:**
->
-> - [Codex](https://developers.openai.com/codex/cli): `codex login`
-> - [Claude Code](https://claude.com/product/claude-code): `claude auth login`
-> - [OpenCode](https://opencode.ai): `opencode auth login`
-> - [Gemini CLI](https://github.com/google-gemini/gemini-cli): `npm i -g @google/gemini-cli` + set `GEMINI_API_KEY`
->
-> **ACP providers (Agent Client Protocol):**
->
-> - [Cursor](https://cursor.sh): comes with the Cursor IDE (`cursor auth login`)
-> - [Hermes Agent](https://github.com/NousResearch/hermes-agent): `hermes setup`
-> - [Devin](https://devin.ai): `devin acp`
-> - **ACP Registry**: any [ACP](https://agentclientprotocol.com)-compatible agent (configurable command + args)
+> [!IMPORTANT]
+> Trifecta drives agents you already have installed. Set up and authenticate at least one before pairing a client.
+
+| Agent | Connection | Install / sign in |
+|---|---|---|
+| **Codex** | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) · `codex login` |
+| **Claude Code** | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) · `claude auth login` |
+| **OpenCode** | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) · `opencode auth login` |
+| **Gemini** | Headless CLI | [Gemini CLI](https://github.com/google-gemini/gemini-cli) · `npm i -g @google/gemini-cli` |
+| **Antigravity** | Python SDK / CLI | Google Antigravity · `google-antigravity` SDK or the `agy` CLI |
+| **Cursor** | ACP (stdio) | [Cursor](https://cursor.sh) · bundled `cursor-agent` *(Early Access)* |
+| **Hermes** | ACP (stdio) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) · `hermes setup` |
+| **Devin** | ACP (stdio) | [Devin](https://devin.ai) · `devin acp` |
+| **ACP Registry** | ACP (stdio) | Any [ACP](https://agentclientprotocol.com)-compatible agent (configurable command + args) |
 
 ### Run without installing
 
@@ -31,75 +29,100 @@ npx @belweave/trifecta
 
 ### Desktop app
 
-Install the latest version of the desktop app from [GitHub Releases](https://github.com/pkyanam/trifecta/releases), or from your favorite package registry:
-
-#### Windows (`winget`)
+Grab the latest build from [GitHub Releases](https://github.com/pkyanam/trifecta/releases), or a package registry:
 
 ```bash
-winget install Belweave.T3Code
-```
-
-#### macOS (Homebrew)
-
-```bash
+# macOS (Homebrew)
 brew install --cask belweave-code
-```
 
-#### Arch Linux (AUR)
+# Windows (winget)
+winget install Belweave.T3Code
 
-```bash
+# Arch Linux (AUR)
 yay -S belweave-bin
 ```
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│              Electron Desktop Shell                  │
-│  ┌───────────────────────────────────────────────┐  │
-│  │           React/Vite Web UI                    │  │
-│  └──────────────────┬────────────────────────────┘  │
-│                     │ WebSocket                      │
-│  ┌──────────────────▼────────────────────────────┐  │
-│  │         Node.js Server (Effect-TS)             │  │
-│  │  ┌─────────────────────────────────────────┐  │  │
-│  │  │         Provider Registry                │  │  │
-│  │  │  Codex │ Claude │ Gemini │ Cursor        │  │  │
-│  │  │  Hermes │ Devin │ OpenCode │ ACP Registry │  │  │
-│  │  └─────────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                  Electron desktop shell                   │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │            React 19 + Vite web UI (@belweave/web)    │  │
+│  └───────────────────────┬────────────────────────────┘  │
+│                          │ WebSocket · Effect RPC         │
+│  ┌───────────────────────▼────────────────────────────┐  │
+│  │         Node.js server (Effect-TS, @belweave/trifecta)│ │
+│  │  ┌──────────────────────────────────────────────┐   │  │
+│  │  │               Provider registry               │   │  │
+│  │  │  Codex · Claude · OpenCode · Gemini · Antigrav │   │  │
+│  │  │  Cursor · Hermes · Devin · ACP Registry        │   │  │
+│  │  └──────────────────────────────────────────────┘   │  │
+│  └─────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────┘
+       │ stdio (JSON-RPC / ACP)            ▲ WebSocket
+       ▼                                   │
+  agent subprocesses              iOS · Android · VS Code clients
 ```
 
-### Tech Stack
+The same server binary backs the desktop app, the VS Code extension, and remote/self-hosted deployments. The web UI is just a client — every client speaks the same WebSocket RPC.
 
-| Layer     | Technology                                 |
-| --------- | ------------------------------------------ |
-| Runtime   | Electron 41 (desktop), Node.js (server)    |
-| Framework | Effect-TS (functional effect system)       |
-| Build     | Turborepo, tsdown, Vite 8                  |
-| Web UI    | React 19, Tailwind CSS 4, Zustand, Lexical |
-| Linting   | oxlint + oxfmt (Oxidation toolchain)       |
-| Agents    | 8 providers via JSON-RPC or ACP over stdio |
+### Workspace
 
-## Some notes
+**Apps**
 
-We are very very early in this project. Expect bugs.
+| Package | Path | Role |
+|---|---|---|
+| `@belweave/trifecta` | `apps/server` | Agent-orchestration server — Effect-TS, WebSocket RPC, provider registry, Git, SSH |
+| `@belweave/web` | `apps/web` | Web UI — React 19, Vite 8, Tailwind 4, Zustand, Lexical |
+| `@belweave/desktop` | `apps/desktop` | Electron shell + auto-update |
+| `trifecta-ide` | `apps/vscode` | VS Code / Cursor extension ([README](./apps/vscode/README.md)) |
+| `@belweave/marketing` | `apps/marketing` | In-repo marketing site (Astro) |
 
-We are not accepting contributions yet.
+**Packages**
 
-Observability guide: [docs/observability.md](./docs/observability.md)
+| Package | Path | Role |
+|---|---|---|
+| `@belweave/contracts` | `packages/contracts` | Effect Schema contracts — events, RPC, models, settings (schema only) |
+| `@belweave/shared` | `packages/shared` | Shared runtime utilities (git, stores, helpers) |
+| `@belweave/client-runtime` | `packages/client-runtime` | Client-side WebSocket / RPC runtime |
+| `@belweave/ssh` | `packages/ssh` | SSH terminal + tunnel helpers |
+| `@belweave/tailscale` | `packages/tailscale` | Tailscale integration for remote access |
+| `effect-acp` | `packages/effect-acp` | Effect bindings for the Agent Client Protocol |
+| `effect-codex-app-server` | `packages/effect-codex-app-server` | Effect bindings for the Codex app-server protocol |
+| `oxlint-plugin-trifecta` | `oxlint-plugin-trifecta` | Custom oxlint rules |
 
-## If you REALLY want to contribute still.... read this first
+### Tech stack
 
-Before local development, prepare the environment and install dependencies:
+| Layer | Technology |
+|---|---|
+| Runtime | Electron 41 (desktop), Node.js (server) |
+| Framework | Effect-TS (functional effect system) |
+| Build | Turborepo, tsdown, Vite 8 |
+| Web UI | React 19, Tailwind CSS 4, Zustand, Lexical |
+| Lint / format | oxlint + oxfmt (Oxc toolchain) |
+| Agents | 9 providers via JSON-RPC or ACP over stdio |
+
+## Development
 
 ```bash
-# Optional: only needed if you use mise for dev tool management.
+# Optional — only if you manage dev tools with mise
 mise install
-bun install .
+
+bun install
+bun run dev            # server + web
+bun run dev:desktop    # Electron shell
 ```
 
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening an issue or PR.
+Useful scripts: `bun run build`, `bun run typecheck`, `bun run test`, `bun run lint`, `bun run fmt`. Filter to a package with Turbo, e.g. `bun run build --filter=@belweave/trifecta --filter=@belweave/web`.
 
-Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).
+## More docs
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — read before opening an issue or PR
+- [DEPLOY.md](./DEPLOY.md) · [REMOTE.md](./REMOTE.md) — self-hosting and remote access
+- [docs/observability.md](./docs/observability.md) — logging and tracing
+- [docs/providers/](./docs/providers) · [docs/source-control-providers.md](./docs/source-control-providers.md)
+
+## Status
+
+We're very early — expect bugs, and we're not accepting external contributions yet. Need help? Join the [Discord](https://discord.gg/jn4EGJjrvv).
