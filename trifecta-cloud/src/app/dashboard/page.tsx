@@ -5,13 +5,15 @@ import { Navbar } from '@/components/Navbar';
 import { SandboxCard } from '@/components/SandboxCard';
 import { CreateSandboxModal } from '@/components/CreateSandboxModal';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { Plus, Box, Play, CircleDot, AlertTriangle } from 'lucide-react';
+import { Plus, Box, Play, CircleDot, AlertTriangle, Copy, Check } from 'lucide-react';
 import type { SandboxRecord } from '@/lib/types';
 
 export default function Dashboard() {
   const [sandboxes, setSandboxes] = useState<SandboxRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [clerkUserId, setClerkUserId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
   const fetchSandboxes = useCallback(async () => {
@@ -34,9 +36,19 @@ export default function Dashboard() {
   useEffect(() => {
     fetch('/api/me')
       .then((r) => r.json())
-      .then((d) => setIsAdmin(d.isAdmin === true))
+      .then((d) => {
+        setIsAdmin(d.isAdmin === true);
+        if (d.userId) setClerkUserId(d.userId);
+      })
       .catch(() => setIsAdmin(false));
   }, []);
+
+  const copyUserId = () => {
+    if (!clerkUserId) return;
+    navigator.clipboard.writeText(clerkUserId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const running = sandboxes.filter((s) => s.status === 'running').length;
   const stopped = sandboxes.filter((s) => s.status === 'stopped').length;
@@ -68,8 +80,38 @@ export default function Dashboard() {
         {/* Guest notice */}
         {!isAdmin && !loading && (
           <div className="guest-notice" style={{ marginBottom: '28px' }}>
-            <strong>Guest access</strong> — Sandbox creation requires an admin account.
-            Payments &amp; self-serve plans are coming soon.
+            <div style={{ marginBottom: clerkUserId ? '10px' : 0 }}>
+              <strong>Guest access</strong> — Sandbox creation requires an admin account.
+              Payments &amp; self-serve plans are coming soon.
+            </div>
+            {clerkUserId && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                <span style={{ color: '#555', fontSize: '12px', flexShrink: 0 }}>Your Clerk ID:</span>
+                <code style={{
+                  fontFamily: 'SF Mono, Fira Code, Menlo, monospace',
+                  fontSize: '12px',
+                  background: '#1a1a1a',
+                  border: '1px solid #2a2a2a',
+                  borderRadius: '4px',
+                  padding: '2px 8px',
+                  color: '#888',
+                  flex: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {clerkUserId}
+                </code>
+                <button
+                  onClick={copyUserId}
+                  className="btn btn-ghost btn-sm btn-icon"
+                  title="Copy Clerk user ID"
+                  style={{ flexShrink: 0 }}
+                >
+                  {copied ? <Check size={13} color="#00c805" /> : <Copy size={13} />}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
