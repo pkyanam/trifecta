@@ -15,7 +15,10 @@ export interface SandboxRecord {
 
 export interface ConnectionInfoResponse {
   trifectaUrl: string;
+  /** Native pairing URL — base is the Daytona server, used for iOS/Android/desktop QR and copy */
   pairingUrl: string;
+  /** Web pairing URL — opens app.trifecta.belweave.com with ?server= for browser-based access */
+  webPairingUrl: string;
   pairingToken: string | null;
   status: string;
 }
