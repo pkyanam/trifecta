@@ -10,20 +10,13 @@ export default function SignInPage() {
       justifyContent: 'center',
       gap: '32px',
       padding: '24px',
+      background: '#000',
     }}>
       <div style={{ textAlign: 'center' }}>
-        <h1 style={{
-          fontSize: '32px',
-          fontWeight: 700,
-          background: 'linear-gradient(135deg, #a78bfa, #6366f1, #06b6d4)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          marginBottom: '8px',
-        }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#ededed', marginBottom: '8px', letterSpacing: '-0.02em' }}>
           Trifecta Cloud
         </h1>
-        <p style={{ color: 'var(--text-2)', fontSize: '15px' }}>
+        <p style={{ color: '#888', fontSize: '14px' }}>
           Manage your AI coding agent sandboxes
         </p>
       </div>
@@ -31,17 +24,44 @@ export default function SignInPage() {
       <SignIn
         appearance={{
           variables: {
-            colorBackground: '#0c1221',
-            colorInputBackground: 'rgba(0,0,0,0.4)',
-            colorInputText: '#f1f5f9',
-            colorText: '#f1f5f9',
-            colorTextSecondary: '#94a3b8',
-            colorPrimary: '#6366f1',
-            colorAlphaShade: 'white',
-            borderRadius: '10px',
+            colorBackground: '#111111',
+            colorInputBackground: '#1a1a1a',
+            colorInputText: '#ededed',
+            colorText: '#ededed',
+            colorTextSecondary: '#888888',
+            colorPrimary: '#0070f3',
+            colorAlphaShade: '#ededed',
+            borderRadius: '8px',
+            fontFamily: 'Inter, -apple-system, sans-serif',
+            fontSize: '14px',
           },
           elements: {
-            card: { boxShadow: '0 8px 48px rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.07)' },
+            card: {
+              boxShadow: '0 0 0 1px #333333, 0 16px 48px rgba(0,0,0,0.9)',
+              border: '1px solid #333333',
+              backgroundColor: '#111111',
+            },
+            headerTitle: { color: '#ededed', fontWeight: 600 },
+            headerSubtitle: { color: '#888888' },
+            socialButtonsBlockButton: {
+              border: '1px solid #333333',
+              backgroundColor: '#1a1a1a',
+              color: '#ededed',
+            },
+            dividerLine: { backgroundColor: '#333333' },
+            dividerText: { color: '#555555' },
+            formFieldInput: {
+              backgroundColor: '#1a1a1a',
+              border: '1px solid #333333',
+              color: '#ededed',
+            },
+            formButtonPrimary: {
+              backgroundColor: '#0070f3',
+              border: 'none',
+            },
+            footerActionLink: { color: '#0070f3' },
+            identityPreviewText: { color: '#ededed' },
+            identityPreviewEditButton: { color: '#0070f3' },
           },
         }}
       />

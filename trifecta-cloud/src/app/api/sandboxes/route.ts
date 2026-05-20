@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getAllSandboxes, createSandbox as dbCreateSandbox, updateSandbox } from '@/lib/db';
 import { createSandbox as daytonaCreateSandbox } from '@/lib/daytona';
 import { SandboxTier } from '@/lib/config';
+import { getIsAdmin } from '@/lib/admin';
 import { z } from 'zod';
 import crypto from 'crypto';
 
@@ -27,6 +28,14 @@ export async function GET() {
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const isAdmin = await getIsAdmin();
+  if (!isAdmin) {
+    return NextResponse.json(
+      { error: 'Sandbox creation is currently limited to admin users. Payments coming soon.' },
+      { status: 403 },
+    );
+  }
 
   try {
     const body = await request.json();
