@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { UserButton } from '@clerk/nextjs';
-import { LayoutDashboard } from 'lucide-react';
 
 export function Navbar() {
   return (
@@ -10,26 +9,19 @@ export function Navbar() {
       position: 'sticky',
       top: 0,
       zIndex: 50,
-      borderBottom: '1px solid var(--border)',
-      background: 'rgba(6,10,19,0.85)',
-      backdropFilter: 'blur(16px)',
+      borderBottom: '1px solid #1a1a1a',
+      background: 'rgba(0,0,0,0.9)',
+      backdropFilter: 'blur(12px)',
     }}>
-      <div className="container" style={{ display: 'flex', alignItems: 'center', height: '60px', gap: '16px' }}>
+      <div className="container" style={{ display: 'flex', alignItems: 'center', height: '56px', gap: '16px' }}>
         <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-          <div style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <LayoutDashboard size={16} color="#fff" />
-          </div>
-          <span style={{ fontWeight: 700, fontSize: '16px', color: 'var(--text)' }}>
-            Trifecta <span className="gradient-text">Cloud</span>
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" style={{ flexShrink: 0 }}>
+            <rect width="22" height="22" rx="5" fill="#0070f3" />
+            <path d="M6 16L11 6L16 16" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M8 13H14" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span style={{ fontWeight: 700, fontSize: '15px', color: '#ededed', letterSpacing: '-0.01em' }}>
+            Trifecta Cloud
           </span>
         </Link>
 
@@ -41,9 +33,9 @@ export function Navbar() {
 
         <UserButton
           appearance={{
-            variables: { colorPrimary: '#6366f1' },
+            variables: { colorPrimary: '#0070f3' },
             elements: {
-              avatarBox: { width: 32, height: 32 },
+              avatarBox: { width: 30, height: 30 },
             },
           }}
         />

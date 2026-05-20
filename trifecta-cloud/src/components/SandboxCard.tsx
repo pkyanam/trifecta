@@ -41,34 +41,34 @@ export function SandboxCard({ sandbox, onRefresh }: { sandbox: SandboxRecord; on
     return `${Math.floor(diff / 86400)}d ago`;
   })();
 
+  const accentColor =
+    sandbox.status === 'running' ? '#00c805' :
+    sandbox.status === 'error'   ? '#e00000' :
+    '#333333';
+
   return (
     <div className="glass glass-hover" style={{
       padding: '20px',
       display: 'flex',
       flexDirection: 'column',
       gap: '16px',
-      transition: 'transform 0.15s',
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {/* accent strip */}
+      {/* top accent line */}
       <div style={{
         position: 'absolute',
         top: 0, left: 0, right: 0,
         height: 2,
-        background: sandbox.status === 'running'
-          ? 'linear-gradient(90deg, #22c55e, #06b6d4)'
-          : sandbox.status === 'error'
-          ? 'linear-gradient(90deg, #ef4444, #f97316)'
-          : 'linear-gradient(90deg, #6366f1, #8b5cf6)',
-        opacity: sandbox.status === 'stopped' ? 0.3 : 1,
+        background: accentColor,
+        opacity: sandbox.status === 'stopped' ? 0.2 : 0.8,
       }} />
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            <Link href={`/dashboard/${sandbox.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Link href={`/dashboard/${sandbox.id}`} style={{ color: '#ededed', textDecoration: 'none' }}>
               {sandbox.name}
             </Link>
           </h3>
@@ -79,25 +79,25 @@ export function SandboxCard({ sandbox, onRefresh }: { sandbox: SandboxRecord; on
             )}
           </div>
         </div>
-        <Link href={`/dashboard/${sandbox.id}`} style={{ color: 'var(--text-3)', marginLeft: '8px', flexShrink: 0 }}>
-          <ChevronRight size={18} />
+        <Link href={`/dashboard/${sandbox.id}`} style={{ color: '#444', marginLeft: '8px', flexShrink: 0 }}>
+          <ChevronRight size={16} />
         </Link>
       </div>
 
       {/* Resource info */}
       {tier && (
-        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--text-2)' }}>
+        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#666' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Cpu size={12} /> {tier.cpu} vCPU · {tier.memory}GB RAM
+            <Cpu size={11} /> {tier.cpu} vCPU · {tier.memory} GB RAM
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Clock size={12} /> {timeAgo}
+            <Clock size={11} /> {timeAgo}
           </span>
         </div>
       )}
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: '6px', marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', gap: '6px', marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid #1a1a1a' }}>
         <Link
           href={`/dashboard/${sandbox.id}`}
           className="btn btn-primary btn-sm"
@@ -112,9 +112,9 @@ export function SandboxCard({ sandbox, onRefresh }: { sandbox: SandboxRecord; on
             onClick={() => doAction('start')}
             disabled={acting}
             title="Start sandbox"
-            style={{ color: 'var(--success)', borderColor: 'rgba(34,197,94,0.25)' }}
+            style={{ color: '#00c805', borderColor: 'rgba(0,200,5,0.2)' }}
           >
-            <Play size={13} />
+            <Play size={12} />
           </button>
         )}
         {sandbox.status === 'running' && (
@@ -124,7 +124,7 @@ export function SandboxCard({ sandbox, onRefresh }: { sandbox: SandboxRecord; on
             disabled={acting}
             title="Stop sandbox"
           >
-            <Square size={13} />
+            <Square size={12} />
           </button>
         )}
 
@@ -134,7 +134,7 @@ export function SandboxCard({ sandbox, onRefresh }: { sandbox: SandboxRecord; on
           disabled={acting}
           title="Delete sandbox"
         >
-          <Trash2 size={13} />
+          <Trash2 size={12} />
         </button>
       </div>
     </div>
