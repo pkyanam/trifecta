@@ -29,9 +29,18 @@ function describeJsonResponseMismatch(response: Response, text: string): string 
   }`;
 }
 
+function joinUrlPath(basePath: string, endpointPath: string): string {
+  const base = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
+  const endpoint = endpointPath.startsWith("/") ? endpointPath : `/${endpointPath}`;
+  if (!base || base === "/") {
+    return endpoint;
+  }
+  return `${base}${endpoint}`;
+}
+
 function remoteEndpointUrl(httpBaseUrl: string, pathname: string): string {
   const url = new URL(httpBaseUrl);
-  url.pathname = pathname;
+  url.pathname = joinUrlPath(url.pathname, pathname);
   url.search = "";
   url.hash = "";
   return url.toString();

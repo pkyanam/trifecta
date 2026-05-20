@@ -22,9 +22,14 @@ function normalizeRemoteBaseUrl(rawValue: string): URL {
       ? trimmed
       : `https://${trimmed}`;
   const url = new URL(normalizedInput, window.location.origin);
-  url.pathname = "/";
   url.search = "";
   url.hash = "";
+  if (url.pathname.endsWith("/pair")) {
+    url.pathname = url.pathname.slice(0, -"/pair".length) || "/";
+  }
+  if (url.pathname !== "/" && !url.pathname.endsWith("/")) {
+    url.pathname += "/";
+  }
   return url;
 }
 
@@ -35,7 +40,6 @@ function toHttpBaseUrl(url: URL): string {
   } else if (next.protocol === "wss:") {
     next.protocol = "https:";
   }
-  next.pathname = "/";
   next.search = "";
   next.hash = "";
   return next.toString();
@@ -48,7 +52,6 @@ function toWsBaseUrl(url: URL): string {
   } else if (next.protocol === "https:") {
     next.protocol = "wss:";
   }
-  next.pathname = "/";
   next.search = "";
   next.hash = "";
   return next.toString();
@@ -76,10 +79,11 @@ export function resolveRemotePairingTarget(input: {
     if (!credential) {
       throw new Error("Pairing URL is missing its token.");
     }
+    const backendBase = normalizeRemoteBaseUrl(url.toString());
     return {
       credential,
-      httpBaseUrl: toHttpBaseUrl(url),
-      wsBaseUrl: toWsBaseUrl(url),
+      httpBaseUrl: toHttpBaseUrl(backendBase),
+      wsBaseUrl: toWsBaseUrl(backendBase),
     };
   }
 
