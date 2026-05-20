@@ -74,6 +74,19 @@ describe("remote environment api", () => {
     });
   });
 
+  it("preserves path prefixes for Cloudflare path-routed sandbox proxies", () => {
+    expect(
+      resolveRemotePairingTarget({
+        pairingUrl:
+          "https://app.trifecta.belweave.com/pair?host=https%3A%2F%2Fsbx.belweave.com%2F3773-abc123&label=test#token=pairing-token",
+      }),
+    ).toEqual({
+      credential: "pairing-token",
+      httpBaseUrl: "https://sbx.belweave.com/3773-abc123/",
+      wsBaseUrl: "wss://sbx.belweave.com/3773-abc123/",
+    });
+  });
+
   it("preserves host ports when normalizing a bare host input", () => {
     expect(
       resolveRemotePairingTarget({
@@ -265,6 +278,34 @@ describe("remote environment api", () => {
         authorization: "Bearer bearer-token",
       },
     });
+  });
+
+  it("joins API paths onto path-prefixed sandbox proxy bases", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          environmentId: "environment-remote",
+          label: "Sandbox",
+          platform: { os: "linux", arch: "x64" },
+          serverVersion: "0.0.0-test",
+          capabilities: { repositoryIdentity: true },
+        }),
+        { status: 200 },
+      ),
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await fetchRemoteEnvironmentDescriptor({
+      httpBaseUrl: "https://sbx.belweave.com/3773-abc123/",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://sbx.belweave.com/3773-abc123/.well-known/belweave/environment",
+      {
+        method: "GET",
+        headers: {},
+      },
+    );
   });
 
   it("mints a websocket url with a short-lived ws token", async () => {
