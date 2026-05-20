@@ -22,14 +22,20 @@ import serverPackageJson from "../package.json" with { type: "json" };
 
 interface PackageJson {
   name: string;
+  version: string;
+  description: string;
+  license: string;
+  homepage: string;
   repository: {
     type: string;
     url: string;
     directory: string;
   };
+  bugs: { url: string };
+  keywords: ReadonlyArray<string>;
+  publishConfig: { access: string; registry: string };
   bin: Record<string, string>;
   type: string;
-  version: string;
   engines: Record<string, string>;
   files: string[];
   dependencies: Record<string, string>;
@@ -188,6 +194,7 @@ const publishCmd = Command.make(
     tag: Flag.string("tag").pipe(Flag.withDefault("latest")),
     access: Flag.string("access").pipe(Flag.withDefault("public")),
     appVersion: Flag.string("app-version").pipe(Flag.optional),
+    otp: Flag.string("otp").pipe(Flag.optional),
     provenance: Flag.boolean("provenance").pipe(Flag.withDefault(false)),
     dryRun: Flag.boolean("dry-run").pipe(Flag.withDefault(false)),
     verbose: Flag.boolean("verbose").pipe(Flag.withDefault(false)),
@@ -217,10 +224,16 @@ const publishCmd = Command.make(
           const version = Option.getOrElse(config.appVersion, () => serverPackageJson.version);
           const pkg: PackageJson = {
             name: serverPackageJson.name,
+            version,
+            description: serverPackageJson.description,
+            license: serverPackageJson.license,
+            homepage: serverPackageJson.homepage,
             repository: serverPackageJson.repository,
+            bugs: serverPackageJson.bugs,
+            keywords: serverPackageJson.keywords,
+            publishConfig: serverPackageJson.publishConfig,
             bin: serverPackageJson.bin,
             type: serverPackageJson.type,
-            version,
             engines: serverPackageJson.engines,
             files: serverPackageJson.files,
             dependencies: resolveCatalogDependencies(
@@ -248,6 +261,8 @@ const publishCmd = Command.make(
         () =>
           Effect.gen(function* () {
             const args = ["publish", "--access", config.access, "--tag", config.tag];
+            const otp = Option.getOrUndefined(config.otp);
+            if (otp) args.push("--otp", otp);
             if (config.provenance) args.push("--provenance");
             if (config.dryRun) args.push("--dry-run");
 

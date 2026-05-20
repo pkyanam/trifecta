@@ -1,87 +1,79 @@
-# Trifecta — AI Coding Agent Extension for VS Code / Cursor
+# Trifecta — AI Coding Agent for VS Code / Cursor
 
-Embed a full-featured AI coding agent chat sidebar directly into your IDE. Companion mobile apps available for <a href="../../trifecta-ios/">iOS</a> and <a href="../../trifecta-android/">Android</a> — compatible with Belweave-powered Trifecta Desktop servers.
+Embed a full coding-agent chat sidebar directly in your editor. Companion apps available for [iOS](../../../trifecta-ios) and [Android](../../../trifecta-android), all pairing with the same Trifecta Desktop server.
 
-## What's Inside
+## What's inside
 
-Trifecta is a universal coding agent interface — it wraps **eight** coding agents behind a single UI that lives in your editor's activity bar:
+Trifecta is a universal coding-agent interface — it wraps **nine** agents behind one UI in your editor's activity bar:
 
-| Agent            | Protocol         | Install                                                                                   |
-| ---------------- | ---------------- | ----------------------------------------------------------------------------------------- |
-| **Codex**        | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) — `codex login`                      |
-| **Claude Code**  | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) — `claude auth login`               |
-| **OpenCode**     | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) — `opencode auth login`                                   |
-| **Gemini**       | Headless CLI     | [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm i -g @google/gemini-cli` |
-| **Cursor**       | ACP (stdio)      | [Cursor](https://cursor.sh) — comes with the Cursor IDE                                   |
-| **Hermes**       | ACP (stdio)      | [Hermes Agent](https://github.com/NousResearch/hermes-agent) — `hermes setup`             |
-| **Devin**        | ACP (stdio)      | [Devin](https://devin.ai) — `devin acp`                                                   |
-| **ACP Registry** | ACP (stdio)      | Any [ACP](https://agentclientprotocol.com)-compatible agent                               |
+| Agent | Connection | Install / sign in |
+|---|---|---|
+| **Codex** | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) · `codex login` |
+| **Claude Code** | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) · `claude auth login` |
+| **OpenCode** | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) · `opencode auth login` |
+| **Gemini** | Headless CLI | [Gemini CLI](https://github.com/google-gemini/gemini-cli) · `npm i -g @google/gemini-cli` |
+| **Antigravity** | Python SDK / CLI | Google Antigravity · `google-antigravity` SDK or the `agy` CLI |
+| **Cursor** | ACP (stdio) | [Cursor](https://cursor.sh) · bundled `cursor-agent` *(Early Access)* |
+| **Hermes** | ACP (stdio) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) · `hermes setup` |
+| **Devin** | ACP (stdio) | [Devin](https://devin.ai) · `devin acp` |
+| **ACP Registry** | ACP (stdio) | Any [ACP](https://agentclientprotocol.com)-compatible agent |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  VS Code / Cursor (Extension Host)              │
+│  VS Code / Cursor (extension host)              │
 │  ┌──────────┐    spawns     ┌────────────────┐  │
-│  │ Extension│──────────────▶│ Trifecta Server│  │
-│  │ (sidebar)│◀── iframe ───│  (Node.js)     │  │
+│  │ Extension│──────────────▶│ Trifecta server│  │
+│  │ (sidebar)│◀── iframe ────│  (Node.js)     │  │
 │  │          │  + auth tokens│  + providers   │  │
-│  └──────────┘              └────────────────┘  │
+│  └──────────┘               └────────────────┘  │
 └─────────────────────────────────────────────────┘
 ```
 
-The extension spawns a local Node.js server and embeds its web UI in a sidebar webview iframe. The pre-consumes the single-use pairing token before the iframe loads, so Cursor/Codex can't steal it. Auth tokens (session + WebSocket) are passed into the iframe via URL parameters — cookies don't work in VS Code webviews.
+The extension spawns a local Node.js server and embeds its web UI in a sidebar webview iframe. It pre-consumes the single-use pairing token before the iframe loads, so the host can't intercept it. Auth tokens (session + WebSocket) are passed into the iframe via URL parameters — cookies don't work in VS Code webviews.
 
-## Quick Start
+## Quick start
 
-### From a Monorepo Checkout
+From a monorepo checkout:
 
 ```bash
-cd ~/projects/trifecta/trifecta-desktop
+cd trifecta-desktop
 bun install
 bun run build --filter=@belweave/trifecta --filter=trifecta-ide
 ```
 
-Then open VS Code and run:
-
-- `Extensions: Install from VSIX...` → select the built `.vsix`
-- Or run the extension from the Debug view (`F5`)
+Then, in VS Code: **Extensions: Install from VSIX…** and select the built `.vsix`, or launch from the Debug view (`F5`).
 
 ### Settings
 
-| Setting               | Default | Description                       |
-| --------------------- | ------- | --------------------------------- |
-| `trifecta.autoStart`  | `true`  | Auto-start server on VS Code open |
-| `trifecta.serverPort` | `0`     | Server port (`0` = random)        |
+| Setting | Default | Description |
+|---|---|---|
+| `trifecta.autoStart` | `true` | Auto-start the server when VS Code opens |
+| `trifecta.serverPort` | `0` | Server port (`0` = random) |
+
+### Commands
+
+| Command | ID | Description |
+|---|---|---|
+| Open Trifecta | `trifecta.openPanel` | Show the sidebar chat panel |
+| Focus Trifecta Chat | `trifecta.focusChat` | Focus the chat input |
 
 ## Development
 
 ```bash
-# Watch mode for extension (rebundles on save)
-cd apps/vscode && npm run watch
-
-# Build web app + server
-bun run build --filter=@belweave/trifecta
-
-# Full rebuild
-bun run build
+cd apps/vscode && npm run watch        # rebundle the extension on save
+bun run build --filter=@belweave/trifecta   # rebuild web UI + server
 ```
 
-## Authentication Flow
+## Authentication flow
 
-1. Server starts and generates a single-use pairing token
-2. Extension reads the token from stdout and calls `/api/auth/bootstrap/bearer`
-3. Server returns a session token + WebSocket token
-4. Extension opens iframe at `/?wsToken=XXX&sessionToken=YYY`
-5. Web app captures tokens from URL, strips them via `replaceState`
-6. WebSocket connects with `?wsToken=`, HTTP requests use `?token=` (since cookies are blocked in webviews)
-
-## Commands
-
-| Command             | ID                   | Description                 |
-| ------------------- | -------------------- | --------------------------- |
-| Open Trifecta       | `trifecta.openPanel` | Show the sidebar chat panel |
-| Focus Trifecta Chat | `trifecta.focusChat` | Focus into the chat input   |
+1. The server starts and generates a single-use pairing token
+2. The extension reads it from stdout and calls `/api/auth/bootstrap/bearer`
+3. The server returns a session token + WebSocket token
+4. The extension opens the iframe at `/?wsToken=…&sessionToken=…`
+5. The web app captures the tokens from the URL and strips them via `replaceState`
+6. The WebSocket connects with `?wsToken=`; HTTP requests use `?token=` (cookies are blocked in webviews)
 
 ## License
 

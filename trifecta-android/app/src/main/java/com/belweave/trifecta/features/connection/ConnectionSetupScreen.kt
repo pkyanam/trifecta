@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -54,10 +55,14 @@ import com.belweave.trifecta.designsystem.T3Radius
 import com.belweave.trifecta.designsystem.T3SectionHeader
 import com.belweave.trifecta.designsystem.T3Spacing
 import com.belweave.trifecta.designsystem.T3Typography
+import com.belweave.trifecta.designsystem.T3ToolbarChip
 import com.belweave.trifecta.designsystem.T3WordmarkLabel
 
 @Composable
 fun ConnectionSetupScreen(
+    onCancel: (() -> Unit)? = null,
+    onSuccess: (() -> Unit)? = null,
+    onScanQr: (() -> Unit)? = null,
     viewModel: ConnectionSetupViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -72,6 +77,9 @@ fun ConnectionSetupScreen(
             app?.consumePendingPairingLink()
         }
     }
+    LaunchedEffect(state.didPair) {
+        if (state.didPair) onSuccess?.invoke()
+    }
 
     Box(
         modifier = Modifier
@@ -80,7 +88,7 @@ fun ConnectionSetupScreen(
             .windowInsetsPadding(WindowInsets.systemBars)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            HeaderBar()
+            HeaderBar(onCancel = onCancel)
 
             Column(
                 modifier = Modifier
@@ -97,6 +105,7 @@ fun ConnectionSetupScreen(
                     onUrlChange = viewModel::updateServerUrl,
                     onTokenChange = viewModel::updateToken,
                     onPaste = { viewModel.applyPastedText(readClipboard(ctx)) },
+                    onScanQr = onScanQr,
                     onConnect = viewModel::connect
                 )
                 HelpCard()
@@ -106,9 +115,10 @@ fun ConnectionSetupScreen(
 }
 
 @Composable
-private fun HeaderBar() {
+private fun HeaderBar(onCancel: (() -> Unit)? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(T3Spacing.sm),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = T3Spacing.lg)
@@ -122,6 +132,16 @@ private fun HeaderBar() {
             tint = T3Color.warning,
             emphasized = true
         )
+        if (onCancel != null) {
+            T3ToolbarChip(onClick = onCancel) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Close",
+                    tint = T3Color.textPrimary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
     }
 }
 
@@ -148,6 +168,7 @@ private fun FormCard(
     onUrlChange: (String) -> Unit,
     onTokenChange: (String) -> Unit,
     onPaste: () -> Unit,
+    onScanQr: (() -> Unit)?,
     onConnect: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(T3Spacing.sm)) {
@@ -169,12 +190,25 @@ private fun FormCard(
                 FieldGroup(
                     label = "Pairing token",
                     trailing = {
-                        Text(
-                            "Paste link",
-                            style = T3Typography.footnote,
-                            color = T3Color.primary,
-                            modifier = Modifier.clickable(onClick = onPaste)
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(T3Spacing.md)
+                        ) {
+                            if (onScanQr != null) {
+                                Text(
+                                    "Scan QR",
+                                    style = T3Typography.footnote,
+                                    color = T3Color.primary,
+                                    modifier = Modifier.clickable(onClick = onScanQr)
+                                )
+                            }
+                            Text(
+                                "Paste link",
+                                style = T3Typography.footnote,
+                                color = T3Color.primary,
+                                modifier = Modifier.clickable(onClick = onPaste)
+                            )
+                        }
                     }
                 ) {
                     InputField(

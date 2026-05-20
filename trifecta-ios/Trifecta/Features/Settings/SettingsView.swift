@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var renamingProfile: SavedServerProfile?
     @State private var renameDraft: String = ""
     @State private var pendingDeleteProfile: SavedServerProfile?
+    @State private var showAddServer: Bool = false
 
     @AppStorage("appearance") private var appearanceRaw: String = AppAppearance.system.rawValue
     @AppStorage("accent") private var accentRaw: String = AppAccent.blue.rawValue
@@ -90,6 +91,10 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) { pendingDeleteProfile = nil }
             } message: { profile in
                 Text("Remove \"\(profile.name)\" from this device?")
+            }
+            .sheet(isPresented: $showAddServer) {
+                ConnectionSetupView(onDismiss: { showAddServer = false })
+                    .environment(env)
             }
             .sheet(item: $renamingProfile) { profile in
                 NavigationStack {
@@ -232,6 +237,17 @@ struct SettingsView: View {
                             }
                         }
                     }
+
+                    Divider().overlay(T3Color.separator)
+                    Button {
+                        showAddServer = true
+                    } label: {
+                        Label("Add server", systemImage: "plus")
+                            .font(T3Typography.bodyEmphasis)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.bordered)
                 }
             }
         }

@@ -1,193 +1,143 @@
 # Trifecta for Android
 
-Native Android client for the Trifecta coding agent platform. Chat with your AI coding assistant, review changes, approve actions, and manage development threads from your Android phone or tablet.
+Native Android client for the Trifecta coding-agent platform. Chat with your AI coding agent, watch it work, review and approve actions, drive Git, and open an SSH terminal — all from your Android phone or tablet.
 
-**Compatible with both Trifecta Desktop and the official <a href="https://t3.gg">T3 Code by Theo (t3.gg)</a> desktop server.**
-
+Pairs with a Trifecta Desktop server (and the [T3 Code by Theo (t3.gg)](https://t3.gg) server it builds on).
 
 ## Features
 
-- **Chat with your agent** — Start and continue coding conversations with full context
-- **Thread management** — Organize work by project, archive completed threads
-- **Approvals on the go** — Accept, decline, or session-approve command, file-read, and file-change requests
-- **Git Lite** — Pull, commit, and push from your phone with inline diffs and status
-- **Model picker** — Choose from any provider/model configured on your desktop server
-- **Image attachments** — Select photos from your gallery and attach them to messages
-- **Multi-server support** — Save and switch between multiple Trifecta desktop servers
-- **Adaptive UI** — Full support for light/dark mode, customizable accent colors, and density settings
+- **Chat** — Start and continue coding threads with streaming output and markdown
+- **Threads & projects** — Organize by project and archive completed work
+- **Approvals** — Accept, decline, or session-approve command, file-read, and file-change requests
+- **Proposed plans** — Review an agent's plan and start a turn to implement it
+- **Git Lite** — Pull, commit, and push from the thread, with status and inline diffs
+- **SSH terminal** — Open a terminal to hosts your server can reach (when the server enables SSH)
+- **Model picker** — A provider rail + model list with favorites, recents, and colored provider badges; pick any model your server has configured
+- **Image attachments** — Attach photos from your gallery
+- **Multi-server profiles** — Save, switch, rename, and remove servers; pair via QR or `trifecta://` deep links
+- **Tailored look** — Light/dark/system, four accent colors, transcript density, and composer height, with Material 3 and a Liquid-Glass-inspired design
 
 ## Requirements
 
 - Android 8.0+ (API 26)
-- Android Studio Ladybug or newer
-- JDK 17
-- A Trifecta Desktop or <a href="https://t3.gg">T3 Code by Theo (t3.gg)</a> desktop server to pair with
+- Android Studio (latest stable) + JDK 17
+- A Trifecta Desktop (or T3 Code) server to pair with
 
-## Project Structure
+## Project structure
 
 ```
 trifecta-android/
 ├── app/
-│   ├── build.gradle.kts              # App module build config
+│   ├── build.gradle.kts
 │   └── src/main/java/com/belweave/trifecta/
-│       ├── TrifectaApp.kt            # Application singleton bootstrap
-│       ├── MainActivity.kt           # Compose entry point + navigation
+│       ├── TrifectaApp.kt              # Application bootstrap
+│       ├── MainActivity.kt             # Compose entry point + navigation
 │       ├── core/
-│       │   ├── env/
-│       │   │   └── AppEnvironment.kt # Global session, connection, profiles
-│       │   ├── models/               # Thread, Message, ServerEvent, Activity, VCS, etc.
-│       │   ├── networking/           # WebSocket, RPC, connection state
-│       │   │   ├── T3Connection.kt   # OkHttp WebSocket lifecycle
-│       │   │   ├── T3Client.kt       # RPC request/response matching
-│       │   │   ├── EffectRpc.kt      # Wire format encoder/decoder
-│       │   │   └── T3Error.kt        # Error types
-│       │   ├── auth/                 # Pairing flow and encrypted storage
-│       │   │   ├── PairingFlow.kt    # URL parsing and token exchange
-│       │   │   └── KeychainStore.kt  # EncryptedSharedPreferences wrapper
-│       │   ├── preferences/          # DataStore preferences + saved profiles
-│       │   ├── stores/               # StateFlow-based state containers
-│       │   │   ├── ThreadListStore.kt
-│       │   │   └── ThreadStore.kt
-│       │   └── util/                 # RelativeTime, JsonHelpers, etc.
-│       ├── designsystem/             # Theme, tokens, and shared components
-│       │   ├── T3Theme.kt            # Material3 theme with custom colors
-│       │   ├── T3Color.kt            # Semantic color tokens
-│       │   ├── T3Typography.kt       # Type scale
-│       │   ├── T3Spacing.kt          # Spacing and radius tokens
-│       │   ├── T3Style.kt            # Reusable primitives
-│       │   ├── MarkdownText.kt       # Markdown renderer
-│       │   ├── MessageBubble.kt      # Chat bubble component
-│       │   └── StreamingDots.kt      # Typing animation
-│       └── features/                 # Screen-level UI
-│           ├── connection/           # Pairing and server setup
-│           ├── threads/              # Thread list
-│           ├── thread/               # Chat timeline, composer, activity, git
-│           ├── newthread/            # New thread creation
-│           └── settings/             # Appearance, accent, profiles, sign out
-├── build.gradle.kts                  # Root build config
-├── settings.gradle.kts               # Project settings
-└── gradle/libs.versions.toml         # Version catalog
+│       │   ├── env/AppEnvironment.kt   # Global session, connection, profiles
+│       │   ├── models/                 # Thread, Message, Activity, ServerConfig,
+│       │   │                           #   ServerEvent, SshSession, ModelSelection…
+│       │   ├── networking/             # T3Connection, T3Client, EffectRpc,
+│       │   │                           #   SshClient, UploadImage, ConnectionState
+│       │   ├── auth/                   # PairingFlow + KeychainStore
+│       │   ├── preferences/            # DataStore prefs + saved profiles
+│       │   ├── stores/                 # ThreadListStore, ThreadStore (shared state)
+│       │   └── util/                   # RelativeTime, helpers
+│       ├── designsystem/               # T3Theme/Color/Typography/Spacing/Style,
+│       │   │                           #   T3AdaptiveGlass, MarkdownText, MessageBubble
+│       │   └── AppPreferences.kt       # Appearance, accent, density enums
+│       └── features/
+│           ├── connection/             # Pairing & server setup (+ ViewModel)
+│           ├── threads/                # Thread list (+ ViewModel)
+│           ├── thread/                 # Timeline, composer, activity, model picker,
+│           │                           #   header (+ ThreadViewModel)
+│           ├── newthread/              # New thread creation (+ ViewModel)
+│           ├── ssh/                    # SSH terminal screen
+│           └── settings/               # Appearance, profiles, providers (+ ViewModel)
+├── build.gradle.kts
+├── settings.gradle.kts
+└── gradle/libs.versions.toml           # Version catalog
 ```
 
 ## Architecture
 
-### State Management
+### State
 
-All UI state is driven by Kotlin `StateFlow` inside ViewModels:
+UI state is driven by Kotlin `StateFlow`. Per-screen `ViewModel`s expose state; shared session data lives in stores held by `AppEnvironment`.
 
 | Layer | Component | Responsibility |
 |---|---|---|
-| **Global Session** | `AppEnvironment` | Connection, client, server config, profiles |
-| **Thread List** | `ThreadListStore` | Projects, thread shells, live shell stream |
-| **Thread Detail** | `ThreadViewModel` | Messages, activity, approvals, plans |
-| **Preferences** | `AppPreferencesStore` | DataStore-backed appearance, accent, density |
-| **Secrets** | `KeychainStore` | AES256-GCM encrypted tokens and URLs |
+| Global session | `AppEnvironment` | Connection, client, server config, profiles |
+| Thread list | `ThreadListStore` | Projects, thread shells, live shell stream |
+| Thread detail | `ThreadStore` / `ThreadViewModel` | Messages, activity, approvals, plans |
+| Preferences | `AppPreferencesStore` | DataStore-backed appearance, accent, density |
+| Secrets | `KeychainStore` | AES256-GCM `EncryptedSharedPreferences` for tokens + URLs |
 
 ### Networking
 
-A single long-lived OkHttp WebSocket carries all communication:
+A single long-lived OkHttp WebSocket carries everything.
 
-- **Connection** — `T3Connection` manages OkHttp WebSocket, heartbeat (5s ping/pong), and exponential backoff reconnect
+- **Connection** — `T3Connection` manages the OkHttp WebSocket, a 5s ping/pong heartbeat, and exponential-backoff reconnect
 - **RPC** — `T3Client` maps requests to coroutine continuations and demuxes inbound messages
-- **Wire format** — Custom Effect-style JSON envelopes: `Request`, `StreamRequest`, `Chunk`, `Exit`, `Defect`, `Ping`, `Pong`, `Ack`
-- **Streaming** — Two subscription topics auto-resubscribe on reconnect: `orchestration.subscribeShell` and `orchestration.subscribeThread`
+- **Wire format** — Effect-style JSON envelopes: `Request`, `StreamRequest`, `Chunk`, `Exit`, `Defect`, `Ping`, `Pong`, `Ack`
+- **Streaming** — `orchestration.subscribeShell` and `orchestration.subscribeThread`, both re-subscribed on reconnect
 
-### Auth Flow
+### Auth flow
 
-1. Desktop app emits a pairing URL
-2. Android parses the URL (also supports `trifecta://` deep links)
-3. GET `/.well-known/belweave/environment` for server info
-4. POST `/api/auth/bootstrap/bearer` exchanges credential for bearer token
-5. Bearer token saved to `EncryptedSharedPreferences`
-6. Fresh `wsToken` minted before every WebSocket connect
-7. WebSocket opens at `wss://<host>/ws?wsToken=...`
+1. The desktop app emits a pairing URL (also handled as a `trifecta://` deep link)
+2. The app reads `/.well-known/belweave/environment`
+3. `POST /api/auth/bootstrap/bearer` exchanges the credential for a bearer token
+4. The token is stored in `EncryptedSharedPreferences`
+5. A fresh `wsToken` is minted before each connect; the WebSocket opens at `wss://<host>/ws?wsToken=…`
 
-On app launch, saved credentials trigger automatic reconnect.
+Saved credentials trigger automatic reconnect on launch.
 
 ## Building
 
-### Android Studio
-
-1. Open the `trifecta-android` folder in Android Studio
-2. Sync project with Gradle files
-3. Select the `app` run configuration
-4. Choose an emulator or connected device
-5. Click **Run**
-
-### Command Line
-
 ```bash
 cd trifecta-android
-./gradlew :app:assembleDebug
+./gradlew :app:assembleDebug      # → app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleRelease    # signed release (needs keystore in local.properties)
 ```
 
-The APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
+Or open the `trifecta-android` folder in Android Studio, sync Gradle, and run the `app` configuration.
 
-For release:
+## Build config & dependencies
 
-```bash
-./gradlew :app:assembleRelease
-```
-
-## Key Dependencies
+`compileSdk 36` · `minSdk 26` · `targetSdk 36` · JVM 17 · Kotlin 2.2+
 
 | Dependency | Purpose |
 |---|---|
-| Jetpack Compose (BOM) | Declarative UI |
-| Material3 | Material Design components |
-| OkHttp | WebSocket and HTTP client |
-| Kotlinx Serialization | JSON encoding/decoding |
-| Kotlinx Coroutines | Async programming |
-| Security Crypto | EncryptedSharedPreferences |
-| DataStore Preferences | Type-safe preferences |
-| Coil | Image loading and caching |
+| Jetpack Compose (BOM) + Material 3 | Declarative UI |
 | Navigation Compose | In-app navigation |
+| Kotlinx Coroutines | Async |
+| Kotlinx Serialization | JSON |
+| OkHttp | WebSocket + HTTP |
+| AndroidX Security Crypto | `EncryptedSharedPreferences` |
+| DataStore Preferences | Type-safe preferences |
+| Coil | Image loading |
 
-## Key Behaviors
-
-- **Resume on launch** — Automatically reconnects if credentials are saved
-- **Reconnect** — Exponential backoff with jitter; connection pill shows status
-- **Auto-scroll** — Timeline scrolls to bottom as new messages arrive
-- **Optimistic model selection** — Local UI updates immediately, reconciles with server echo
-- **Git Lite** — Pull, commit, push only enable when meaningful; confirmations for network actions
-- **Multi-server profiles** — Save, switch, rename, and delete servers with confirmation
-- **Deep links** — `trifecta://` scheme for pairing URL ingestion
-
-## User Preferences
+## Preferences
 
 | Preference | Options | Default |
 |---|---|---|
 | Appearance | system, light, dark | system |
 | Accent | blue, violet, green, orange | blue |
 | Transcript density | compact, comfortable | comfortable |
-| Composer size | compact, comfortable, expanded | comfortable |
+| Composer height | compact, comfortable, expanded | comfortable |
 
 ## Permissions
 
-- **Internet** — WebSocket and API communication
-- **Network State** — Connection status detection
-- **Read Media Images** — Photo gallery access for attachments
-- **Cleartext Traffic** — Allows HTTP/ws for local servers
-
-## Testing
-
-Manual smoke tests:
-
-1. Pair with a fresh server; confirm reconnect after app relaunch
-2. Switch saved profiles; confirm tokens stay scoped
-3. Trigger an approval; confirm Accept/Decline round-trip
-4. Trigger a proposed plan; tap Implement plan; confirm new turn starts
-5. Make a change in a worktree; pull, commit, push from the git sheet
-6. Archive and unarchive a thread; confirm live stream updates
+- **Internet** / **Network State** — WebSocket + API communication
+- **Read Media Images** — gallery access for attachments
+- **Cleartext Traffic** — allows HTTP/ws for local servers
 
 ## Contributing
 
 - Target JVM 17, Kotlin 2.2+
-- Use Compose + `StateFlow` + ViewModel for UI layers
-- Prefer `suspend` functions and coroutines over callbacks
-- Match iOS design system tokens for visual consistency
-- Run `./gradlew :app:lintDebug` before submitting changes
+- Compose + `StateFlow` + `ViewModel` for UI; prefer `suspend` functions over callbacks
+- Match the iOS design-system tokens for visual consistency
+- Run `./gradlew :app:lintDebug` before submitting
 
 ## License
 
-Copyright (c) Belweave. All rights reserved.
+Copyright © Belweave. All rights reserved.

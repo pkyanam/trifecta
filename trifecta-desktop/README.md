@@ -45,27 +45,20 @@ yay -S belweave-bin
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                  Electron desktop shell                   │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │            React 19 + Vite web UI (@belweave/web)    │  │
-│  └───────────────────────┬────────────────────────────┘  │
-│                          │ WebSocket · Effect RPC         │
-│  ┌───────────────────────▼────────────────────────────┐  │
-│  │         Node.js server (Effect-TS, @belweave/trifecta)│ │
-│  │  ┌──────────────────────────────────────────────┐   │  │
-│  │  │               Provider registry               │   │  │
-│  │  │  Codex · Claude · OpenCode · Gemini · Antigrav │   │  │
-│  │  │  Cursor · Hermes · Devin · ACP Registry        │   │  │
-│  │  └──────────────────────────────────────────────┘   │  │
-│  └─────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────┘
-       │ stdio (JSON-RPC / ACP)            ▲ WebSocket
-       ▼                                   │
-  agent subprocesses              iOS · Android · VS Code clients
+  Clients     iOS  ·  Android  ·  VS Code / Cursor  ·  Web UI
+                              │
+                   WebSocket · Effect-style RPC
+                              ▼
+  Server      Trifecta Desktop — Node.js, Effect-TS (@belweave/trifecta)
+              WebSocket gateway · provider registry · Git · SSH
+                              │
+                   stdio:  JSON-RPC  /  ACP
+                              ▼
+  Agents      Codex · Claude · OpenCode · Gemini · Antigravity
+              Cursor · Hermes · Devin · ACP Registry
 ```
 
-The same server binary backs the desktop app, the VS Code extension, and remote/self-hosted deployments. The web UI is just a client — every client speaks the same WebSocket RPC.
+The same server binary backs the desktop app, the VS Code extension, and remote/self-hosted deployments. The Electron shell wraps the React web UI, but that UI is just one client — every client (web, mobile, editor) speaks the same WebSocket RPC.
 
 ### Workspace
 

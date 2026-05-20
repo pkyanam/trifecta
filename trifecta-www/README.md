@@ -1,35 +1,41 @@
 # trifecta-www
 
-Marketing website for the Trifecta family of AI coding agent applications. Built with Next.js and deployed on Vercel.
+Marketing site for Trifecta, the AI coding-agent platform. Built with Next.js and deployed on Vercel.
 
-The website lives at [trifecta.belweave.com](https://trifecta.belweave.com) and [trifecta.belweave.ai](https://trifecta.belweave.ai).
+Live at [trifecta.belweave.com](https://trifecta.belweave.com) and [trifecta.belweave.ai](https://trifecta.belweave.ai).
 
-## What's on the site
+## Pages
 
-- **Landing page** — overview of Trifecta products (desktop, iOS, Android, VS Code extension)
-- **Developers** — documentation and setup guide for the desktop server
-- **Docs** — API and integration documentation
-- **Privacy** — privacy policy
+| Route | Page |
+|---|---|
+| `/` | Landing — overview of the desktop app, iOS, Android, and the VS Code extension |
+| `/developers` | Setup guide for the desktop server |
+| `/docs` | API and integration docs |
+| `/privacy` | Privacy policy |
 
-## Tech Stack
+## Tech stack
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js (App Router) |
-| Styling | Tailwind CSS |
-| UI Components | Radix UI + shadcn/ui |
-| Fonts | DM Sans, Geist |
-| Deployment | Vercel |
+| Framework | Next.js 16 (App Router), React 19 |
+| Styling | Tailwind CSS 4 |
+| Components | Base UI + shadcn-style primitives (CVA, `tailwind-merge`) |
+| Icons | lucide-react |
+| Fonts | Geist Sans / Geist Mono |
+| Hosting | Vercel |
 
-## Getting Started
+## Develop
 
 ```bash
 cd trifecta-www
-bun install
-bun dev
+npm install
+npm run dev      # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Other scripts: `npm run build`, `npm run start`, `npm run lint`.
+
+> [!NOTE]
+> This repo tracks a fast-moving Next.js — read the relevant guide in `node_modules/next/dist/docs/` before writing code, since APIs and conventions may differ from older releases. See [`AGENTS.md`](./AGENTS.md).
 
 ## Deploy
 
@@ -40,4 +46,4 @@ vercel --prod
 
 ## License
 
-Copyright (c) Belweave. All rights reserved.
+Copyright © Belweave. All rights reserved.

@@ -3,10 +3,13 @@ import SwiftUI
 struct ConnectionSetupView: View {
     @Environment(AppEnvironment.self) private var env
 
+    var onDismiss: (() -> Void)? = nil
+
     @State private var serverURL: String = ""
     @State private var pairingToken: String = ""
     @State private var isWorking: Bool = false
     @State private var errorMessage: String?
+    @State private var showScanner: Bool = false
     @FocusState private var focused: Field?
 
     enum Field { case url, token }
@@ -38,15 +41,35 @@ struct ConnectionSetupView: View {
                 }
             }
             .navigationBarHidden(true)
+            .sheet(isPresented: $showScanner) {
+                QRScannerView(onScan: { scanned in
+                    if let parsed = PairingFlow.parsePairingURL(scanned) {
+                        serverURL = PairingFlow.serverBaseURL(from: parsed.serverURL).absoluteString
+                        pairingToken = parsed.token
+                        errorMessage = nil
+                    } else if scanned.hasPrefix("http"), let url = URL(string: scanned) {
+                        serverURL = PairingFlow.serverBaseURL(from: url).absoluteString
+                    } else {
+                        pairingToken = scanned
+                    }
+                }, isPresented: $showScanner)
+            }
         }
     }
 
     private var headerBar: some View {
-        HStack {
+        HStack(spacing: T3Spacing.sm) {
             T3WordmarkLabel()
             Spacer()
             T3Style.Pill(text: "Pair", systemImage: "link",
                          tint: T3Color.warning, emphasized: true)
+            if let onDismiss {
+                T3Style.ToolbarChip(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(T3Color.textPrimary)
+                }
+            }
         }
     }
 
@@ -76,9 +99,14 @@ struct ConnectionSetupView: View {
                     }
 
                     fieldGroup(label: "Pairing token", trailing: AnyView(
-                        Button("Paste link") { pastePairingLink() }
-                            .font(T3Typography.footnote)
-                            .foregroundStyle(T3Color.primary)
+                        HStack(spacing: T3Spacing.md) {
+                            Button("Scan QR") { showScanner = true }
+                                .font(T3Typography.footnote)
+                                .foregroundStyle(T3Color.primary)
+                            Button("Paste link") { pastePairingLink() }
+                                .font(T3Typography.footnote)
+                                .foregroundStyle(T3Color.primary)
+                        }
                     )) {
                         TextField("PAIRCODE", text: $pairingToken)
                             .textInputAutocapitalization(.never)
@@ -197,6 +225,7 @@ struct ConnectionSetupView: View {
             _ = try await PairingFlow.fetchEnvironment(serverURL: url)
             let pair = try await PairingFlow.exchangeToken(serverURL: url, oneTimeToken: token)
             await env.configure(serverURL: url, bearerToken: pair.bearerToken)
+            onDismiss?()
         } catch {
             errorMessage = error.localizedDescription
         }

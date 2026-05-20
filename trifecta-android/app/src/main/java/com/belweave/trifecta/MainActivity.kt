@@ -25,6 +25,7 @@ import com.belweave.trifecta.designsystem.ComposerSize
 import com.belweave.trifecta.designsystem.T3Theme
 import com.belweave.trifecta.designsystem.TranscriptDensity
 import com.belweave.trifecta.features.connection.ConnectionSetupScreen
+import com.belweave.trifecta.features.connection.QrScannerScreen
 import com.belweave.trifecta.features.newthread.NewThreadScreen
 import com.belweave.trifecta.features.ssh.SshScreen
 import com.belweave.trifecta.features.settings.SettingsScreen
@@ -79,6 +80,8 @@ class MainActivity : ComponentActivity() {
 
 private object Routes {
     const val Connect = "connect"
+    const val PairAnother = "pair-another"
+    const val QrScanner = "qr-scanner"
     const val Threads = "threads"
     const val NewThread = "new-thread"
     const val Settings = "settings"
@@ -124,7 +127,15 @@ private fun AppNav(
 
     NavHost(navController = nav, startDestination = start) {
         composable(Routes.Connect) {
-            ConnectionSetupScreen()
+            ConnectionSetupScreen(
+                onScanQr = { nav.navigate(Routes.QrScanner) }
+            )
+        }
+        composable(Routes.QrScanner) {
+            QrScannerScreen(
+                onScanned = { nav.popBackStack() },
+                onCancel = { nav.popBackStack() }
+            )
         }
         composable(Routes.Threads) {
             ThreadsListScreen(
@@ -141,7 +152,15 @@ private fun AppNav(
             SettingsScreen(
                 isDark = isDark,
                 onDismiss = { nav.popBackStack() },
-                onOpenSsh = { nav.navigate(Routes.Ssh) }
+                onOpenSsh = { nav.navigate(Routes.Ssh) },
+                onAddServer = { nav.navigate(Routes.PairAnother) }
+            )
+        }
+        composable(Routes.PairAnother) {
+            ConnectionSetupScreen(
+                onCancel = { nav.popBackStack() },
+                onSuccess = { nav.popBackStack() },
+                onScanQr = { nav.navigate(Routes.QrScanner) }
             )
         }
         composable(Routes.Ssh) {
