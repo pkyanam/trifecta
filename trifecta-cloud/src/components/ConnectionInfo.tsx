@@ -102,9 +102,9 @@ export function ConnectionInfo({ sandboxId, status }: { sandboxId: string; statu
         </div>
       )}
 
-      {/* Open in web app */}
+      {/* Open in browser web app */}
       <a
-        href={info.pairingUrl}
+        href={info.webPairingUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="btn btn-primary"
@@ -123,19 +123,22 @@ export function ConnectionInfo({ sandboxId, status }: { sandboxId: string; statu
         </div>
       </div>
 
-      {/* Pairing URL */}
+      {/* Native pairing URL — for iOS / Android / desktop */}
       <div>
-        <p className="section-title">Pairing URL</p>
+        <p className="section-title">Pairing URL (mobile &amp; desktop apps)</p>
         <div className="copy-row">
           <div className="mono" style={{ fontSize: '11px' }}>{info.pairingUrl}</div>
           <CopyButton text={info.pairingUrl} label="pairing URL" />
         </div>
+        <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '6px' }}>
+          Paste this into the iOS / Android / desktop app → Settings → Connections
+        </p>
       </div>
 
       {/* Server URL (advanced) */}
       <details style={{ fontSize: '12px' }}>
         <summary style={{ color: 'var(--text-3)', cursor: 'pointer', userSelect: 'none', listStyle: 'none' }}>
-          Advanced: server URL
+          ▸ Advanced: raw server URL
         </summary>
         <div className="copy-row" style={{ marginTop: '8px' }}>
           <div className="mono" style={{ fontSize: '11px' }}>{info.trifectaUrl}</div>

@@ -15,16 +15,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   try {
     const trifectaUrl = await getTrifectaUrl(sandbox.daytona_sandbox_id);
+    const token = sandbox.pairing_token ?? '';
 
-    // Build the pairing URL pointing to the production web app, not the Daytona server directly
-    const pairingUrl = new URL(`${config.app.webAppUrl}/pair`);
-    pairingUrl.searchParams.set('token', sandbox.pairing_token ?? '');
-    pairingUrl.searchParams.set('server', trifectaUrl);
+    // Native pairing URL (iOS / Android / desktop apps).
+    // The app parses the base URL as the server and ?token= as the token.
+    const pairingUrl = new URL(`${trifectaUrl}/pair`);
+    pairingUrl.searchParams.set('token', token);
+
+    // Web browser pairing URL — opens app.trifecta.belweave.com which reads
+    // both ?token= and ?server= to connect in the browser.
+    const webPairingUrl = new URL(`${config.app.webAppUrl}/pair`);
+    webPairingUrl.searchParams.set('token', token);
+    webPairingUrl.searchParams.set('server', trifectaUrl);
 
     return NextResponse.json({
       trifectaUrl,
       pairingUrl: pairingUrl.toString(),
-      pairingToken: sandbox.pairing_token,
+      webPairingUrl: webPairingUrl.toString(),
+      pairingToken: token,
       status: sandbox.status,
     });
   } catch (error) {
