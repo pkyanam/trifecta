@@ -22,11 +22,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const pairingUrl = new URL(`${trifectaUrl}/pair`);
     pairingUrl.searchParams.set('token', token);
 
-    // Web browser pairing URL — opens app.trifecta.belweave.com which reads
-    // both ?token= and ?server= to connect in the browser.
+    // Web browser pairing URL — opens app.trifecta.belweave.com.
+    // The hosted web app expects ?host=<server>&label=<name>#token=<token>
+    // (token in the fragment so it isn't sent to the server in Referer headers).
     const webPairingUrl = new URL(`${config.app.webAppUrl}/pair`);
-    webPairingUrl.searchParams.set('token', token);
-    webPairingUrl.searchParams.set('server', trifectaUrl);
+    webPairingUrl.searchParams.set('host', trifectaUrl);
+    webPairingUrl.searchParams.set('label', sandbox.name);
+    webPairingUrl.hash = `token=${token}`;
 
     return NextResponse.json({
       trifectaUrl,
