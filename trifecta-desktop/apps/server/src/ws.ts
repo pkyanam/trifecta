@@ -1400,6 +1400,13 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           observeRpcEffect(
             WS_METHODS.sshSetupShellProfile,
             Effect.sync(() => {
+              if (process.platform !== "darwin") {
+                return SshSetupShellProfileResult.make({
+                  shellProfile: process.platform === "win32" ? "Windows OpenSSH" : "OpenSSH",
+                  alreadyPresent: true,
+                });
+              }
+
               const home = process.env.HOME ?? process.cwd();
               const marker = "# >>> trifecta-ssh-keychain >>>";
               const markerEnd = "# <<< trifecta-ssh-keychain <<<";

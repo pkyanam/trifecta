@@ -10,7 +10,7 @@ enum SshAuthMethod: String, Codable, CaseIterable, Identifiable, Sendable {
     var label: String {
         switch self {
         case .agentForward: return "SSH Agent"
-        case .keychainKey: return "Keychain Key"
+        case .keychainKey: return "SSH Key"
         case .passwordPrompt: return "Password"
         }
     }
@@ -20,7 +20,7 @@ enum SshAuthMethod: String, Codable, CaseIterable, Identifiable, Sendable {
         case .agentForward:
             return "Requires the Desktop app server to have SSH_AUTH_SOCK with a loaded key."
         case .keychainKey:
-            return "Uses macOS ssh public-key auth with local SSH configuration."
+            return "Uses Desktop OpenSSH public-key auth with local SSH configuration."
         case .passwordPrompt:
             return "Password auth is not wired for mobile yet."
         }

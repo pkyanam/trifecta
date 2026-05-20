@@ -37,6 +37,10 @@ struct SshClientView: View {
         }
     }
 
+    private var isMacDesktopServer: Bool {
+        env.serverConfig?.serverPlatformOS == "darwin"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if env.connectionStatus != .connected {
@@ -110,7 +114,7 @@ struct SshClientView: View {
 
     @ViewBuilder
     private var keychainBanner: some View {
-        if showKeychainBanner {
+        if isMacDesktopServer && showKeychainBanner {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Image(systemName: "lock.sha256")
@@ -214,7 +218,7 @@ struct SshClientView: View {
     private var desktopOnlyView: some View {
         ContentUnavailableView("Requires Trifecta Desktop",
                                systemImage: "desktopcomputer",
-                               description: Text("SSH is only available when connected to Trifecta Desktop on your Mac. This server does not support SSH sessions."))
+                               description: Text("SSH is only available when connected to Trifecta Desktop on macOS, Windows, or Linux. This server does not support SSH sessions."))
     }
 
     private var hostBar: some View {
@@ -280,16 +284,18 @@ struct SshClientView: View {
                 .disabled(selectedHost == nil || hasLiveSession || isLoading)
                 .labelStyle(.iconOnly)
 
-                Menu {
-                    Button {
-                        Task { await setupShellProfile() }
+                if isMacDesktopServer {
+                    Menu {
+                        Button {
+                            Task { await setupShellProfile() }
+                        } label: {
+                            Label("Setup macOS Keychain Unlock", systemImage: "key.horizontal")
+                        }
                     } label: {
-                        Label("Setup Keychain Unlock", systemImage: "key.horizontal")
+                        Image(systemName: "ellipsis.circle")
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
+                    .disabled(hasLiveSession)
                 }
-                .disabled(hasLiveSession)
             }
 
             if hosts.isEmpty {
@@ -303,7 +309,7 @@ struct SshClientView: View {
             }
 
             if selectedHost?.username == "mobile" {
-                Label("This host is using the iPhone user `mobile`; reconnect with your macOS username.",
+                Label("This host is using the iPhone user `mobile`; reconnect with your desktop username.",
                       systemImage: "exclamationmark.triangle")
                     .font(T3Typography.caption)
                     .foregroundStyle(.yellow)
@@ -461,7 +467,8 @@ struct SshClientView: View {
             }
         case .output(let data):
             terminalHandle.feed(data)
-            if data.localizedCaseInsensitiveContains("unlock") &&
+            if isMacDesktopServer &&
+                data.localizedCaseInsensitiveContains("unlock") &&
                 (data.localizedCaseInsensitiveContains("keychain") || data.localizedCaseInsensitiveContains("login.keychain")) {
                 if !showKeychainBanner {
                     withAnimation { showKeychainBanner = true }
@@ -474,7 +481,7 @@ struct SshClientView: View {
             errorMessage = message
             terminalHandle.feed("\n[ssh error] \(message)\n")
             if message.localizedCaseInsensitiveContains("permission denied") {
-                terminalHandle.feed("[ssh] Public-key auth failed. Make sure this Mac account has a key loaded in ssh-agent or its public key in ~/.ssh/authorized_keys.\n")
+                terminalHandle.feed("[ssh] Public-key auth failed. Make sure this desktop account has a key loaded in ssh-agent or its public key in ~/.ssh/authorized_keys.\n")
             }
         case .exited(let exitCode):
             terminalHandle.feed("\n[ssh exited \(exitCode.map(String.init) ?? "without status")]\n")
@@ -583,7 +590,7 @@ private struct SshAddHostInput {
 
 private struct SshAddHostView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var label = "My Mac"
+    @State private var label = "My Desktop"
     @State private var hostname = "127.0.0.1"
     @State private var port = "22"
     @State private var username = ""
@@ -625,7 +632,7 @@ private struct SshAddHostView: View {
                 }
                 .disabled(!canSave)
             } footer: {
-                Text("Use SSH Agent or Keychain Key for current testing. Password auth is not fully wired on Desktop yet.")
+                Text("Use SSH Agent or SSH Key for current testing. Password auth is not fully wired on Desktop yet.")
             }
         }
         .navigationTitle("Add SSH Host")
