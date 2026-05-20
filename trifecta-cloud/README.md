@@ -98,3 +98,17 @@ vercel domains add dashboard.trifecta.belweave.com
 ```
 
 Add all environment variables in the Vercel project settings (Settings → Environment Variables).
+
+## Cloudflare sandbox proxy (`sbx.belweave.com`)
+
+Browser pairing needs a Worker in front of Daytona preview URLs (CORS + preview warning bypass).
+Path-based routing keeps Universal SSL happy: `https://sbx.belweave.com/<sandbox-host>/...`
+
+1. Deploy `cloudflare/sandbox-proxy-worker.js` to the `trifecta-sandbox-proxy` Worker.
+2. Route: `sbx.belweave.com/*`
+3. DNS: `sbx` → `AAAA` `100::` (Proxied)
+4. Set `NEXT_PUBLIC_CF_PROXY_DOMAIN=sbx.belweave.com` on the dashboard (Vercel).
+
+**WebSocket:** the Worker must return the upstream `fetch()` response directly for
+`Upgrade: websocket` requests. Do not wrap WebSocket responses in `new Response(body, upstream)`
+or the hosted app will pair over HTTP but stay stuck on "Connecting...".
