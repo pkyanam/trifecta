@@ -1,180 +1,138 @@
 # Trifecta for iOS
 
-Native iOS client for the Trifecta coding agent platform. Chat with your AI coding assistant, review changes, approve actions, and manage development threads from your iPhone or iPad.
+Native iOS and iPadOS client for the Trifecta coding-agent platform. Chat with your AI coding agent, watch it work, review and approve actions, drive Git, and open an SSH terminal — all from your iPhone or iPad.
 
-**Compatible with both Trifecta Desktop and the official <a href="https://t3.gg">T3 Code by Theo (t3.gg)</a> desktop server.**
-
+Pairs with a Trifecta Desktop server (and the [T3 Code by Theo (t3.gg)](https://t3.gg) server it builds on).
 
 ## Features
 
-- **Chat with your agent** — Start and continue coding conversations with full context
-- **Thread management** — Organize work by project, archive completed threads, search and sort
-- **Approvals on the go** — Accept, decline, or session-approve command, file-read, and file-change requests
-- **Git Lite** — Pull, commit, and push from your phone with inline diffs and status
-- **Model picker** — Choose from any provider/model configured on your desktop server
-- **Image attachments** — Snap a photo and attach it to any message
-- **Multi-server support** — Save and switch between multiple Trifecta desktop servers
-- **Adaptive UI** — Full support for light/dark mode, customizable accent colors, and density settings
+- **Chat** — Start and continue coding threads with full streaming output, markdown, reasoning ("thinking") blocks, and inline Mermaid diagrams
+- **Threads & projects** — Browse from a glass sidebar, organize by project, search, and archive completed work
+- **Approvals** — Accept, decline, or session-approve command, file-read, and file-change requests as the agent runs
+- **Proposed plans** — Review an agent's plan and kick off a new turn to implement it
+- **Git Lite** — Pull, commit, and push from the thread, with status and inline diffs
+- **SSH terminal** — Open a real terminal to hosts your server can reach, with host-key approval and a touch key bar (when the server enables SSH)
+- **Model picker** — Pick any provider/model configured on your server, with search and favorites
+- **Image attachments** — Snap or pick a photo and attach it to a message
+- **Multi-server profiles** — Save, switch, rename, and remove servers
+- **Tailored look** — Light/dark/system, six accent colors, a 14-color user-bubble palette, transcript density, and composer height — with haptics and Liquid Glass throughout
 
 ## Requirements
 
-- iOS 18.0+
+- iOS / iPadOS 18.0+
 - Xcode 16+
-- Swift 5.10+
-- A Trifecta Desktop or <a href="https://t3.gg">T3 Code by Theo (t3.gg)</a> desktop server to pair with
+- A Trifecta Desktop (or T3 Code) server to pair with
 
-## Project Structure
+## Project structure
 
 ```
 trifecta-ios/
-├── Trifecta.xcodeproj/                 # Xcode project
-├── Info.plist                          # Bundle metadata and permissions
-├── PrivacyInfo.xcprivacy               # Required API declarations
-└── Trifecta/                           # Sources
-    ├── TrifectaApp.swift               # @main entry point
-    ├── Assets.xcassets/                # App icon and accent color
-    ├── App/                            # Root routing, environment, tabs
-    │   ├── AppRoot.swift               # Routes between setup and main UI
-    │   ├── MainTabView.swift           # Chat + Settings tabs
-    │   ├── AppEnvironment.swift        # Global session and connection state
-    │   └── AppPreferences.swift        # UI helpers and keyboard dismissal
-    ├── Core/                           # Business logic
-    │   ├── Models/                     # Thread, Message, ServerEvent, VCS, etc.
-    │   ├── Networking/                 # WebSocket, RPC client, auth
-    │   │   ├── T3Connection.swift      # WebSocket lifecycle and reconnect
-    │   │   ├── T3Client.swift          # RPC request/response matching
-    │   │   ├── EffectRPC.swift         # Wire format encoder/decoder
-    │   │   └── Auth/                   # Pairing flow and Keychain storage
-    │   └── Stores/                     # Observable state containers
-    │       ├── ThreadListStore.swift   # Project + thread list state
-    │       └── ThreadStore.swift       # Individual thread detail state
-    ├── DesignSystem/                   # UI tokens and components
-    │   ├── T3Color.swift               # Semantic color tokens (light/dark)
-    │   ├── T3Typography.swift          # Type scale with DM Sans
-    │   ├── T3Spacing.swift             # Spacing and radius tokens
-    │   ├── T3Style.swift               # Reusable primitives (Card, Pill, etc.)
-    │   └── Components/                 # Shared UI components
-    │       ├── MessageBubble.swift     # Chat bubble with markdown
-    │       ├── MarkdownText.swift      # Markdown renderer
-    │       ├── ModelPickerSheet.swift  # Provider → model picker
-    │       ├── ConnectionPill.swift    # Connection status indicator
-    │       └── StreamingDots.swift     # Typing animation
-    └── Features/                       # Screen-level UI
-        ├── Connection/                 # Pairing and server setup
-        ├── Threads/                    # Thread list, archived threads, new thread
-        ├── Thread/                     # Chat timeline, composer, activity, git
-        └── Settings/                   # Appearance, profiles, sign out
+├── Trifecta.xcodeproj/
+├── Info.plist
+└── Trifecta/
+    ├── TrifectaApp.swift              # @main entry point
+    ├── App/
+    │   ├── AppRoot.swift              # Routes between setup and main UI
+    │   ├── SidebarRootView.swift      # Glass sidebar drawer + home shell
+    │   ├── MainTabView.swift          # Legacy tab shell
+    │   ├── AppEnvironment.swift       # Global session & connection state
+    │   └── AppPreferences.swift       # Appearance, accent, density enums
+    ├── Core/
+    │   ├── Models/                    # Thread, Message, Activity, ServerEvent,
+    │   │                              #   ServerConfig, SshSession, ModelSelection…
+    │   ├── Networking/
+    │   │   ├── T3Connection.swift     # WebSocket lifecycle + reconnect (actor)
+    │   │   ├── T3Client.swift         # RPC request/response matching (actor)
+    │   │   ├── EffectRPC.swift        # Wire-format encoder/decoder
+    │   │   ├── SshClient.swift        # SSH session RPC client
+    │   │   └── Auth/                  # PairingFlow + KeychainStore
+    │   └── Stores/                    # ThreadListStore, ThreadStore
+    ├── DesignSystem/
+    │   ├── T3Color/Typography/Spacing/Style.swift
+    │   ├── T3AdaptiveGlass.swift      # Liquid Glass helpers
+    │   ├── HapticFeedback.swift
+    │   └── Components/                # MessageBubble, MarkdownText, ModelCatalogPicker,
+    │                                  #   ProviderIcon, ConnectionPill, StreamingDots…
+    └── Features/
+        ├── Connection/                # Pairing & server setup
+        ├── Sidebar/                   # Sidebar panel + thread rows
+        ├── Threads/                   # List, archived, new thread
+        ├── Thread/                    # Timeline, composer, activity, git, plans,
+        │                              #   thinking & Mermaid blocks, approval cards
+        ├── SSH/                       # Terminal view, key bar, terminal bridge
+        └── Settings/                  # Appearance, profiles, providers, sign out
 ```
 
 ## Architecture
 
-### State Management
+### State
 
-All state uses Swift's `@Observable` macro (no `ObservableObject` or Combine):
+All state uses Swift's `@Observable` macro — no `ObservableObject` or Combine.
 
 | Layer | Component | Responsibility |
 |---|---|---|
-| **Global Session** | `AppEnvironment` | Connection, client, server config, profiles |
-| **Thread List** | `ThreadListStore` | Projects, thread shells, live shell stream |
-| **Thread Detail** | `ThreadStore` | Messages, activity, approvals, plans |
-| **Preferences** | `@AppStorage` | Appearance, accent, density, composer size |
-| **Secrets** | `KeychainStore` | Bearer tokens and server URLs |
+| Global session | `AppEnvironment` | Connection, client, server config, saved profiles |
+| Thread list | `ThreadListStore` | Projects, thread shells, live shell stream |
+| Thread detail | `ThreadStore` | Messages, activity, approvals, plans |
+| Preferences | `@AppStorage` | Appearance, accent, bubble color, density, composer size |
+| Secrets | `KeychainStore` | Bearer tokens and server URLs |
 
 ### Networking
 
-A single long-lived WebSocket carries all communication:
+A single long-lived WebSocket carries everything.
 
-- **Connection** — `T3Connection` actor manages `URLSessionWebSocketTask`, heartbeat (5s ping/pong), and exponential backoff reconnect
+- **Connection** — `T3Connection` actor manages the `URLSessionWebSocketTask`, a 5s ping/pong heartbeat, and exponential-backoff reconnect
 - **RPC** — `T3Client` actor maps requests to continuations and demuxes inbound messages
-- **Wire format** — Custom Effect-style JSON envelopes: `Request`, `Chunk`, `Exit`, `Defect`, `Ping`, `Pong`, `Ack`
-- **Streaming** — Two subscription topics: `orchestration.subscribeShell` (projects + threads) and `orchestration.subscribeThread` (thread detail + events)
+- **Wire format** — Effect-style JSON envelopes: `Request`, `Chunk`, `Exit`, `Defect`, `Ping`, `Pong`, `Ack`
+- **Streaming** — Two topics that re-subscribe on reconnect: `orchestration.subscribeShell` (projects + threads) and `orchestration.subscribeThread` (thread detail + events)
 
-### Auth Flow
+### Auth flow
 
-1. Desktop app emits a pairing URL
-2. iOS parses the URL and fetches `/.well-known/belweave/environment`
-3. POST `/api/auth/bootstrap/bearer` exchanges the credential for a bearer token
-4. Bearer token is saved to Keychain (`kSecClassGenericPassword`)
-5. On every WebSocket connect, a fresh `wsToken` is minted via `POST /api/auth/ws-token`
-6. WebSocket opens with `wss://<host>/ws?wsToken=...`
+1. The desktop app emits a pairing URL
+2. The app fetches `/.well-known/belweave/environment`
+3. `POST /api/auth/bootstrap/bearer` exchanges the credential for a bearer token
+4. The bearer token is stored in the Keychain (`kSecClassGenericPassword`)
+5. Before each connect, a fresh `wsToken` is minted via `POST /api/auth/ws-token`
+6. The WebSocket opens at `wss://<host>/ws?wsToken=…`
 
-On app launch, if a bearer token and server URL exist in Keychain, the app reconnects automatically.
+On launch, if a bearer token and server URL are present, the app reconnects automatically.
 
 ## Building
 
 ### Xcode
 
-1. Open `Trifecta.xcodeproj`
-2. Select the **Trifecta** scheme
-3. Choose a destination (iOS 18 simulator or device)
-4. Press **Run**
+Open `Trifecta.xcodeproj`, select the **Trifecta** scheme and an iOS 18 destination, then **Run**. Swift Package Manager resolves dependencies on first build.
 
-### Command Line
+### Command line
 
 ```bash
-# Simulator build
 xcodebuild -project "trifecta-ios/Trifecta.xcodeproj" \
-  -scheme "Trifecta" \
-  -configuration Debug \
+  -scheme "Trifecta" -configuration Debug \
   -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
-  build
-
-# Device build (requires signing)
-xcodebuild -project "trifecta-ios/Trifecta.xcodeproj" \
-  -scheme "Trifecta" \
-  -configuration Debug \
-  -sdk iphoneos \
-  -destination "id=<DEVICE_UDID>" \
-  -allowProvisioningUpdates \
-  build
+  -destination 'platform=iOS Simulator,name=iPhone 17' build
 ```
 
-## Key Behaviors
-
-- **Resume on launch** — Automatically reconnects if credentials are saved
-- **Reconnect** — Exponential backoff with jitter on disconnect; connection pill shows status
-- **Auto-scroll** — Timeline scrolls to bottom as new messages arrive
-- **Optimistic model selection** — Local UI updates immediately, reconciles with server echo
-- **Git Lite** — Pull, commit, and push only enable when meaningful; confirmations for network actions
-- **Multi-server profiles** — Save multiple servers, switch, rename, and delete with confirmation
-
-## User Preferences
+## Preferences
 
 | Preference | Options | Default |
 |---|---|---|
 | Appearance | system, light, dark | system |
-| Accent | blue, violet, green, orange | blue |
-| Transcript density | compact, comfortable | comfortable |
-| Composer size | compact, comfortable, expanded | comfortable |
+| Accent | blue, violet, green, orange, rose, teal | blue |
+| User bubble | accent + 13 named colors | accent |
+| Transcript density | compact, comfortable, spacious | comfortable |
+| Composer height | compact, comfortable, expanded | comfortable |
 
 ## Permissions
 
-- **Photo Library** — For attaching images to messages
-- **Local Network** — For connecting to desktop servers on LAN or Tailscale
-- **Arbitrary Loads** — Allows HTTP/ws connections to non-public servers
+- **Photo Library** — attaching images to messages
+- **Local Network** — reaching desktop servers on LAN or Tailscale
+- **Arbitrary Loads** — allows HTTP/ws to non-public servers
 
 ## Dependencies
 
-None. The app uses only Apple frameworks:
-
-- `SwiftUI` — UI layer
-- `Foundation` — Networking, JSON, concurrency
-- `Security` — Keychain access
-- `PhotosUI` — Image picker
-- `UIKit` — Keyboard dismissal shim
-
-## Testing
-
-Manual smoke tests:
-
-1. Pair with a fresh server; confirm reconnect after app relaunch
-2. Switch saved profiles; confirm bearer tokens stay scoped
-3. Trigger an approval; confirm Accept/Decline round-trip
-4. Trigger a proposed plan; tap Implement plan; confirm new turn starts
-5. Make a change in a worktree; pull, commit, push from the git sheet
-6. Archive and unarchive a thread; confirm live stream updates
+- **Apple frameworks** — SwiftUI, Foundation, Security (Keychain), PhotosUI, UIKit
+- **[SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)** — terminal emulation for the SSH feature
 
 ## License
 
-Copyright (c) Belweave. All rights reserved.
+Copyright © Belweave. All rights reserved.

@@ -1,17 +1,41 @@
 {
   "name": "@belweave/trifecta",
-  "version": "0.0.29-alpha.3",
+  "version": "0.0.33-alpha.4",
+  "description": "Trifecta server — orchestrate AI coding agents (Codex, Claude Code, OpenCode, Gemini, Cursor, and more) behind one interface, paired with the Trifecta desktop, web, iOS, and Android clients.",
   "license": "MIT",
+  "homepage": "https://github.com/pkyanam/trifecta#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/belweave/trifecta.git",
+    "url": "git+https://github.com/pkyanam/trifecta.git",
     "directory": "apps/server"
+  },
+  "bugs": {
+    "url": "https://github.com/pkyanam/trifecta/issues"
+  },
+  "keywords": [
+    "ai",
+    "coding-agent",
+    "agent-orchestration",
+    "codex",
+    "claude-code",
+    "opencode",
+    "gemini",
+    "cursor",
+    "acp",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "bin": {
     "trifecta": "dist/bin.mjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.map",
+    "!dist/**/*.cjs",
+    "!dist/**/*.publish-bak"
   ],
   "type": "module",
   "scripts": {
@@ -27,6 +51,7 @@
     "@anthropic-ai/claude-agent-sdk": "^0.2.111",
     "@effect/platform-bun": "catalog:",
     "@effect/platform-node": "catalog:",
+    "@effect/platform-node-shared": "catalog:",
     "@effect/sql-sqlite-bun": "catalog:",
     "@opencode-ai/sdk": "^1.3.15",
     "@pierre/diffs": "catalog:",

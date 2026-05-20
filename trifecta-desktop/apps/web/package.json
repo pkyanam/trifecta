@@ -1,6 +1,6 @@
 {
   "name": "@belweave/web",
-  "version": "0.0.29-alpha.3",
+  "version": "0.0.33-alpha.4",
   "private": true,
   "type": "module",
   "scripts": {

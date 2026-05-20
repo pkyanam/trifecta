@@ -9,18 +9,16 @@ Trifecta is made by **Belweave** and builds on [T3 Code by Theo (t3.gg)](https:/
 ## How it works
 
 ```
-   iOS app   Android app   VS Code / Cursor   Web UI
-      └───────────┴──────────────┴──────────────┘
-                         │
-              WebSocket  ·  Effect-style RPC
-                         │
-              ┌──────────▼───────────┐
-              │   Trifecta Desktop    │
-              │  server (Effect-TS)   │
-              └──────────┬───────────┘
-                         │  stdio: JSON-RPC / ACP
-     ┌─────────┬─────────┼─────────┬─────────┬─────────┐
-   Codex    Claude     Gemini    Cursor    Hermes    Devin …
+  Clients   iOS app  ·  Android app  ·  VS Code / Cursor  ·  Web UI
+                              │
+                   WebSocket · Effect-style RPC
+                              ▼
+  Server    Trifecta Desktop — runs your agents (Node.js, Effect-TS)
+                              │
+                   stdio:  JSON-RPC  /  ACP
+                              ▼
+  Agents    Codex · Claude · OpenCode · Gemini · Antigravity
+            Cursor · Hermes · Devin · ACP Registry
 ```
 
 A single long-lived WebSocket carries every message between a client and the server. The server keeps your projects and threads in sync, streams agent output as it happens, and brokers approvals. Each agent runs as a local subprocess the server talks to over stdio — JSON-RPC for native agents, the Agent Client Protocol (ACP) for ACP agents.

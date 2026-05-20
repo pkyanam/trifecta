@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -83,6 +84,7 @@ fun SettingsScreen(
     isDark: Boolean,
     onDismiss: () -> Unit,
     onOpenSsh: () -> Unit,
+    onAddServer: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val sessionState by viewModel.sessionState.collectAsState()
@@ -146,7 +148,8 @@ fun SettingsScreen(
                         renameDraft = profile.name
                         renamingProfile = profile
                     },
-                    onDelete = { pendingDeleteProfile = it }
+                    onDelete = { pendingDeleteProfile = it },
+                    onAddServer = onAddServer
                 )
 
                 AppearanceSection(
@@ -362,7 +365,8 @@ private fun ConnectionSection(
     accent: Color,
     onSwitch: (String) -> Unit,
     onRename: (SavedServerProfile) -> Unit,
-    onDelete: (SavedServerProfile) -> Unit
+    onDelete: (SavedServerProfile) -> Unit,
+    onAddServer: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(T3Spacing.sm)) {
         T3SectionHeader(title = "Connection")
@@ -422,6 +426,36 @@ private fun ConnectionSection(
                                 onDelete = { onDelete(profile) }
                             )
                         }
+                    }
+                }
+
+                T3Divider()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 40.dp)
+                        .clip(RoundedCornerShape(T3Radius.md))
+                        .background(T3Color.surfaceMuted)
+                        .border(0.5.dp, T3Color.separator, RoundedCornerShape(T3Radius.md))
+                        .clickable(onClick = onAddServer)
+                        .padding(horizontal = T3Spacing.md),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(T3Spacing.xs)
+                    ) {
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = null,
+                            tint = T3Color.textPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Add server",
+                            style = T3Typography.bodyEmphasis,
+                            color = T3Color.textPrimary
+                        )
                     }
                 }
             }
