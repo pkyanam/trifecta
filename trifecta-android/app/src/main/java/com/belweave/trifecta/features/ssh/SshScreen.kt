@@ -93,6 +93,7 @@ fun SshScreen(
     val connectionState by app.env.connectionState.collectAsState()
     val serverConfig by app.env.serverConfig.collectAsState()
     val sshEnabled = serverConfig?.sshEnabled ?: true
+    val isMacDesktopServer = serverConfig?.serverPlatformOs == "darwin"
 
     var terminalText by remember { mutableStateOf("") }
     var hosts by remember { mutableStateOf<List<SshHostProfile>>(emptyList()) }
@@ -201,7 +202,8 @@ fun SshScreen(
                             } else if (event.data.contains("\n")) {
                                 isSecureInputMode = false
                             }
-                            if (event.data.contains("keychain", ignoreCase = true) &&
+                            if (isMacDesktopServer &&
+                                event.data.contains("keychain", ignoreCase = true) &&
                                 event.data.contains("unlock", ignoreCase = true)) {
                                 showKeychainBanner = true
                             }
@@ -321,7 +323,7 @@ fun SshScreen(
                         color = T3Color.textPrimary
                     )
                     Text(
-                        "SSH is only available when connected to Trifecta Desktop on your Mac. This server does not support SSH sessions.",
+                        "SSH is only available when connected to Trifecta Desktop on macOS, Windows, or Linux. This server does not support SSH sessions.",
                         style = T3Typography.callout,
                         color = T3Color.textSecondary
                     )
@@ -397,7 +399,7 @@ fun SshScreen(
             }
         }
 
-        if (showKeychainBanner && hasLiveSession) {
+        if (isMacDesktopServer && showKeychainBanner && hasLiveSession) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -539,12 +541,14 @@ fun SshScreen(
                         }
                     )
                 }
-                T3Pill(
-                    text = "Setup Keychain Unlock",
-                    tint = T3Color.warning,
-                    emphasized = true,
-                    modifier = Modifier.clickable(enabled = false) {}
-                )
+                if (isMacDesktopServer) {
+                    T3Pill(
+                        text = "Setup macOS Keychain Unlock",
+                        tint = T3Color.warning,
+                        emphasized = true,
+                        modifier = Modifier.clickable(enabled = false) {}
+                    )
+                }
             }
         } else {
             Box(
@@ -568,21 +572,23 @@ fun SshScreen(
                     .horizontalScroll(keyScroll),
                 horizontalArrangement = Arrangement.spacedBy(T3Spacing.sm)
             ) {
-                T3Pill(
-                    text = "Setup Keychain Unlock",
-                    tint = T3Color.warning,
-                    emphasized = true,
-                    modifier = Modifier.clickable {
-                        scope.launch {
-                            try {
-                                shellProfileResult = app.env.client()?.sshSetupShellProfile()
-                                showShellProfileResult = true
-                            } catch (t: Throwable) {
-                                errorMessage = t.message ?: "Failed to update shell profile"
+                if (isMacDesktopServer) {
+                    T3Pill(
+                        text = "Setup macOS Keychain Unlock",
+                        tint = T3Color.warning,
+                        emphasized = true,
+                        modifier = Modifier.clickable {
+                            scope.launch {
+                                try {
+                                    shellProfileResult = app.env.client()?.sshSetupShellProfile()
+                                    showShellProfileResult = true
+                                } catch (t: Throwable) {
+                                    errorMessage = t.message ?: "Failed to update shell profile"
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
@@ -698,7 +704,7 @@ private fun AddHostDialog(
     onDismiss: () -> Unit,
     onSave: (label: String, hostname: String, port: Int, username: String, authMethod: SshAuthMethod) -> Unit
 ) {
-    var label by remember { mutableStateOf("My Mac") }
+    var label by remember { mutableStateOf("My Desktop") }
     var hostname by remember { mutableStateOf("127.0.0.1") }
     var port by remember { mutableStateOf("22") }
     var username by remember { mutableStateOf("") }

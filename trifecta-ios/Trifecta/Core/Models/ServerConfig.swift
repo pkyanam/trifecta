@@ -4,7 +4,12 @@ struct ServerEnvironmentCapabilities: Decodable, Sendable {
     let ssh: Bool?
 }
 
+struct ServerEnvironmentPlatform: Decodable, Sendable {
+    let os: String?
+}
+
 struct ServerEnvironmentDescriptor: Decodable, Sendable {
+    let platform: ServerEnvironmentPlatform?
     let capabilities: ServerEnvironmentCapabilities?
 }
 
@@ -14,6 +19,10 @@ struct ServerRuntimeConfig: Decodable, Sendable {
 
     var sshEnabled: Bool {
         environment?.capabilities?.ssh ?? true
+    }
+
+    var serverPlatformOS: String? {
+        environment?.platform?.os
     }
 }
 

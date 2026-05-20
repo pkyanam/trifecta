@@ -12,14 +12,14 @@ enum class SshAuthMethod(val raw: String) {
     val label: String
         get() = when (this) {
             AGENT_FORWARD -> "SSH Agent"
-            KEYCHAIN_KEY -> "Keychain Key"
+            KEYCHAIN_KEY -> "SSH Key"
             PASSWORD_PROMPT -> "Password"
         }
 
     val testingNote: String
         get() = when (this) {
             AGENT_FORWARD -> "Requires the Desktop app server to have SSH_AUTH_SOCK with a loaded key."
-            KEYCHAIN_KEY -> "Uses macOS ssh public-key auth with local SSH configuration."
+            KEYCHAIN_KEY -> "Uses Desktop OpenSSH public-key auth with local SSH configuration."
             PASSWORD_PROMPT -> "Password auth is not wired for mobile yet."
         }
 

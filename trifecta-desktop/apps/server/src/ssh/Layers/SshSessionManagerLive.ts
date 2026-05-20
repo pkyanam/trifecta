@@ -53,6 +53,9 @@ const KEYSCAN_TIMEOUT = Duration.seconds(15);
 const FINGERPRINT_TIMEOUT = Duration.seconds(5);
 const SSH_KEY_TYPES = "ed25519,ecdsa,rsa";
 const MAX_REPLAY_EVENTS = 128;
+const SSH_COMMAND = process.platform === "win32" ? "ssh.exe" : "ssh";
+const SSH_KEYSCAN_COMMAND = process.platform === "win32" ? "ssh-keyscan.exe" : "ssh-keyscan";
+const SSH_KEYGEN_COMMAND = process.platform === "win32" ? "ssh-keygen.exe" : "ssh-keygen";
 
 interface SshSessionState {
   readonly sessionId: SshSessionId;
@@ -131,7 +134,7 @@ const make = Effect.gen(function* () {
   const runHostKeyScan = (hostname: string, port: number) =>
     processRunner
       .run({
-        command: "ssh-keyscan",
+        command: SSH_KEYSCAN_COMMAND,
         args: ["-T", "5", "-t", SSH_KEY_TYPES, "-p", String(port), hostname],
         timeout: KEYSCAN_TIMEOUT,
       })
@@ -165,7 +168,7 @@ const make = Effect.gen(function* () {
   const extractFingerprint = (rawLine: string) =>
     processRunner
       .run({
-        command: "ssh-keygen",
+        command: SSH_KEYGEN_COMMAND,
         args: ["-l", "-f", "-"],
         stdin: `${rawLine}\n`,
         timeout: FINGERPRINT_TIMEOUT,
@@ -378,9 +381,9 @@ const make = Effect.gen(function* () {
       };
       const childProcess = yield* ptyAdapter
         .spawn({
-          shell: "ssh",
+          shell: SSH_COMMAND,
           args,
-          cwd: process.env.HOME ?? process.cwd(),
+          cwd: process.env.HOME ?? process.env.USERPROFILE ?? process.cwd(),
           cols: state.cols,
           rows: state.rows,
           env,
