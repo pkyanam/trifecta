@@ -2,13 +2,16 @@ import { Nav, Footer } from "@/components/nav"
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#050505]">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
       <Nav />
-      <main className="mx-auto max-w-2xl px-6 py-20">
-        <h1 className="text-lg font-medium text-[#ececec] mb-1">Trifecta Agent Privacy Policy</h1>
-        <p className="text-[11px] text-[#444] mb-10">Last updated: May 2026</p>
+      {/* Grid backdrops */}
+      <div className="absolute inset-0 clean-grid opacity-100 -z-10" />
 
-        <div className="space-y-6 text-sm leading-relaxed text-[#666]">
+      <main className="flex-1 mx-auto max-w-2xl px-6 py-20 relative">
+        <h1 className="text-xl font-bold text-foreground mb-1 tracking-tight">Trifecta Agent Privacy Policy</h1>
+        <p className="text-xs text-muted-foreground mb-10 font-medium">Last updated: May 2026</p>
+
+        <div className="space-y-6 text-sm leading-relaxed text-muted-foreground">
           <p>
             Trifecta Agent does not collect, transmit, or store any personal data on behalf of Belweave.
           </p>
@@ -19,16 +22,16 @@ export default function PrivacyPage() {
             or telemetry pipelines for this app.
           </p>
 
-          <div>
-            <p className="text-[#888] mb-3">Data stored on your device:</p>
-            <ul className="space-y-2 pl-4 border-l border-white/[0.04]">
+          <div className="border border-border bg-card/40 rounded-xl p-5 space-y-3">
+            <p className="text-foreground font-bold tracking-tight text-xs uppercase">Data stored on your device:</p>
+            <ul className="space-y-2 pl-4 border-l border-border text-xs">
               <li>
-                A bearer token and server URL are saved to the iOS Keychain to enable automatic
+                A bearer token and server URL are saved to the device Keychain to enable automatic
                 reconnection. This data never leaves your device to Belweave.
               </li>
               <li>
-                App preferences (appearance, accent color, transcript density) are stored in standard
-                iOS UserDefaults.
+                App preferences (appearance, accent color, transcript density) are stored locally in standard
+                user preferences settings.
               </li>
             </ul>
           </div>
@@ -38,11 +41,11 @@ export default function PrivacyPage() {
             not accessible to Belweave.
           </p>
 
-          <p>
+          <p className="pt-4 border-t border-border/40 text-xs">
             Contact:{" "}
             <a
               href="mailto:info@belweave.com"
-              className="text-[#ececec] hover:text-[#3ecf8e] transition-colors"
+              className="text-foreground font-semibold hover:underline"
             >
               info@belweave.com
             </a>
@@ -53,3 +56,4 @@ export default function PrivacyPage() {
     </div>
   )
 }
+

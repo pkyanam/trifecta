@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,13 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "trifecta — belweave",
-  description: "trifecta is a family of ai coding agent applications built for desktop and mobile.",
+  title: "Trifecta | Cross-Platform AI Coding Agent Platform",
+  description: "Chat with your AI coding agents, watch them work, review diffs, approve actions, and drive Git from iOS, Android, macOS, Windows, Linux, and Web.",
   metadataBase: new URL("https://trifecta.belweave.com"),
   openGraph: {
-    title: "trifecta — belweave",
-    description: "trifecta is a family of ai coding agent applications built for desktop and mobile.",
+    title: "Trifecta | Cross-Platform AI Coding Agent Platform",
+    description: "One interface, nine coding agents. Drive Git, approve actions, and review code from anywhere.",
     type: "website",
+    url: "https://trifecta.belweave.com",
+    siteName: "Trifecta",
   },
   icons: {
     icon: "/trifecta-logo.png",
@@ -35,10 +38,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full dark`}
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col bg-[#050505] text-[#ececec]">
-        {children}
+      <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-primary/20">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
