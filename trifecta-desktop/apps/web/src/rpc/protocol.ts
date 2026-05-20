@@ -73,11 +73,14 @@ function formatSocketErrorMessage(error: unknown): string {
 
 function resolveWsRpcSocketUrl(rawUrl: string): string {
   const resolved = new URL(rawUrl);
-  if (resolved.protocol !== "ws:" && resolved.protocol !== "wss:") {
+  if (resolved.protocol !== "wss:" && resolved.protocol !== "ws:") {
     throw new Error(`Unsupported websocket transport URL protocol: ${resolved.protocol}`);
   }
 
-  resolved.pathname = "/ws";
+  const basePath = resolved.pathname.endsWith("/")
+    ? resolved.pathname.slice(0, -1)
+    : resolved.pathname;
+  resolved.pathname = basePath && basePath !== "/" ? `${basePath}/ws` : "/ws";
   return resolved.toString();
 }
 

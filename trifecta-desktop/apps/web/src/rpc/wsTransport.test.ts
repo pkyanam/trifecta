@@ -200,6 +200,19 @@ describe("WsTransport", () => {
     await transport.dispose();
   });
 
+  it("appends /ws under path-prefixed sandbox proxy bases", async () => {
+    const transport = createTransport(
+      "wss://sbx.belweave.com/3773-abc123/?wsToken=dynamic",
+    );
+
+    await waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+
+    expect(getSocket().url).toBe("wss://sbx.belweave.com/3773-abc123/ws?wsToken=dynamic");
+    await transport.dispose();
+  });
+
   it("tracks initial connection failures for the app error state", async () => {
     const transport = createTransport("ws://localhost:3020");
 
