@@ -47,6 +47,14 @@ body {
   border-radius: var(--radius);
 }
 
+/* ── Clerk widget isolation — prevent global input/label rules from leaking in ── */
+.cl-rootBox input,
+.cl-rootBox select,
+.cl-rootBox textarea,
+.cl-rootBox label {
+  all: revert;
+}
+
 .glass-hover { transition: border-color 0.15s; }
 .glass-hover:hover { border-color: var(--border-hover); }
 
