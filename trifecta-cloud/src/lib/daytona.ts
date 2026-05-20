@@ -257,3 +257,29 @@ export async function getTrifectaUrl(daytonaSandboxId: string): Promise<string> 
     throw error;
   }
 }
+
+/**
+ * Transforms a raw Daytona proxy URL into a Cloudflare-proxied URL so that
+ * browser-based clients (web app, Electron) receive CORS headers.
+ *
+ * Daytona URL:   https://3773-abc123.daytonaproxy01.net
+ * Cloudflare URL: https://3773-abc123.proxy.trifecta.belweave.com
+ *
+ * The Cloudflare Worker strips the Origin header before forwarding upstream,
+ * which prevents Daytona from intercepting the request with its auth wall.
+ * If the CF_PROXY_DOMAIN env var is not set, the raw Daytona URL is returned.
+ */
+export function toCloudflareProxyUrl(daytonaUrl: string): string {
+  const proxyDomain = process.env.NEXT_PUBLIC_CF_PROXY_DOMAIN; // e.g. proxy.trifecta.belweave.com
+  if (!proxyDomain) return daytonaUrl;
+
+  try {
+    const parsed = new URL(daytonaUrl);
+    // sandbox subdomain = everything before the first "." in the Daytona hostname
+    // e.g. "3773-abc123" from "3773-abc123.daytonaproxy01.net"
+    const sandboxSubdomain = parsed.hostname.split('.')[0];
+    return `https://${sandboxSubdomain}.${proxyDomain}`;
+  } catch {
+    return daytonaUrl;
+  }
+}
