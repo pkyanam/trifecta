@@ -6,34 +6,34 @@ import { UserButton } from '@clerk/nextjs';
 
 export function Navbar() {
   return (
-    <nav style={{
-      position: 'sticky',
-      top: 0,
-      zIndex: 50,
-      borderBottom: '1px solid #1a1a1a',
-      background: 'rgba(0,0,0,0.9)',
-      backdropFilter: 'blur(12px)',
-    }}>
-      <div className="container" style={{ display: 'flex', alignItems: 'center', height: '56px', gap: '16px' }}>
-        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-          <Image src="/trifecta-logo.png" alt="Trifecta" width={28} height={28} style={{ borderRadius: 6, flexShrink: 0 }} />
-          <span style={{ fontWeight: 700, fontSize: '15px', color: '#ededed', letterSpacing: '-0.01em' }}>
-            Trifecta
-          </span>
+    <nav className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-6">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <Image
+            src="/trifectaAppLogo.png"
+            alt="Trifecta"
+            width={26}
+            height={26}
+            className="rounded-md ring-1 ring-border group-hover:ring-foreground/20 transition-all"
+          />
+          <span className="text-[15px] font-bold tracking-tight text-foreground">Trifecta</span>
         </Link>
 
-        <div style={{ flex: 1 }} />
+        <div className="h-4 w-px bg-border/60" />
 
-        <Link href="/dashboard" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
+        <Link
+          href="/dashboard"
+          className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
           Dashboard
         </Link>
 
+        <div className="flex-1" />
+
         <UserButton
           appearance={{
-            variables: { colorPrimary: '#0070f3' },
-            elements: {
-              avatarBox: { width: 30, height: 30 },
-            },
+            variables: { colorPrimary: '#000000' },
+            elements: { avatarBox: { width: 28, height: 28 } },
           }}
         />
       </div>

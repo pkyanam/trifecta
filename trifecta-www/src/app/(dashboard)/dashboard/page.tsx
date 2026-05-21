@@ -5,6 +5,9 @@ import { Navbar } from '@/components/Navbar';
 import { SandboxCard } from '@/components/SandboxCard';
 import { CreateSandboxModal } from '@/components/CreateSandboxModal';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Plus, Box, Play, CircleDot, AlertTriangle, Copy, Check } from 'lucide-react';
 import type { SandboxRecord } from '@/lib/types';
 
@@ -50,116 +53,133 @@ export default function Dashboard() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const running = sandboxes.filter((s) => s.status === 'running').length;
-  const stopped = sandboxes.filter((s) => s.status === 'stopped').length;
-  const errored = sandboxes.filter((s) => s.status === 'error').length;
+  const running = sandboxes.filter((s) => s.status === 'running');
+  const stopped = sandboxes.filter((s) => s.status === 'stopped');
+  const errored = sandboxes.filter((s) => s.status === 'error');
+
+  const tabData = [
+    { value: 'all',     label: 'All',     items: sandboxes,          count: sandboxes.length },
+    { value: 'running', label: 'Running', items: running,            count: running.length },
+    { value: 'stopped', label: 'Stopped', items: stopped,            count: stopped.length },
+    ...(errored.length > 0 ? [{ value: 'error', label: 'Error', items: errored, count: errored.length }] : []),
+  ];
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="container" style={{ paddingTop: '40px', paddingBottom: '80px' }}>
+      <main className="mx-auto max-w-6xl px-6 py-10 pb-20">
         {/* Page header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="flex items-start justify-between gap-4 mb-8 flex-wrap">
           <div>
-            <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px', letterSpacing: '-0.02em', color: '#ededed' }}>
-              Sandboxes
-            </h1>
-            <p style={{ color: '#666', fontSize: '14px' }}>
+            <h1 className="text-2xl font-black tracking-tight text-foreground">Sandboxes</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Isolated AI coding agent environments, powered by Daytona
             </p>
           </div>
           {isAdmin && (
-            <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ flexShrink: 0 }}>
-              <Plus size={14} />
+            <Button onClick={() => setShowModal(true)} className="gap-2 shrink-0">
+              <Plus className="h-4 w-4" />
               New Sandbox
-            </button>
+            </Button>
+          )}
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-8">
+          <StatCard icon={<Box className="h-4 w-4" />} value={sandboxes.length} label="Total" />
+          <StatCard icon={<Play className="h-4 w-4 text-emerald-500" />} value={running.length} label="Running" accent="emerald" />
+          <StatCard icon={<CircleDot className="h-4 w-4 text-zinc-400" />} value={stopped.length} label="Stopped" />
+          {errored.length > 0 && (
+            <StatCard icon={<AlertTriangle className="h-4 w-4 text-red-500" />} value={errored.length} label="Error" accent="red" />
           )}
         </div>
 
         {/* Guest notice */}
         {!isAdmin && !loading && (
-          <div className="guest-notice" style={{ marginBottom: '28px' }}>
-            <div style={{ marginBottom: clerkUserId ? '10px' : 0 }}>
-              <strong>Guest access</strong> — Sandbox creation requires an admin account.
-              Payments &amp; self-serve plans are coming soon.
-            </div>
+          <div className="mb-6 rounded-xl border border-border bg-card p-4">
+            <p className="text-sm font-semibold text-foreground">Guest access</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Sandbox creation requires an admin account. Payments &amp; self-serve plans coming soon.
+            </p>
             {clerkUserId && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                <span style={{ color: '#555', fontSize: '12px', flexShrink: 0 }}>Your Clerk ID:</span>
-                <code style={{
-                  fontFamily: 'SF Mono, Fira Code, Menlo, monospace',
-                  fontSize: '12px',
-                  background: '#1a1a1a',
-                  border: '1px solid #2a2a2a',
-                  borderRadius: '4px',
-                  padding: '2px 8px',
-                  color: '#888',
-                  flex: 1,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-muted-foreground shrink-0">Your Clerk ID:</span>
+                <code className="flex-1 truncate rounded border border-border bg-secondary px-2 py-1 text-xs font-mono text-foreground/70">
                   {clerkUserId}
                 </code>
-                <button
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 shrink-0"
                   onClick={copyUserId}
-                  className="btn btn-ghost btn-sm btn-icon"
-                  title="Copy Clerk user ID"
-                  style={{ flexShrink: 0 }}
                 >
-                  {copied ? <Check size={13} color="#00c805" /> : <Copy size={13} />}
-                </button>
+                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                </Button>
               </div>
             )}
           </div>
         )}
 
-        {/* Stats */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          gap: '12px',
-          marginBottom: '32px',
-        }}>
-          <StatCard icon={<Box size={16} />} value={sandboxes.length} label="Total" accent="#ededed" />
-          <StatCard icon={<Play size={16} />} value={running}           label="Running" accent="#00c805" />
-          <StatCard icon={<CircleDot size={16} />} value={stopped}      label="Stopped" accent="#666" />
-          {errored > 0 && (
-            <StatCard icon={<AlertTriangle size={16} />} value={errored} label="Error" accent="#e00000" />
-          )}
-        </div>
-
-        {/* Sandbox grid */}
+        {/* Sandbox grid with tabs */}
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '80px' }}>
+          <div className="flex justify-center py-20">
             <LoadingSpinner size={28} />
           </div>
         ) : sandboxes.length === 0 ? (
-          <div className="glass empty-state">
-            <Box size={44} style={{ margin: '0 auto 16px', opacity: 0.15 }} />
-            <h3>No sandboxes yet</h3>
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-20 text-center">
+            <Box className="h-10 w-10 text-muted-foreground/20 mb-4" />
+            <h3 className="font-semibold text-foreground text-base">No sandboxes yet</h3>
             {isAdmin ? (
               <>
-                <p style={{ marginBottom: '20px' }}>Create your first sandbox to start using AI coding agents.</p>
-                <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-                  <Plus size={14} /> Create Sandbox
-                </button>
+                <p className="text-sm text-muted-foreground mt-2 mb-5">Create your first sandbox to get started.</p>
+                <Button onClick={() => setShowModal(true)} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Create Sandbox
+                </Button>
               </>
             ) : (
-              <p>Contact your admin to provision a sandbox for you.</p>
+              <p className="text-sm text-muted-foreground mt-2">Contact your admin to provision a sandbox.</p>
             )}
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
-            gap: '16px',
-          }}>
-            {sandboxes.map((sb) => (
-              <SandboxCard key={sb.id} sandbox={sb} onRefresh={fetchSandboxes} />
+          <Tabs defaultValue="all">
+            <TabsList className="mb-6 h-9 bg-secondary/60 p-1 rounded-xl">
+              {tabData.map((tab) => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="h-7 gap-2 rounded-lg text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  {tab.label}
+                  {tab.count > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="h-4 min-w-4 px-1 text-[10px] font-bold rounded-full pointer-events-none"
+                    >
+                      {tab.count}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {tabData.map((tab) => (
+              <TabsContent key={tab.value} value={tab.value}>
+                {tab.items.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <p className="text-sm text-muted-foreground">No {tab.label.toLowerCase()} sandboxes.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {tab.items.map((sb) => (
+                      <SandboxCard key={sb.id} sandbox={sb} onRefresh={fetchSandboxes} />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
             ))}
-          </div>
+          </Tabs>
         )}
       </main>
 
@@ -170,15 +190,27 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ icon, value, label, accent }: { icon: React.ReactNode; value: number; label: string; accent: string }) {
+function StatCard({
+  icon,
+  value,
+  label,
+  accent,
+}: {
+  icon: React.ReactNode;
+  value: number;
+  label: string;
+  accent?: 'emerald' | 'red';
+}) {
   return (
-    <div className="glass stat-card">
-      <div className="stat-icon">
-        <span style={{ color: accent }}>{icon}</span>
+    <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-3">
+      <div className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg bg-secondary">
+        {icon}
       </div>
       <div>
-        <div className="stat-value" style={{ color: accent }}>{value}</div>
-        <div className="stat-label">{label}</div>
+        <div className={`text-xl font-black tabular-nums ${accent === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' : accent === 'red' ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
+          {value}
+        </div>
+        <div className="text-xs font-medium text-muted-foreground">{label}</div>
       </div>
     </div>
   );

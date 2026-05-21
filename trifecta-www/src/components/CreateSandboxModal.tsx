@@ -1,7 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Zap, Rocket, Users } from 'lucide-react';
+import { Zap, Rocket, Users } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 const TIERS = [
   { id: 'starter', label: 'Starter', specs: '1 vCPU · 2 GB RAM · 10 GB', icon: Zap,    price: '$9/mo'  },
@@ -13,12 +24,10 @@ export function CreateSandboxModal({ onClose, onSuccess }: { onClose: () => void
   const [name, setName] = useState('');
   const [tier, setTier] = useState('starter');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
     try {
       const res = await fetch('/api/sandboxes', {
         method: 'POST',
@@ -26,32 +35,34 @@ export function CreateSandboxModal({ onClose, onSuccess }: { onClose: () => void
         body: JSON.stringify({ name, tier }),
       });
       if (res.ok) {
+        toast.success('Sandbox created');
         onSuccess();
         onClose();
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Failed to create sandbox.');
+        toast.error(data.error || 'Failed to create sandbox');
       }
     } catch {
-      setError('An error occurred. Please try again.');
+      toast.error('An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="glass modal" onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#ededed' }}>New Sandbox</h2>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={15} /></button>
-        </div>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-md gap-6">
+        <DialogHeader>
+          <DialogTitle className="text-base font-bold">New Sandbox</DialogTitle>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          <div>
-            <label>Sandbox Name</label>
-            <input
-              type="text"
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <div className="space-y-2">
+            <Label htmlFor="sandbox-name" className="text-sm font-semibold">
+              Sandbox Name
+            </Label>
+            <Input
+              id="sandbox-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="my-agent-env"
@@ -59,32 +70,26 @@ export function CreateSandboxModal({ onClose, onSuccess }: { onClose: () => void
               pattern="[a-z0-9-]+"
               title="Lowercase letters, numbers, and hyphens only"
               autoFocus
+              className="font-mono"
             />
-            <p style={{ fontSize: '12px', color: '#444', marginTop: '5px' }}>
-              Lowercase letters, numbers, and hyphens only
-            </p>
+            <p className="text-xs text-muted-foreground">Lowercase letters, numbers, and hyphens only</p>
           </div>
 
-          <div>
-            <label>Plan</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">Plan</Label>
+            <div className="flex flex-col gap-2">
               {TIERS.map((t) => {
                 const Icon = t.icon;
                 const selected = tier === t.id;
                 return (
                   <label
                     key={t.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '12px 14px',
-                      borderRadius: '6px',
-                      border: `1px solid ${selected ? '#0070f3' : '#222'}`,
-                      background: selected ? 'rgba(0,112,243,0.07)' : '#111',
-                      cursor: 'pointer',
-                      transition: 'all 0.1s',
-                    }}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 transition-all',
+                      selected
+                        ? 'border-foreground/40 bg-foreground/5'
+                        : 'border-border bg-card hover:border-foreground/20',
+                    )}
                   >
                     <input
                       type="radio"
@@ -92,24 +97,21 @@ export function CreateSandboxModal({ onClose, onSuccess }: { onClose: () => void
                       value={t.id}
                       checked={selected}
                       onChange={() => setTier(t.id)}
-                      style={{ width: 'auto', display: 'none' }}
+                      className="sr-only"
                     />
-                    <div style={{
-                      width: 30, height: 30, borderRadius: 6,
-                      background: selected ? 'rgba(0,112,243,0.15)' : '#1a1a1a',
-                      border: `1px solid ${selected ? 'rgba(0,112,243,0.3)' : '#222'}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0,
-                    }}>
-                      <Icon size={14} color={selected ? '#0070f3' : '#666'} />
+                    <div className={cn(
+                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
+                      selected ? 'border-foreground/20 bg-foreground/10' : 'border-border bg-secondary',
+                    )}>
+                      <Icon className={cn('h-4 w-4', selected ? 'text-foreground' : 'text-muted-foreground')} />
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: '13px', color: selected ? '#ededed' : '#888' }}>
+                    <div className="flex-1 min-w-0">
+                      <div className={cn('text-sm font-semibold', selected ? 'text-foreground' : 'text-muted-foreground')}>
                         {t.label}
                       </div>
-                      <div style={{ fontSize: '11px', color: '#444', marginTop: '1px' }}>{t.specs}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{t.specs}</div>
                     </div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: selected ? '#ededed' : '#555' }}>
+                    <div className={cn('text-sm font-semibold shrink-0', selected ? 'text-foreground' : 'text-muted-foreground/60')}>
                       {t.price}
                     </div>
                   </label>
@@ -118,27 +120,16 @@ export function CreateSandboxModal({ onClose, onSuccess }: { onClose: () => void
             </div>
           </div>
 
-          {error && (
-            <div style={{
-              background: 'rgba(220,0,0,0.08)',
-              border: '1px solid rgba(220,0,0,0.2)',
-              borderRadius: '6px',
-              padding: '10px 14px',
-              color: '#e00000',
-              fontSize: '13px',
-            }}>
-              {error}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn" onClick={onClose} disabled={loading}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
+          <div className="flex gap-2 justify-end pt-1">
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
               {loading ? 'Provisioning…' : 'Create Sandbox'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
