@@ -7,6 +7,13 @@ _reference/
 # temporary local assets
 tempAssetsDoNotCommit/
 
+# monorepo root — local-only folders not shipped to GitHub
+docs/
+scripts/
+
+# standalone cloud app — superseded by trifecta-www unified app
+trifecta-cloud/
+
 # system files
 .DS_Store
 Thumbs.db
