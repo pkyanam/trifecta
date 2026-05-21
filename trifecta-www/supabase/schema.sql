@@ -77,6 +77,13 @@ CREATE TABLE IF NOT EXISTS cloud_accounts (
   updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE cloud_accounts
+  DROP CONSTRAINT IF EXISTS cloud_accounts_plan_check;
+
+ALTER TABLE cloud_accounts
+  ADD CONSTRAINT cloud_accounts_plan_check
+  CHECK (plan IN ('free', 'starter', 'pro', 'team'));
+
 CREATE INDEX IF NOT EXISTS cloud_accounts_customer_idx
   ON cloud_accounts (stripe_customer_id);
 
