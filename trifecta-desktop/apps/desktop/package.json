@@ -1,6 +1,6 @@
 {
   "name": "@belweave/desktop",
-  "version": "0.0.33-alpha.4",
+  "version": "0.0.35-alpha.1",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.cjs",
