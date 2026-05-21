@@ -1,4 +1,5 @@
 import { SignUp } from '@clerk/nextjs';
+import { dark } from '@clerk/themes';
 
 export default function SignUpPage() {
   return (
@@ -29,12 +30,13 @@ export default function SignUpPage() {
 
       <SignUp
         appearance={{
+          baseTheme: dark,
           variables: {
             colorBackground: '#111111',
             colorInputBackground: '#1a1a1a',
             colorInputText: '#ededed',
             colorText: '#ededed',
-            colorTextSecondary: '#999999',
+            colorTextSecondary: '#aaaaaa',
             colorPrimary: '#0070f3',
             colorDanger: '#e00000',
             colorAlphaShade: '#ffffff',
@@ -46,17 +48,29 @@ export default function SignUpPage() {
           elements: {
             rootBox: { width: '100%', maxWidth: '420px' },
             card: {
+              backgroundColor: '#111111',
               border: '1px solid #2a2a2a',
               boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
               padding: '32px',
             },
+            headerTitle: { color: '#ededed' },
+            headerSubtitle: { color: '#aaaaaa' },
             socialButtonsBlockButton: {
+              backgroundColor: '#1a1a1a',
               border: '1px solid #333333',
               color: '#ededed',
             },
+            socialButtonsBlockButtonText: { color: '#ededed' },
             dividerLine: { backgroundColor: '#2a2a2a' },
-            formFieldInput: { border: '1px solid #333333' },
+            dividerText: { color: '#666666' },
+            formFieldLabel: { color: '#aaaaaa' },
+            formFieldInput: {
+              backgroundColor: '#1a1a1a',
+              border: '1px solid #333333',
+              color: '#ededed',
+            },
             footerActionLink: { color: '#0070f3' },
+            footerActionText: { color: '#666666' },
             footer: { background: 'transparent' },
             footerAction: { background: 'transparent' },
           },

@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -118,7 +119,7 @@ fun QrScannerScreen(
 
         IconButton(
             onClick = onCancel,
-            modifier = Modifier.padding(16)
+            modifier = Modifier.padding(16.dp)
         ) {
             Icon(
                 Icons.Filled.ArrowBack,
