@@ -27,6 +27,17 @@ interface AccountResponse {
 
 const planList = Object.values(CLOUD_PLANS);
 
+async function readJsonResponse(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return { error: text };
+  }
+}
+
 export default function BillingPage() {
   return (
     <Suspense fallback={<BillingShell />}>
@@ -89,8 +100,8 @@ function BillingContent() {
     try {
       if (plan === 'free') {
         const res = await fetch('/api/billing/free', { method: 'POST' });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Unable to activate free trial.');
+        const data = await readJsonResponse(res);
+        if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Unable to activate free trial.');
         await fetchAccount();
         setBusyPlan(null);
         return;
@@ -101,8 +112,9 @@ function BillingContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Unable to start checkout.');
+      const data = await readJsonResponse(res);
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Unable to start checkout.');
+      if (typeof data.url !== 'string') throw new Error('Checkout did not return a redirect URL.');
       window.location.assign(data.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update plan.');
@@ -115,8 +127,9 @@ function BillingContent() {
     setError(null);
     try {
       const res = await fetch('/api/billing/portal', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Unable to open subscription settings.');
+      const data = await readJsonResponse(res);
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Unable to open subscription settings.');
+      if (typeof data.url !== 'string') throw new Error('Subscription settings did not return a redirect URL.');
       window.location.assign(data.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to open subscription settings.');
