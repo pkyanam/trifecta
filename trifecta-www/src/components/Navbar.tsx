@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { UserButton } from '@clerk/nextjs';
 
 export function Navbar() {
@@ -15,13 +16,9 @@ export function Navbar() {
     }}>
       <div className="container" style={{ display: 'flex', alignItems: 'center', height: '56px', gap: '16px' }}>
         <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" style={{ flexShrink: 0 }}>
-            <rect width="22" height="22" rx="5" fill="#0070f3" />
-            <path d="M6 16L11 6L16 16" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M8 13H14" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
+          <Image src="/trifecta-logo.png" alt="Trifecta" width={28} height={28} style={{ borderRadius: 6, flexShrink: 0 }} />
           <span style={{ fontWeight: 700, fontSize: '15px', color: '#ededed', letterSpacing: '-0.01em' }}>
-            Trifecta Cloud
+            Trifecta
           </span>
         </Link>
 
