@@ -11,6 +11,7 @@ export const config = {
   },
   trifecta: {
     snapshotName: process.env.TRIFECTA_SNAPSHOT_NAME || 'trifecta-server-v1',
+    gpuSnapshotName: process.env.TRIFECTA_GPU_SNAPSHOT_NAME || '',
     npmVersion: process.env.TRIFECTA_NPM_VERSION || '0.0.35-alpha.2',
     serverPort: parseInt(process.env.TRIFECTA_SERVER_PORT || '3773', 10),
     volumeName: process.env.TRIFECTA_VOLUME_NAME || 'trifecta-persistent-data',

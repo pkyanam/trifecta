@@ -123,7 +123,7 @@ export default function SandboxDetail() {
               {tier && (
                 <span className="flex items-center gap-1.5">
                   <Cpu className="h-3.5 w-3.5" />
-                  {tier.cpu} vCPU · {tier.memory} GB RAM · {tier.disk} GB disk
+                  {tier.cpu} vCPU · {tier.memory} GB RAM · {sandbox.disk_gib ?? tier.disk} GiB disk
                 </span>
               )}
               <span className="flex items-center gap-1.5">
@@ -213,7 +213,7 @@ export default function SandboxDetail() {
                   {[
                     ['CPU', `${tier.cpu} vCPU`],
                     ['Memory', `${tier.memory} GB`],
-                    ['Disk', `${tier.disk} GB`],
+                    ['Disk', `${sandbox.disk_gib ?? tier.disk} GiB`],
                     ['Plan', `${tier.label} — ${tier.price}`],
                     ['Sandbox ID', sandbox.id.slice(0, 16) + '…'],
                   ].map(([k, v]) => (

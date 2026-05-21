@@ -38,12 +38,13 @@ export async function getSandbox(id: string, userId: string): Promise<SandboxRec
 export async function createSandbox(data: {
   name: string;
   tier: string;
+  disk_gib?: number;
   pairing_token: string;
   user_id: string;
 }): Promise<SandboxRecord> {
   const { data: row, error } = await getClient()
     .from('sandboxes')
-    .insert({ ...data, status: 'creating' })
+    .insert({ ...data, disk_gib: data.disk_gib ?? 10, status: 'creating' })
     .select()
     .single();
   if (error) throw error;
@@ -110,9 +111,10 @@ export async function upsertCloudAccountForPlan(data: {
   stripe_subscription_id?: string | null;
   current_period_end?: string | null;
   cancel_at_period_end?: boolean;
+  reset_credits?: boolean;
 }): Promise<CloudAccount> {
   const plan = data.plan ? CLOUD_PLANS[data.plan] : null;
-  return upsertCloudAccount({
+  const base: Partial<CloudAccount> & { user_id: string } = {
     user_id: data.user_id,
     plan: data.plan,
     subscription_status: data.subscription_status,
@@ -124,7 +126,10 @@ export async function upsertCloudAccountForPlan(data: {
     running_sandbox_limit: plan?.runningSandboxLimit ?? 0,
     stored_sandbox_limit: plan?.storedSandboxLimit ?? 0,
     gpu_enabled: plan?.gpuEnabled ?? false,
-  });
+    idle_timeout_minutes: plan?.idleTimeoutMinutes ?? 15,
+  };
+  if (data.reset_credits) base.runtime_credits_used = 0;
+  return upsertCloudAccount(base);
 }
 
 export async function activateFreeCloudAccount(userId: string): Promise<CloudAccount> {
@@ -162,4 +167,21 @@ export async function getCheckoutSession(
     .maybeSingle();
   if (error) throw error;
   return data as { user_id: string; plan: CloudPlanId; stripe_customer_id: string | null } | null;
+}
+
+export async function addRuntimeCreditsUsed(userId: string, credits: number): Promise<void> {
+  const { error } = await getClient().rpc('increment_credits_used', {
+    p_user_id: userId,
+    p_credits: credits,
+  });
+  if (error) throw error;
+}
+
+export async function getAllRunningSandboxes(): Promise<SandboxRecord[]> {
+  const { data, error } = await getClient()
+    .from('sandboxes')
+    .select('*')
+    .eq('status', 'running');
+  if (error) throw error;
+  return (data ?? []) as SandboxRecord[];
 }

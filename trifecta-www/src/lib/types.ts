@@ -3,12 +3,14 @@ export interface SandboxRecord {
   user_id: string;
   name: string;
   tier: string;
+  disk_gib: number;
   daytona_sandbox_id: string | null;
   status: string;
   pairing_token: string | null;
   volume_id: string | null;
   trifecta_url: string | null;
   terminal_url: string | null;
+  started_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -22,9 +24,11 @@ export interface CloudAccount {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   runtime_credits_monthly: number;
+  runtime_credits_used: number;
   running_sandbox_limit: number;
   stored_sandbox_limit: number;
   gpu_enabled: boolean;
+  idle_timeout_minutes: number;
   created_at: string;
   updated_at: string;
 }
