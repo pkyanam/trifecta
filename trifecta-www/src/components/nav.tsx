@@ -54,6 +54,13 @@ export function Nav() {
 
           <span className="h-4 w-px bg-border/60 mx-1" />
 
+          <Link
+            href="/dashboard"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Dashboard
+          </Link>
+
           {/* Launch Web App Button */}
           <Link
             href="https://app.trifecta.belweave.com"
@@ -110,6 +117,13 @@ export function Nav() {
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground py-1"
             >
               GitHub
+            </Link>
+            <Link
+              href="/dashboard"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-muted-foreground hover:text-foreground py-1"
+            >
+              Dashboard
             </Link>
             <Link
               href="https://app.trifecta.belweave.com"
