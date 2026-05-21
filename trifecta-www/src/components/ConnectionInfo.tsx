@@ -5,6 +5,8 @@ import Image from 'next/image';
 import QRCode from 'qrcode';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Copy, Check, ExternalLink, Wifi, WifiOff } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { ConnectionInfoResponse } from '@/lib/types';
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -15,9 +17,9 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button className="btn btn-sm btn-icon" onClick={copy} title={`Copy ${label ?? ''}`} style={{ flexShrink: 0 }}>
-      {copied ? <Check size={13} color="var(--success)" /> : <Copy size={13} />}
-    </button>
+    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0" onClick={copy} title={`Copy ${label ?? ''}`}>
+      {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+    </Button>
   );
 }
 
@@ -56,18 +58,16 @@ export function ConnectionInfo({ sandboxId, status }: { sandboxId: string; statu
 
   if (status !== 'running') {
     return (
-      <div className="glass" style={{ padding: '24px', textAlign: 'center' }}>
-        <WifiOff size={28} style={{ color: 'var(--text-3)', marginBottom: '12px' }} />
-        <p style={{ color: 'var(--text-2)', fontSize: '13px' }}>
-          Start the sandbox to view connection info
-        </p>
+      <div className="rounded-xl border border-border bg-card p-6 flex flex-col items-center gap-3 text-center">
+        <WifiOff className="h-7 w-7 text-muted-foreground/30" />
+        <p className="text-sm text-muted-foreground">Start the sandbox to view connection info</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="glass" style={{ padding: '24px', textAlign: 'center', color: 'var(--danger)', fontSize: '13px' }}>
+      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center text-sm text-destructive">
         {error}
       </div>
     );
@@ -75,73 +75,64 @@ export function ConnectionInfo({ sandboxId, status }: { sandboxId: string; statu
 
   if (!info) {
     return (
-      <div className="glass" style={{ padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', minHeight: '120px' }}>
+      <div className="rounded-xl border border-border bg-card p-6 flex items-center justify-center gap-3 min-h-[120px]">
         <LoadingSpinner size={20} />
-        <span style={{ color: 'var(--text-2)', fontSize: '13px' }}>Loading connection info…</span>
+        <span className="text-sm text-muted-foreground">Loading connection info…</span>
       </div>
     );
   }
 
   return (
-    <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <Wifi size={16} color="var(--success)" />
-        <h3 style={{ fontSize: '15px', fontWeight: 600, margin: 0 }}>Connect via Trifecta</h3>
+    <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-5">
+      <div className="flex items-center gap-2">
+        <Wifi className="h-4 w-4 text-emerald-500" />
+        <h3 className="text-sm font-semibold text-foreground">Connect via Trifecta</h3>
       </div>
 
-      {/* QR code — big and prominent */}
       {qrDataUrl && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-          <div className="qr-container">
-            <Image src={qrDataUrl} alt="Scan to pair" width={200} height={200} unoptimized style={{ display: 'block' }} />
+        <div className="flex flex-col items-center gap-3">
+          <div className="rounded-xl border border-border bg-white p-2">
+            <Image src={qrDataUrl} alt="Scan to pair" width={180} height={180} unoptimized />
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-3)', textAlign: 'center' }}>
-            Scan with Trifecta mobile app to pair
-          </p>
+          <p className="text-xs text-muted-foreground text-center">Scan with Trifecta mobile app to pair</p>
         </div>
       )}
 
-      {/* Open in browser web app */}
       <a
         href={info.webPairingUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="btn btn-primary"
-        style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}
+        className={cn(buttonVariants(), "w-full gap-2 justify-center")}
       >
-        <ExternalLink size={14} />
+        <ExternalLink className="h-3.5 w-3.5" />
         Open in Trifecta Web App
       </a>
 
-      {/* Pairing token */}
-      <div>
-        <p className="section-title">Pairing Token</p>
-        <div className="copy-row">
-          <div className="mono">{info.pairingToken}</div>
+      <div className="space-y-1.5">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50">Pairing Token</p>
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2">
+          <code className="flex-1 truncate font-mono text-xs text-foreground/80">{info.pairingToken}</code>
           <CopyButton text={info.pairingToken ?? ''} label="token" />
         </div>
       </div>
 
-      {/* Native pairing URL — for iOS / Android / desktop */}
-      <div>
-        <p className="section-title">Pairing URL (mobile &amp; desktop apps)</p>
-        <div className="copy-row">
-          <div className="mono" style={{ fontSize: '11px' }}>{info.pairingUrl}</div>
+      <div className="space-y-1.5">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50">Pairing URL</p>
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2">
+          <code className="flex-1 truncate font-mono text-[11px] text-foreground/80">{info.pairingUrl}</code>
           <CopyButton text={info.pairingUrl} label="pairing URL" />
         </div>
-        <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '6px' }}>
-          Paste this into the iOS / Android / desktop app → Settings → Connections
+        <p className="text-[11px] text-muted-foreground/50">
+          Paste into iOS / Android / desktop app → Settings → Connections
         </p>
       </div>
 
-      {/* Server URL (advanced) */}
-      <details style={{ fontSize: '12px' }}>
-        <summary style={{ color: 'var(--text-3)', cursor: 'pointer', userSelect: 'none', listStyle: 'none' }}>
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer select-none text-muted-foreground/50 hover:text-muted-foreground list-none">
           ▸ Advanced: raw server URL
         </summary>
-        <div className="copy-row" style={{ marginTop: '8px' }}>
-          <div className="mono" style={{ fontSize: '11px' }}>{info.trifectaUrl}</div>
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2">
+          <code className="flex-1 truncate font-mono text-[11px] text-foreground/80">{info.trifectaUrl}</code>
           <CopyButton text={info.trifectaUrl} label="server URL" />
         </div>
       </details>

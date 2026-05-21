@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
 import { ExternalLink, Terminal } from 'lucide-react';
+import { buttonVariants } from '@/components/ui/button';
 
 export function TerminalEmbed({ sandboxId, status }: { sandboxId: string; status: string }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -27,101 +28,72 @@ export function TerminalEmbed({ sandboxId, status }: { sandboxId: string; status
     return () => { mounted = false; };
   }, [sandboxId, status]);
 
-  const wrapStyle: React.CSSProperties = {
-    borderRadius: '12px',
-    border: '1px solid var(--border)',
-    overflow: 'hidden',
-    minHeight: '540px',
-    display: 'flex',
-    flexDirection: 'column',
-    background: '#0a0e17',
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '10px 16px',
-    borderBottom: '1px solid var(--border)',
-    background: 'rgba(0,0,0,0.3)',
-    flexShrink: 0,
-  };
-
-  if (status === 'creating') return (
-    <div style={wrapStyle}>
-      <div style={headerStyle}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', color: 'var(--text-2)' }}>
-          <Terminal size={14} /> Terminal
+  const Shell = ({ children }: { children: React.ReactNode }) => (
+    <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-[#0a0e17] min-h-[540px]">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-black/30 shrink-0">
+        <span className="flex items-center gap-2 text-sm text-white/40">
+          <Terminal className="h-3.5 w-3.5" />
+          Terminal
         </span>
       </div>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px' }}>
-        <LoadingSpinner size={28} />
-        <p style={{ color: 'var(--text-2)', fontSize: '14px' }}>Provisioning sandbox…</p>
-        <p style={{ color: 'var(--text-3)', fontSize: '12px' }}>This takes about 30–60 seconds</p>
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        {children}
       </div>
     </div>
+  );
+
+  if (status === 'creating') return (
+    <Shell>
+      <LoadingSpinner size={28} />
+      <p className="text-sm text-white/40">Provisioning sandbox…</p>
+      <p className="text-xs text-white/20">This takes about 30–60 seconds</p>
+    </Shell>
   );
 
   if (status === 'stopped') return (
-    <div style={wrapStyle}>
-      <div style={headerStyle}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', color: 'var(--text-2)' }}>
-          <Terminal size={14} /> Terminal
-        </span>
-      </div>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-        <Terminal size={32} style={{ color: 'var(--text-3)' }} />
-        <p style={{ color: 'var(--text-2)', fontSize: '14px' }}>Sandbox is stopped</p>
-        <p style={{ color: 'var(--text-3)', fontSize: '12px' }}>Start the sandbox to access the terminal</p>
-      </div>
-    </div>
+    <Shell>
+      <Terminal className="h-8 w-8 text-white/10" />
+      <p className="text-sm text-white/40">Sandbox is stopped</p>
+      <p className="text-xs text-white/20">Start the sandbox to access the terminal</p>
+    </Shell>
   );
 
   if (error) return (
-    <div style={wrapStyle}>
-      <div style={headerStyle}>
-        <span style={{ fontSize: '13px', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '7px' }}>
-          <Terminal size={14} /> Terminal
-        </span>
-      </div>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: 'var(--danger)', fontSize: '14px' }}>{error}</p>
-      </div>
-    </div>
+    <Shell>
+      <p className="text-sm text-red-400">{error}</p>
+    </Shell>
   );
 
   if (!url) return (
-    <div style={wrapStyle}>
-      <div style={headerStyle}>
-        <span style={{ fontSize: '13px', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '7px' }}>
-          <Terminal size={14} /> Terminal
-        </span>
-      </div>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <LoadingSpinner size={24} />
-      </div>
-    </div>
+    <Shell>
+      <LoadingSpinner size={24} />
+    </Shell>
   );
 
   return (
-    <div style={wrapStyle}>
-      <div style={headerStyle}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', color: 'var(--text-2)' }}>
-          {/* Traffic lights */}
-          <span style={{ display: 'flex', gap: '5px', marginRight: '4px' }}>
-            {['#ef4444', '#f59e0b', '#22c55e'].map((c, i) => (
-              <span key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.7 }} />
+    <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-[#0a0e17] min-h-[540px]">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-black/30 shrink-0">
+        <span className="flex items-center gap-2 text-sm text-white/50">
+          <span className="flex gap-1.5 mr-1">
+            {['bg-red-500', 'bg-amber-500', 'bg-emerald-500'].map((c, i) => (
+              <span key={i} className={`h-2.5 w-2.5 rounded-full ${c} opacity-70`} />
             ))}
           </span>
-          <Terminal size={13} /> Terminal — daytona@sandbox
+          <Terminal className="h-3.5 w-3.5" />
+          daytona@sandbox
         </span>
-        <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none', fontSize: '12px' }}>
-          <ExternalLink size={12} /> Pop out
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-6 gap-1.5 text-xs text-white/40 hover:text-white/70 hover:bg-white/10 px-2"}
+        >
+          <ExternalLink className="h-3 w-3" /> Pop out
         </a>
       </div>
       <iframe
         src={url}
-        style={{ flex: 1, border: 'none', minHeight: '500px' }}
+        className="flex-1 min-h-[500px] border-none"
         title="Terminal"
         allow="clipboard-read; clipboard-write"
       />
