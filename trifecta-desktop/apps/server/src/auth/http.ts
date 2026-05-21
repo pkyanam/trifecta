@@ -13,7 +13,9 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstab
 
 import { AuthError, ServerAuth } from "./Services/ServerAuth.ts";
 import { SessionCredentialService } from "./Services/SessionCredentialService.ts";
+import { isReviewSession, REVIEW_ACCESS_DENIED_MESSAGE } from "./reviewAccess.ts";
 import { deriveAuthClientMetadata } from "./utils.ts";
+import { ServerConfig } from "../config.ts";
 import { browserApiCorsHeaders } from "../httpCors.ts";
 
 export const respondToAuthError = (error: AuthError) =>
@@ -146,11 +148,18 @@ export const authPairingCredentialRouteLayer = HttpRouter.add(
   "/api/auth/pairing-token",
   Effect.gen(function* () {
     const serverAuth = yield* ServerAuth;
+    const config = yield* ServerConfig;
     const request = yield* HttpServerRequest.HttpServerRequest;
     const session = yield* serverAuth.authenticateHttpRequest(request);
     if (session.role !== "owner") {
       return yield* new AuthError({
         message: "Only owner sessions can create pairing credentials.",
+        status: 403,
+      });
+    }
+    if (isReviewSession(session, config)) {
+      return yield* new AuthError({
+        message: REVIEW_ACCESS_DENIED_MESSAGE,
         status: 403,
       });
     }
@@ -184,10 +193,17 @@ export const authPairingCredentialRouteLayer = HttpRouter.add(
 const authenticateOwnerSession = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const serverAuth = yield* ServerAuth;
+  const config = yield* ServerConfig;
   const session = yield* serverAuth.authenticateHttpRequest(request);
   if (session.role !== "owner") {
     return yield* new AuthError({
       message: "Only owner sessions can manage network access.",
+      status: 403,
+    });
+  }
+  if (isReviewSession(session, config)) {
+    return yield* new AuthError({
+      message: REVIEW_ACCESS_DENIED_MESSAGE,
       status: 403,
     });
   }

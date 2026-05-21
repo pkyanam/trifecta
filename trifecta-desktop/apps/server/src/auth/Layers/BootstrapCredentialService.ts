@@ -19,6 +19,7 @@ import {
   type BootstrapGrant,
   type IssuedBootstrapCredential,
 } from "../Services/BootstrapCredentialService.ts";
+import { REVIEW_BOOTSTRAP_SUBJECT } from "../reviewAccess.ts";
 
 interface StoredBootstrapGrant extends BootstrapGrant {
   readonly remainingUses: number | "unbounded";
@@ -101,7 +102,7 @@ export const makeBootstrapCredentialService = Effect.gen(function* () {
     yield* seedGrant(config.reviewPairingToken, {
       method: "one-time-token",
       role: "owner",
-      subject: "review-bootstrap",
+      subject: REVIEW_BOOTSTRAP_SUBJECT,
       expiresAt: DateTime.add(now, {
         milliseconds: Duration.toMillis(Duration.days(365)),
       }),

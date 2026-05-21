@@ -7,6 +7,7 @@ import {
   type AuthWebSocketTokenResult,
 } from "@belweave/contracts";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -28,6 +29,7 @@ import {
   SessionCredentialService,
 } from "../Services/SessionCredentialService.ts";
 import { AuthControlPlaneLive, AuthCoreLive } from "./AuthControlPlane.ts";
+import { REVIEW_BOOTSTRAP_SUBJECT } from "../reviewAccess.ts";
 
 type BootstrapExchangeResult = {
   readonly response: AuthBootstrapResult;
@@ -36,6 +38,7 @@ type BootstrapExchangeResult = {
 
 const AUTHORIZATION_PREFIX = "Bearer ";
 const WEBSOCKET_TOKEN_QUERY_PARAM = "wsToken";
+const REVIEW_SESSION_TTL = Duration.hours(12);
 
 export function toBootstrapExchangeAuthError(cause: BootstrapCredentialError): AuthError {
   if (cause.status === 500) {
@@ -142,6 +145,7 @@ export const makeServerAuth = Effect.gen(function* () {
             method: "browser-session-cookie",
             subject: grant.subject,
             role: grant.role,
+            ...(grant.subject === REVIEW_BOOTSTRAP_SUBJECT ? { ttl: REVIEW_SESSION_TTL } : {}),
             client: {
               ...requestMetadata,
               ...(grant.label ? { label: grant.label } : {}),
@@ -181,6 +185,7 @@ export const makeServerAuth = Effect.gen(function* () {
               method: "bearer-session-token",
               subject: grant.subject,
               role: grant.role,
+              ...(grant.subject === REVIEW_BOOTSTRAP_SUBJECT ? { ttl: REVIEW_SESSION_TTL } : {}),
               client: {
                 ...requestMetadata,
                 ...(grant.label ? { label: grant.label } : {}),

@@ -26,14 +26,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // Native clients use the raw Daytona URL — they don't send Origin headers
     // so they already pass through fine without the Cloudflare proxy.
     const pairingUrl = new URL(`${rawTrifectaUrl}/pair`);
-    pairingUrl.searchParams.set('token', token);
+    pairingUrl.hash = new URLSearchParams({ token }).toString();
 
     // Web browser pairing URL — opens app.trifecta.belweave.com.
     // Pass the Cloudflare-proxied server URL so browser requests get CORS headers.
     const webPairingUrl = new URL(`${config.app.webAppUrl}/pair`);
     webPairingUrl.searchParams.set('host', proxiedTrifectaUrl);
     webPairingUrl.searchParams.set('label', sandbox.name);
-    webPairingUrl.hash = `token=${token}`;
+    webPairingUrl.hash = new URLSearchParams({ token }).toString();
 
     return NextResponse.json({
       trifectaUrl: proxiedTrifectaUrl,

@@ -101,7 +101,10 @@ enum PairingFlow {
             direct.scheme = scheme
             direct.host = host
             direct.port = comps.port
-            return direct.url.map { ($0, token) }
+            direct.path = comps.path
+            direct.query = comps.query
+            direct.fragment = comps.fragment
+            return direct.url.map { (serverBaseURL(from: $0), token) }
         }
         return nil
     }
@@ -110,7 +113,12 @@ enum PairingFlow {
         guard var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return url
         }
-        comps.path = ""
+        let trimmedPath = comps.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if trimmedPath == "pair" {
+            comps.path = ""
+        } else if comps.path.hasSuffix("/pair") {
+            comps.path = String(comps.path.dropLast("/pair".count))
+        }
         comps.query = nil
         comps.fragment = nil
         return comps.url ?? url
