@@ -11,6 +11,7 @@ import { CLOUD_PLANS, type CloudPlanId } from '@/lib/billing';
 interface CloudAccount {
   plan: CloudPlanId | null;
   subscription_status: string | null;
+  stripe_customer_id: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   runtime_credits_monthly: number;
@@ -86,6 +87,15 @@ function BillingContent() {
     setBusyPlan(plan);
     setError(null);
     try {
+      if (plan === 'free') {
+        const res = await fetch('/api/billing/free', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Unable to activate free trial.');
+        await fetchAccount();
+        setBusyPlan(null);
+        return;
+      }
+
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -95,7 +105,7 @@ function BillingContent() {
       if (!res.ok) throw new Error(data.error || 'Unable to start checkout.');
       window.location.assign(data.url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to start checkout.');
+      setError(err instanceof Error ? err.message : 'Unable to update plan.');
       setBusyPlan(null);
     }
   };
@@ -149,7 +159,7 @@ function BillingContent() {
                 Update payment details, change plans, or cancel from your account portal.
               </p>
             </div>
-            <Button onClick={openPortal} disabled={portalBusy || !account?.plan || !account?.subscription_status} className="gap-2">
+            <Button onClick={openPortal} disabled={portalBusy || !account?.stripe_customer_id} className="gap-2">
               {portalBusy ? 'Opening...' : 'Manage Subscription'}
               <ExternalLink className="h-4 w-4" />
             </Button>
@@ -174,11 +184,11 @@ function BillingContent() {
           <div className="mb-5">
             <h2 className="text-xl font-black tracking-tight text-foreground">Choose a Plan</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Plans unlock sandbox creation after payment succeeds and the subscription is reflected on your account.
+              Start free or choose a paid plan. Sandbox creation unlocks once your account plan is active.
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {planList.map((plan) => {
               const isCurrent = account?.plan === plan.id && account.subscription_status === 'active';
               const isSelected = selectedPlan === plan.id;

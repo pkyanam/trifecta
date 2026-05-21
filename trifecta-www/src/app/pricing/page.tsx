@@ -209,17 +209,15 @@ export default function PricingPage() {
                         </li>
                       ))}
                     </ul>
-                    {plan.name !== "Free Trial" && (
-                      <div className="mt-auto pt-5">
-                        <Link
-                          href={`/dashboard/billing?plan=${plan.name.toLowerCase()}`}
-                          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground px-4 text-sm font-bold text-background transition-all hover:opacity-85"
-                        >
-                          Select {plan.name}
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
-                      </div>
-                    )}
+                    <div className="mt-auto pt-5">
+                      <Link
+                        href={`/dashboard/billing?plan=${plan.name === "Free Trial" ? "free" : plan.name.toLowerCase()}`}
+                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground px-4 text-sm font-bold text-background transition-all hover:opacity-85"
+                      >
+                        {plan.name === "Free Trial" ? "Start Free Trial" : `Select ${plan.name}`}
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
                 </article>
               ))}

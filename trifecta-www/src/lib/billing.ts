@@ -1,4 +1,16 @@
 export const CLOUD_PLANS = {
+  free: {
+    id: 'free',
+    name: 'Free Trial',
+    price: '$0',
+    interval: 'once',
+    monthlyLaunchHours: 10,
+    runningSandboxLimit: 1,
+    storedSandboxLimit: 1,
+    allowedSandboxTiers: ['launch'],
+    gpuEnabled: false,
+    isFree: true,
+  },
   starter: {
     id: 'starter',
     name: 'Starter',
@@ -9,6 +21,7 @@ export const CLOUD_PLANS = {
     storedSandboxLimit: 3,
     allowedSandboxTiers: ['launch'],
     gpuEnabled: false,
+    isFree: false,
     stripePriceEnv: 'STRIPE_PRICE_STARTER',
   },
   pro: {
@@ -21,6 +34,7 @@ export const CLOUD_PLANS = {
     storedSandboxLimit: 8,
     allowedSandboxTiers: ['launch', 'build'],
     gpuEnabled: true,
+    isFree: false,
     stripePriceEnv: 'STRIPE_PRICE_PRO',
   },
   team: {
@@ -33,6 +47,7 @@ export const CLOUD_PLANS = {
     storedSandboxLimit: 20,
     allowedSandboxTiers: ['launch', 'build', 'max-cpu'],
     gpuEnabled: true,
+    isFree: false,
     stripePriceEnv: 'STRIPE_PRICE_TEAM',
   },
 } as const;
@@ -82,7 +97,9 @@ export function isSandboxSizeTier(value: string): value is SandboxSizeTier {
 }
 
 export function stripePriceIdForPlan(planId: CloudPlanId): string | null {
-  const envName = CLOUD_PLANS[planId].stripePriceEnv;
+  const plan = CLOUD_PLANS[planId];
+  if (plan.isFree) return null;
+  const envName = plan.stripePriceEnv;
   return process.env[envName] || null;
 }
 
@@ -90,6 +107,7 @@ export function planFromStripePriceId(priceId: string | null | undefined): Cloud
   if (!priceId) return null;
 
   for (const plan of Object.values(CLOUD_PLANS)) {
+    if (plan.isFree) continue;
     if (process.env[plan.stripePriceEnv] === priceId) {
       return plan.id;
     }

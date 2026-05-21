@@ -127,6 +127,19 @@ export async function upsertCloudAccountForPlan(data: {
   });
 }
 
+export async function activateFreeCloudAccount(userId: string): Promise<CloudAccount> {
+  const existing = await getCloudAccount(userId);
+  if (existing?.plan && existing.subscription_status === 'active') {
+    return existing;
+  }
+
+  return upsertCloudAccountForPlan({
+    user_id: userId,
+    plan: 'free',
+    subscription_status: 'active',
+  });
+}
+
 export async function saveCheckoutSession(data: {
   stripe_checkout_session_id: string;
   user_id: string;

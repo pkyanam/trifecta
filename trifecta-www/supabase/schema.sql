@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS user_roles (
 
 CREATE TABLE IF NOT EXISTS cloud_accounts (
   user_id                    TEXT PRIMARY KEY,
-  plan                       TEXT CHECK (plan IN ('starter', 'pro', 'team')),
+  plan                       TEXT CHECK (plan IN ('free', 'starter', 'pro', 'team')),
   subscription_status        TEXT NOT NULL DEFAULT 'none'
                                    CHECK (subscription_status IN (
                                      'none',
