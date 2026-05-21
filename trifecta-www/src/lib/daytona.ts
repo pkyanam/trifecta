@@ -36,6 +36,10 @@ function execScriptCommand(scriptLines: string[]): string {
   return `echo "${encoded}" | base64 -d | bash`;
 }
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 function trifectaEnv(pairingToken?: string): Record<string, string> {
   return {
     BELWEAVE_HOST: '0.0.0.0',
@@ -66,8 +70,8 @@ function startTrifectaCommand(pairingToken: string): string {
     `export BELWEAVE_HOME=${DATA_DIR}`,
     `export BELWEAVE_MODE=server`,
     `export BELWEAVE_NO_BROWSER=true`,
-    `export BELWEAVE_REVIEW_PAIRING_TOKEN=${pairingToken}`,
-    `nohup trifecta serve --mode server --host 0.0.0.0 --port ${config.trifecta.serverPort} --base-dir ${DATA_DIR} --no-browser --review-pairing-token ${pairingToken} ${DATA_DIR} >${TRIFECTA_LOG} 2>&1 </dev/null &`,
+    `export BELWEAVE_REVIEW_PAIRING_TOKEN=${shellQuote(pairingToken)}`,
+    `nohup trifecta serve --mode server --host 0.0.0.0 --port ${config.trifecta.serverPort} --base-dir ${DATA_DIR} --no-browser ${DATA_DIR} >${TRIFECTA_LOG} 2>&1 </dev/null &`,
     `echo $! >${TRIFECTA_PID}`,
   ];
   const innerB64 = Buffer.from(innerLines.join('\n')).toString('base64');

@@ -8,6 +8,8 @@ import * as Effect from "effect/Effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
 import { ServerAuth } from "../auth/Services/ServerAuth.ts";
+import { isReviewSession, REVIEW_ACCESS_DENIED_MESSAGE } from "../auth/reviewAccess.ts";
+import { ServerConfig } from "../config.ts";
 import { normalizeDispatchCommand } from "./Normalizer.ts";
 import { OrchestrationEngineService } from "./Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "./Services/ProjectionSnapshotQuery.ts";
@@ -30,10 +32,16 @@ const respondToOrchestrationHttpError = (
 const authenticateOwnerSession = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const serverAuth = yield* ServerAuth;
+  const config = yield* ServerConfig;
   const session = yield* serverAuth.authenticateHttpRequest(request);
   if (session.role !== "owner") {
     return yield* new OrchestrationDispatchCommandError({
       message: "Only owner sessions can manage projects.",
+    });
+  }
+  if (isReviewSession(session, config)) {
+    return yield* new OrchestrationDispatchCommandError({
+      message: REVIEW_ACCESS_DENIED_MESSAGE,
     });
   }
   return session;

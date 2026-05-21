@@ -15,6 +15,8 @@ import {
   CommandId,
   EventId,
   type OrchestrationCommand,
+  GitCommandError,
+  GitManagerError,
   type GitActionProgressEvent,
   type GitManagerServiceError,
   OrchestrationDispatchCommandError,
@@ -35,8 +37,15 @@ import {
   ProjectWriteFileError,
   OrchestrationReplayEventsError,
   FilesystemBrowseError,
+  KeybindingsConfigError,
+  OpenError,
+  ServerProviderUpdateError,
+  ServerSettingsError,
+  SourceControlRepositoryError,
   ThreadId,
+  TerminalCwdError,
   type TerminalEvent,
+  VcsUnsupportedOperationError,
   WS_METHODS,
   WsRpcGroup,
 } from "@belweave/contracts";
@@ -77,7 +86,7 @@ import { GitWorkflowService } from "./git/GitWorkflowService.ts";
 import { ProjectSetupScriptRunner } from "./project/Services/ProjectSetupScriptRunner.ts";
 import { RepositoryIdentityResolver } from "./project/Services/RepositoryIdentityResolver.ts";
 import { ServerEnvironment } from "./environment/Services/ServerEnvironment.ts";
-import { ServerAuth } from "./auth/Services/ServerAuth.ts";
+import { ServerAuth, type AuthenticatedSession } from "./auth/Services/ServerAuth.ts";
 import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
 import * as TraceDiagnostics from "./diagnostics/TraceDiagnostics.ts";
 import * as SourceControlDiscoveryLayer from "./sourceControl/SourceControlDiscovery.ts";
@@ -100,6 +109,7 @@ import {
   type SessionCredentialChange,
 } from "./auth/Services/SessionCredentialService.ts";
 import { respondToAuthError } from "./auth/http.ts";
+import { isReviewSession, REVIEW_ACCESS_DENIED_MESSAGE } from "./auth/reviewAccess.ts";
 const isOrchestrationDispatchCommandError = Schema.is(OrchestrationDispatchCommandError);
 const isSshError = Schema.is(SshError);
 
@@ -178,7 +188,7 @@ function toAuthAccessStreamEvent(
   }
 }
 
-const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
+const makeWsRpcLayer = (session: AuthenticatedSession) =>
   WsRpcGroup.toLayer(
     Effect.gen(function* () {
       const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
@@ -220,8 +230,51 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
       const bootstrapCredentials = yield* BootstrapCredentialService;
       const sessions = yield* SessionCredentialService;
       const processDiagnostics = yield* ProcessDiagnostics.ProcessDiagnostics;
+      const currentSessionId = session.sessionId;
+      const reviewSession = isReviewSession(session, config);
       const serverCommandId = (tag: string) =>
         CommandId.make(`server:${tag}:${crypto.randomUUID()}`);
+      const reviewDenied = <E>(error: E): Effect.Effect<void, E> =>
+        reviewSession ? Effect.fail(error) : Effect.void;
+      const reviewDeniedStream = <A, E>(error: E): Stream.Stream<A, E> =>
+        reviewSession ? Stream.fail(error) : Stream.empty;
+      const reviewDeniedOrchestration = () =>
+        reviewDenied(
+          new OrchestrationDispatchCommandError({
+            message: REVIEW_ACCESS_DENIED_MESSAGE,
+          }),
+        );
+      const reviewDeniedGit = (operation: string, cwd = config.cwd) =>
+        new GitCommandError({
+          operation,
+          command: operation,
+          cwd,
+          detail: REVIEW_ACCESS_DENIED_MESSAGE,
+        });
+      const reviewDeniedGitManager = (operation: string) =>
+        new GitManagerError({
+          operation,
+          detail: REVIEW_ACCESS_DENIED_MESSAGE,
+        });
+      const reviewDeniedSourceControl = (operation: string, provider: string | undefined) =>
+        new SourceControlRepositoryError({
+          provider:
+            provider === "github" ||
+            provider === "gitlab" ||
+            provider === "azure-devops" ||
+            provider === "bitbucket"
+              ? provider
+              : "unknown",
+          operation,
+          detail: REVIEW_ACCESS_DENIED_MESSAGE,
+        });
+      const reviewDeniedTerminal = () =>
+        new TerminalCwdError({
+          cwd: config.cwd,
+          reason: "statFailed",
+          cause: new Error(REVIEW_ACCESS_DENIED_MESSAGE),
+        });
+      const reviewDeniedSsh = () => new SshSpawnError({ detail: REVIEW_ACCESS_DENIED_MESSAGE });
 
       const loadAuthAccessSnapshot = () =>
         Effect.all({
@@ -595,6 +648,27 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           );
       };
 
+      const assertReviewDispatchAllowed = (
+        normalizedCommand: OrchestrationCommand,
+      ): Effect.Effect<void, OrchestrationDispatchCommandError> => {
+        if (!reviewSession) {
+          return Effect.void;
+        }
+        if (
+          normalizedCommand.type === "project.create" ||
+          normalizedCommand.type === "project.meta.update" ||
+          normalizedCommand.type === "project.delete" ||
+          normalizedCommand.type === "thread.delete" ||
+          normalizedCommand.type === "thread.checkpoint.revert" ||
+          (normalizedCommand.type === "thread.turn.start" &&
+            (normalizedCommand.bootstrap?.prepareWorktree !== undefined ||
+              normalizedCommand.bootstrap?.runSetupScript === true))
+        ) {
+          return reviewDeniedOrchestration();
+        }
+        return Effect.void;
+      };
+
       const loadServerConfig = Effect.gen(function* () {
         const keybindingsConfig = yield* keybindings.loadConfigState;
         const providers = yield* providerRegistry.getProviders;
@@ -636,6 +710,7 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
             ORCHESTRATION_WS_METHODS.dispatchCommand,
             Effect.gen(function* () {
               const normalizedCommand = yield* normalizeDispatchCommand(command);
+              yield* assertReviewDispatchAllowed(normalizedCommand);
               const shouldStopSessionAfterArchive =
                 normalizedCommand.type === "thread.archive"
                   ? yield* projectionSnapshotQuery
@@ -874,7 +949,12 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.serverUpdateProvider]: (input) =>
           observeRpcEffect(
             WS_METHODS.serverUpdateProvider,
-            providerMaintenanceRunner.updateProvider(input),
+            reviewDenied(
+              new ServerProviderUpdateError({
+                provider: input.provider,
+                reason: REVIEW_ACCESS_DENIED_MESSAGE,
+              }),
+            ).pipe(Effect.flatMap(() => providerMaintenanceRunner.updateProvider(input))),
             {
               "rpc.aggregate": "server",
             },
@@ -883,6 +963,12 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           observeRpcEffect(
             WS_METHODS.serverUpsertKeybinding,
             Effect.gen(function* () {
+              yield* reviewDenied(
+                new KeybindingsConfigError({
+                  configPath: config.keybindingsConfigPath,
+                  detail: REVIEW_ACCESS_DENIED_MESSAGE,
+                }),
+              );
               const keybindingsConfig = yield* keybindings.upsertKeybindingRule(rule);
               return { keybindings: keybindingsConfig, issues: [] };
             }),
@@ -892,6 +978,12 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           observeRpcEffect(
             WS_METHODS.serverRemoveKeybinding,
             Effect.gen(function* () {
+              yield* reviewDenied(
+                new KeybindingsConfigError({
+                  configPath: config.keybindingsConfigPath,
+                  detail: REVIEW_ACCESS_DENIED_MESSAGE,
+                }),
+              );
               const keybindingsConfig = yield* keybindings.removeKeybindingRule(rule);
               return { keybindings: keybindingsConfig, issues: [] };
             }),
@@ -908,7 +1000,16 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.serverUpdateSettings]: ({ patch }) =>
           observeRpcEffect(
             WS_METHODS.serverUpdateSettings,
-            serverSettings.updateSettings(patch).pipe(Effect.map(redactServerSettingsForClient)),
+            reviewDenied(
+              new ServerSettingsError({
+                settingsPath: config.settingsPath,
+                detail: REVIEW_ACCESS_DENIED_MESSAGE,
+              }),
+            ).pipe(
+              Effect.flatMap(() =>
+                serverSettings.updateSettings(patch).pipe(Effect.map(redactServerSettingsForClient)),
+              ),
+            ),
             {
               "rpc.aggregate": "server",
             },
@@ -937,9 +1038,20 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
             "rpc.aggregate": "server",
           }),
         [WS_METHODS.serverSignalProcess]: (input) =>
-          observeRpcEffect(WS_METHODS.serverSignalProcess, processDiagnostics.signal(input), {
-            "rpc.aggregate": "server",
-          }),
+          observeRpcEffect(
+            WS_METHODS.serverSignalProcess,
+            reviewSession
+              ? Effect.succeed({
+                  pid: input.pid,
+                  signal: input.signal,
+                  signaled: false,
+                  message: Option.some(REVIEW_ACCESS_DENIED_MESSAGE),
+                })
+              : processDiagnostics.signal(input),
+            {
+              "rpc.aggregate": "server",
+            },
+          ),
         [WS_METHODS.sourceControlLookupRepository]: (input) =>
           observeRpcEffect(
             WS_METHODS.sourceControlLookupRepository,
@@ -951,7 +1063,9 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.sourceControlCloneRepository]: (input) =>
           observeRpcEffect(
             WS_METHODS.sourceControlCloneRepository,
-            sourceControlRepositories.cloneRepository(input),
+            reviewDenied(reviewDeniedSourceControl("cloneRepository", input.provider)).pipe(
+              Effect.flatMap(() => sourceControlRepositories.cloneRepository(input)),
+            ),
             {
               "rpc.aggregate": "source-control",
             },
@@ -959,9 +1073,13 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.sourceControlPublishRepository]: (input) =>
           observeRpcEffect(
             WS_METHODS.sourceControlPublishRepository,
-            sourceControlRepositories
-              .publishRepository(input)
-              .pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            reviewDenied(reviewDeniedSourceControl("publishRepository", input.provider)).pipe(
+              Effect.flatMap(() =>
+                sourceControlRepositories
+                  .publishRepository(input)
+                  .pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+              ),
+            ),
             {
               "rpc.aggregate": "source-control",
             },
@@ -998,33 +1116,55 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.projectsWriteFile]: (input) =>
           observeRpcEffect(
             WS_METHODS.projectsWriteFile,
-            workspaceFileSystem.writeFile(input).pipe(
-              Effect.mapError((cause) => {
-                const message = isWorkspacePathOutsideRootError(cause)
-                  ? "Workspace file path must stay within the project root."
-                  : "Failed to write workspace file";
-                return new ProjectWriteFileError({
-                  message,
-                  cause,
-                });
+            reviewDenied(
+              new ProjectWriteFileError({
+                message: REVIEW_ACCESS_DENIED_MESSAGE,
               }),
+            ).pipe(
+              Effect.flatMap(() =>
+                workspaceFileSystem.writeFile(input).pipe(
+                  Effect.mapError((cause) => {
+                    const message = isWorkspacePathOutsideRootError(cause)
+                      ? "Workspace file path must stay within the project root."
+                      : "Failed to write workspace file";
+                    return new ProjectWriteFileError({
+                      message,
+                      cause,
+                    });
+                  }),
+                ),
+              ),
             ),
             { "rpc.aggregate": "workspace" },
           ),
         [WS_METHODS.shellOpenInEditor]: (input) =>
-          observeRpcEffect(WS_METHODS.shellOpenInEditor, open.openInEditor(input), {
-            "rpc.aggregate": "workspace",
-          }),
+          observeRpcEffect(
+            WS_METHODS.shellOpenInEditor,
+            reviewDenied(new OpenError({ message: REVIEW_ACCESS_DENIED_MESSAGE })).pipe(
+              Effect.flatMap(() => open.openInEditor(input)),
+            ),
+            {
+              "rpc.aggregate": "workspace",
+            },
+          ),
         [WS_METHODS.filesystemBrowse]: (input) =>
           observeRpcEffect(
             WS_METHODS.filesystemBrowse,
-            workspaceEntries.browse(input).pipe(
-              Effect.mapError(
-                (cause) =>
-                  new FilesystemBrowseError({
-                    message: cause.detail,
-                    cause,
-                  }),
+            reviewDenied(
+              new FilesystemBrowseError({
+                message: REVIEW_ACCESS_DENIED_MESSAGE,
+              }),
+            ).pipe(
+              Effect.flatMap(() =>
+                workspaceEntries.browse(input).pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new FilesystemBrowseError({
+                        message: cause.detail,
+                        cause,
+                      }),
+                  ),
+                ),
               ),
             ),
             { "rpc.aggregate": "workspace" },
@@ -1050,36 +1190,47 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.vcsPull]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsPull,
-            gitWorkflow.pullCurrentBranch(input.cwd).pipe(
-              Effect.matchCauseEffect({
-                onFailure: (cause) => Effect.failCause(cause),
-                onSuccess: (result) =>
-                  refreshGitStatus(input.cwd).pipe(Effect.ignore({ log: true }), Effect.as(result)),
-              }),
+            reviewDenied(reviewDeniedGit("pull", input.cwd)).pipe(
+              Effect.flatMap(() =>
+                gitWorkflow.pullCurrentBranch(input.cwd).pipe(
+                  Effect.matchCauseEffect({
+                    onFailure: (cause) => Effect.failCause(cause),
+                    onSuccess: (result) =>
+                      refreshGitStatus(input.cwd).pipe(
+                        Effect.ignore({ log: true }),
+                        Effect.as(result),
+                      ),
+                  }),
+                ),
+              ),
             ),
             { "rpc.aggregate": "git" },
           ),
         [WS_METHODS.gitRunStackedAction]: (input) =>
           observeRpcStream(
             WS_METHODS.gitRunStackedAction,
-            Stream.callback<GitActionProgressEvent, GitManagerServiceError>((queue) =>
-              gitWorkflow
-                .runStackedAction(input, {
-                  actionId: input.actionId,
-                  progressReporter: {
-                    publish: (event) => Queue.offer(queue, event).pipe(Effect.asVoid),
-                  },
-                })
-                .pipe(
-                  Effect.matchCauseEffect({
-                    onFailure: (cause) => Queue.failCause(queue, cause),
-                    onSuccess: () =>
-                      refreshGitStatus(input.cwd).pipe(
-                        Effect.andThen(Queue.end(queue).pipe(Effect.asVoid)),
-                      ),
-                  }),
+            reviewSession
+              ? reviewDeniedStream<GitActionProgressEvent, GitManagerServiceError>(
+                  reviewDeniedGitManager("runStackedAction"),
+                )
+              : Stream.callback<GitActionProgressEvent, GitManagerServiceError>((queue) =>
+                  gitWorkflow
+                    .runStackedAction(input, {
+                      actionId: input.actionId,
+                      progressReporter: {
+                        publish: (event) => Queue.offer(queue, event).pipe(Effect.asVoid),
+                      },
+                    })
+                    .pipe(
+                      Effect.matchCauseEffect({
+                        onFailure: (cause) => Queue.failCause(queue, cause),
+                        onSuccess: () =>
+                          refreshGitStatus(input.cwd).pipe(
+                            Effect.andThen(Queue.end(queue).pipe(Effect.asVoid)),
+                          ),
+                      }),
+                    ),
                 ),
-            ),
             { "rpc.aggregate": "vcs" },
           ),
         [WS_METHODS.gitResolvePullRequest]: (input) =>
@@ -1093,9 +1244,13 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.gitPreparePullRequestThread]: (input) =>
           observeRpcEffect(
             WS_METHODS.gitPreparePullRequestThread,
-            gitWorkflow
-              .preparePullRequestThread(input)
-              .pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            reviewDenied(reviewDeniedGitManager("preparePullRequestThread")).pipe(
+              Effect.flatMap(() =>
+                gitWorkflow
+                  .preparePullRequestThread(input)
+                  .pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+              ),
+            ),
             { "rpc.aggregate": "git" },
           ),
         [WS_METHODS.vcsListRefs]: (input) =>
@@ -1105,59 +1260,121 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.vcsCreateWorktree]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsCreateWorktree,
-            gitWorkflow.createWorktree(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            reviewDenied(reviewDeniedGit("createWorktree", input.cwd)).pipe(
+              Effect.flatMap(() =>
+                gitWorkflow.createWorktree(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+              ),
+            ),
             { "rpc.aggregate": "vcs" },
           ),
         [WS_METHODS.vcsRemoveWorktree]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsRemoveWorktree,
-            gitWorkflow.removeWorktree(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            reviewDenied(reviewDeniedGit("removeWorktree", input.cwd)).pipe(
+              Effect.flatMap(() =>
+                gitWorkflow.removeWorktree(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+              ),
+            ),
             { "rpc.aggregate": "vcs" },
           ),
         [WS_METHODS.vcsCreateRef]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsCreateRef,
-            gitWorkflow.createRef(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            reviewDenied(reviewDeniedGit("createRef", input.cwd)).pipe(
+              Effect.flatMap(() =>
+                gitWorkflow.createRef(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+              ),
+            ),
             { "rpc.aggregate": "vcs" },
           ),
         [WS_METHODS.vcsSwitchRef]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsSwitchRef,
-            gitWorkflow.switchRef(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            reviewDenied(reviewDeniedGit("switchRef", input.cwd)).pipe(
+              Effect.flatMap(() =>
+                gitWorkflow.switchRef(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+              ),
+            ),
             { "rpc.aggregate": "vcs" },
           ),
         [WS_METHODS.vcsInit]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsInit,
-            vcsProvisioning
-              .initRepository(input)
-              .pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            reviewDenied(
+              new VcsUnsupportedOperationError({
+                operation: "init",
+                kind: "git",
+                detail: REVIEW_ACCESS_DENIED_MESSAGE,
+              }),
+            ).pipe(
+              Effect.flatMap(() =>
+                vcsProvisioning
+                  .initRepository(input)
+                  .pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+              ),
+            ),
             { "rpc.aggregate": "vcs" },
           ),
         [WS_METHODS.terminalOpen]: (input) =>
-          observeRpcEffect(WS_METHODS.terminalOpen, terminalManager.open(input), {
-            "rpc.aggregate": "terminal",
-          }),
+          observeRpcEffect(
+            WS_METHODS.terminalOpen,
+            reviewDenied(reviewDeniedTerminal()).pipe(
+              Effect.flatMap(() => terminalManager.open(input)),
+            ),
+            {
+              "rpc.aggregate": "terminal",
+            },
+          ),
         [WS_METHODS.terminalWrite]: (input) =>
-          observeRpcEffect(WS_METHODS.terminalWrite, terminalManager.write(input), {
-            "rpc.aggregate": "terminal",
-          }),
+          observeRpcEffect(
+            WS_METHODS.terminalWrite,
+            reviewDenied(reviewDeniedTerminal()).pipe(
+              Effect.flatMap(() => terminalManager.write(input)),
+            ),
+            {
+              "rpc.aggregate": "terminal",
+            },
+          ),
         [WS_METHODS.terminalResize]: (input) =>
-          observeRpcEffect(WS_METHODS.terminalResize, terminalManager.resize(input), {
-            "rpc.aggregate": "terminal",
-          }),
+          observeRpcEffect(
+            WS_METHODS.terminalResize,
+            reviewDenied(reviewDeniedTerminal()).pipe(
+              Effect.flatMap(() => terminalManager.resize(input)),
+            ),
+            {
+              "rpc.aggregate": "terminal",
+            },
+          ),
         [WS_METHODS.terminalClear]: (input) =>
-          observeRpcEffect(WS_METHODS.terminalClear, terminalManager.clear(input), {
-            "rpc.aggregate": "terminal",
-          }),
+          observeRpcEffect(
+            WS_METHODS.terminalClear,
+            reviewDenied(reviewDeniedTerminal()).pipe(
+              Effect.flatMap(() => terminalManager.clear(input)),
+            ),
+            {
+              "rpc.aggregate": "terminal",
+            },
+          ),
         [WS_METHODS.terminalRestart]: (input) =>
-          observeRpcEffect(WS_METHODS.terminalRestart, terminalManager.restart(input), {
-            "rpc.aggregate": "terminal",
-          }),
+          observeRpcEffect(
+            WS_METHODS.terminalRestart,
+            reviewDenied(reviewDeniedTerminal()).pipe(
+              Effect.flatMap(() => terminalManager.restart(input)),
+            ),
+            {
+              "rpc.aggregate": "terminal",
+            },
+          ),
         [WS_METHODS.terminalClose]: (input) =>
-          observeRpcEffect(WS_METHODS.terminalClose, terminalManager.close(input), {
-            "rpc.aggregate": "terminal",
-          }),
+          observeRpcEffect(
+            WS_METHODS.terminalClose,
+            reviewDenied(reviewDeniedTerminal()).pipe(
+              Effect.flatMap(() => terminalManager.close(input)),
+            ),
+            {
+              "rpc.aggregate": "terminal",
+            },
+          ),
         [WS_METHODS.subscribeTerminalEvents]: (_input) =>
           observeRpcStream(
             WS_METHODS.subscribeTerminalEvents,
@@ -1238,9 +1455,13 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.sshListHosts]: (_input) =>
           observeRpcEffect(
             WS_METHODS.sshListHosts,
-            sshHostProfiles.list().pipe(
-              Effect.map((hosts) => ({ hosts })),
-              Effect.mapError((cause) => mapToSshError(cause)),
+            reviewDenied(reviewDeniedSsh()).pipe(
+              Effect.flatMap(() =>
+                sshHostProfiles.list().pipe(
+                  Effect.map((hosts) => ({ hosts })),
+                  Effect.mapError((cause) => mapToSshError(cause)),
+                ),
+              ),
             ),
             { "rpc.aggregate": "ssh" },
           ),
@@ -1248,6 +1469,7 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           observeRpcEffect(
             WS_METHODS.sshAddHost,
             Effect.gen(function* () {
+              yield* reviewDenied(reviewDeniedSsh());
               const profile = yield* sshHostProfiles.create(input);
               yield* sshAuditLog
                 .append({
@@ -1270,6 +1492,7 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           observeRpcEffect(
             WS_METHODS.sshRemoveHost,
             Effect.gen(function* () {
+              yield* reviewDenied(reviewDeniedSsh());
               const profile = yield* sshHostProfiles.get(input.hostId);
               yield* sshHostProfiles.remove(input.hostId);
               yield* sshKnownHosts
@@ -1295,6 +1518,7 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           observeRpcEffect(
             WS_METHODS.sshOpenSession,
             Effect.gen(function* () {
+              yield* reviewDenied(reviewDeniedSsh());
               const snapshot = yield* sshSessionManager.open({
                 authSessionId: currentSessionId,
                 hostId: input.hostId,
@@ -1316,62 +1540,83 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.sshGetSession]: (input) =>
           observeRpcEffect(
             WS_METHODS.sshGetSession,
-            sshSessionManager
-              .get({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
-              .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            reviewDenied(reviewDeniedSsh()).pipe(
+              Effect.flatMap(() =>
+                sshSessionManager
+                  .get({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
+                  .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+              ),
+            ),
             { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.sshSendInput]: (input) =>
           observeRpcEffect(
             WS_METHODS.sshSendInput,
-            sshSessionManager
-              .sendInput({
-                authSessionId: currentSessionId,
-                sshSessionId: input.sessionId,
-                data: input.data,
-              })
-              .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            reviewDenied(reviewDeniedSsh()).pipe(
+              Effect.flatMap(() =>
+                sshSessionManager
+                  .sendInput({
+                    authSessionId: currentSessionId,
+                    sshSessionId: input.sessionId,
+                    data: input.data,
+                  })
+                  .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+              ),
+            ),
             { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.sshResize]: (input) =>
           observeRpcEffect(
             WS_METHODS.sshResize,
-            sshSessionManager
-              .resize({
-                authSessionId: currentSessionId,
-                sshSessionId: input.sessionId,
-                cols: input.cols,
-                rows: input.rows,
-              })
-              .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            reviewDenied(reviewDeniedSsh()).pipe(
+              Effect.flatMap(() =>
+                sshSessionManager
+                  .resize({
+                    authSessionId: currentSessionId,
+                    sshSessionId: input.sessionId,
+                    cols: input.cols,
+                    rows: input.rows,
+                  })
+                  .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+              ),
+            ),
             { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.sshConfirmHostKey]: (input) =>
           observeRpcEffect(
             WS_METHODS.sshConfirmHostKey,
-            sshSessionManager
-              .confirmHostKey({
-                authSessionId: currentSessionId,
-                sshSessionId: input.sessionId,
-                fingerprintSha256: input.fingerprintSha256,
-                decision: input.decision,
-                remember: input.remember,
-              })
-              .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            reviewDenied(reviewDeniedSsh()).pipe(
+              Effect.flatMap(() =>
+                sshSessionManager
+                  .confirmHostKey({
+                    authSessionId: currentSessionId,
+                    sshSessionId: input.sessionId,
+                    fingerprintSha256: input.fingerprintSha256,
+                    decision: input.decision,
+                    remember: input.remember,
+                  })
+                  .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+              ),
+            ),
             { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.sshCloseSession]: (input) =>
           observeRpcEffect(
             WS_METHODS.sshCloseSession,
-            sshSessionManager
-              .close({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
-              .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            reviewDenied(reviewDeniedSsh()).pipe(
+              Effect.flatMap(() =>
+                sshSessionManager
+                  .close({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
+                  .pipe(Effect.mapError((cause) => mapToSshError(cause))),
+              ),
+            ),
             { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.sshIssueSessionToken]: (input) =>
           observeRpcEffect(
             WS_METHODS.sshIssueSessionToken,
             Effect.gen(function* () {
+              yield* reviewDenied(reviewDeniedSsh());
               // Verify caller still owns the session before minting a fresh token.
               yield* sshSessionManager
                 .get({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
@@ -1390,16 +1635,20 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
         [WS_METHODS.sshListAudit]: (_input) =>
           observeRpcEffect(
             WS_METHODS.sshListAudit,
-            sshAuditLog.list().pipe(
-              Effect.map((events) => ({ events })),
-              Effect.mapError((cause) => mapToSshError(cause)),
+            reviewDenied(reviewDeniedSsh()).pipe(
+              Effect.flatMap(() =>
+                sshAuditLog.list().pipe(
+                  Effect.map((events) => ({ events })),
+                  Effect.mapError((cause) => mapToSshError(cause)),
+                ),
+              ),
             ),
             { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.sshSetupShellProfile]: (_input: unknown) =>
           observeRpcEffect(
             WS_METHODS.sshSetupShellProfile,
-            Effect.sync(() => {
+            reviewDenied(reviewDeniedSsh()).pipe(Effect.flatMap(() => Effect.sync(() => {
               if (process.platform !== "darwin") {
                 return SshSetupShellProfileResult.make({
                   shellProfile: process.platform === "win32" ? "Windows OpenSSH" : "OpenSSH",
@@ -1447,24 +1696,29 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
                 shellProfile: rcFile as any,
                 alreadyPresent: false,
               });
-            }),
+            }))),
             { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.subscribeSshTerminal]: (input) =>
           observeRpcStream(
             WS_METHODS.subscribeSshTerminal,
-            sshSessionManager
-              .subscribe({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
-              .pipe(Stream.mapError((cause) => mapToSshError(cause))) as Stream.Stream<
-              SshTerminalEvent,
-              SshError
-            >,
+            reviewSession
+              ? reviewDeniedStream<SshTerminalEvent, SshError>(reviewDeniedSsh())
+              : (sshSessionManager
+                  .subscribe({ authSessionId: currentSessionId, sshSessionId: input.sessionId })
+                  .pipe(Stream.mapError((cause) => mapToSshError(cause))) as Stream.Stream<
+                  SshTerminalEvent,
+                  SshError
+                >),
             { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.subscribeAuthAccess]: (_input) =>
           observeRpcStreamEffect(
             WS_METHODS.subscribeAuthAccess,
             Effect.gen(function* () {
+              if (reviewSession) {
+                return Stream.empty;
+              }
               const initialSnapshot = yield* loadAuthAccessSnapshot();
               const revisionRef = yield* Ref.make(1);
               const accessChanges: Stream.Stream<
@@ -1511,7 +1765,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
           disableTracing: true,
         }).pipe(
           Effect.provide(
-            makeWsRpcLayer(session.sessionId).pipe(
+            makeWsRpcLayer(session).pipe(
               Layer.provideMerge(RpcSerialization.layerJson),
               Layer.provide(ProviderMaintenanceRunner.layer),
               Layer.provide(

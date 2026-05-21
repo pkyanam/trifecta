@@ -140,7 +140,14 @@ class PairingFlow(private val httpClient: OkHttpClient = defaultClient()) {
             val scheme = url.scheme ?: return url
             val host = url.host ?: return url
             val port = if (url.port == -1) -1 else url.port
-            return URI(scheme, null, host, port, null, null, null)
+            val rawPath = url.rawPath.orEmpty().trimEnd('/')
+            val basePath = when {
+                rawPath == "/pair" -> null
+                rawPath.endsWith("/pair") -> rawPath.removeSuffix("/pair").takeIf { it.isNotEmpty() }
+                rawPath.isNotEmpty() -> rawPath
+                else -> null
+            }
+            return URI(scheme, null, host, port, basePath, null, null)
         }
 
         /**
@@ -169,9 +176,7 @@ class PairingFlow(private val httpClient: OkHttpClient = defaultClient()) {
             val scheme = uri.scheme
             val host = uri.host
             if (token != null && scheme != null && host != null) {
-                val port = if (uri.port == -1) -1 else uri.port
-                val direct = URI(scheme, null, host, port, null, null, null)
-                return direct to token
+                return serverBaseURL(uri) to token
             }
             return null
         }

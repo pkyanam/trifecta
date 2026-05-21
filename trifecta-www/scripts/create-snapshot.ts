@@ -5,7 +5,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 const snapshotName = process.env.TRIFECTA_SNAPSHOT_NAME || 'trifecta-server-v1';
-const trifectaVersion = process.env.TRIFECTA_NPM_VERSION || '0.0.35-alpha.1';
+const trifectaVersion = process.env.TRIFECTA_NPM_VERSION || '0.0.35-alpha.2';
 
 async function main() {
   const daytona = new Daytona({
