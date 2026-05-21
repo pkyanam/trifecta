@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getAllSandboxes, createSandbox as dbCreateSandbox, updateSandbox } from '@/lib/db';
@@ -6,6 +7,9 @@ import { SandboxTier } from '@/lib/config';
 import { getIsAdmin } from '@/lib/admin';
 import { z } from 'zod';
 import crypto from 'crypto';
+
+// Sandbox creation can take up to ~2 minutes (Daytona boot + trifecta health wait).
+export const maxDuration = 300;
 
 const createSchema = z.object({
   name: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/, 'Use lowercase letters, numbers, and hyphens only'),
@@ -44,15 +48,17 @@ export async function POST(request: Request) {
 
     const record = await dbCreateSandbox({ name, tier, pairing_token: pairingToken, user_id: userId });
 
-    daytonaCreateSandbox({ name, tier: tier as SandboxTier, pairingToken })
-      .then((info) => updateSandbox(record.id, userId, {
-        daytona_sandbox_id: info.daytonaSandboxId,
-        status: 'running',
-      }))
-      .catch((err) => {
-        console.error('Background sandbox creation failed:', err);
-        updateSandbox(record.id, userId, { status: 'error' });
-      });
+    after(
+      daytonaCreateSandbox({ name, tier: tier as SandboxTier, pairingToken })
+        .then((info) => updateSandbox(record.id, userId, {
+          daytona_sandbox_id: info.daytonaSandboxId,
+          status: 'running',
+        }))
+        .catch((err) => {
+          console.error('Background sandbox creation failed:', err);
+          updateSandbox(record.id, userId, { status: 'error' });
+        })
+    );
 
     return NextResponse.json({ sandbox: record });
   } catch (error) {
