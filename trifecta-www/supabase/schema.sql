@@ -8,15 +8,20 @@ CREATE TABLE IF NOT EXISTS sandboxes (
   user_id            TEXT NOT NULL,
   name               TEXT NOT NULL,
   tier               TEXT NOT NULL DEFAULT 'launch',
+  disk_gib           INTEGER NOT NULL DEFAULT 10,
   daytona_sandbox_id TEXT,
   status             TEXT NOT NULL DEFAULT 'creating',
   pairing_token      TEXT,
   volume_id          TEXT,
   trifecta_url       TEXT,
   terminal_url       TEXT,
+  started_at         TIMESTAMPTZ,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE sandboxes ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+ALTER TABLE sandboxes ADD COLUMN IF NOT EXISTS disk_gib INTEGER NOT NULL DEFAULT 10;
 
 ALTER TABLE sandboxes
   ALTER COLUMN tier SET DEFAULT 'launch';
@@ -70,12 +75,17 @@ CREATE TABLE IF NOT EXISTS cloud_accounts (
   current_period_end         TIMESTAMPTZ,
   cancel_at_period_end       BOOLEAN NOT NULL DEFAULT false,
   runtime_credits_monthly    INTEGER NOT NULL DEFAULT 0,
+  runtime_credits_used       REAL NOT NULL DEFAULT 0,
   running_sandbox_limit      INTEGER NOT NULL DEFAULT 0,
   stored_sandbox_limit       INTEGER NOT NULL DEFAULT 0,
   gpu_enabled                BOOLEAN NOT NULL DEFAULT false,
+  idle_timeout_minutes       INTEGER NOT NULL DEFAULT 15,
   created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE cloud_accounts ADD COLUMN IF NOT EXISTS runtime_credits_used REAL NOT NULL DEFAULT 0;
+ALTER TABLE cloud_accounts ADD COLUMN IF NOT EXISTS idle_timeout_minutes INTEGER NOT NULL DEFAULT 15;
 
 ALTER TABLE cloud_accounts
   DROP CONSTRAINT IF EXISTS cloud_accounts_plan_check;
@@ -102,6 +112,18 @@ CREATE TABLE IF NOT EXISTS billing_checkout_sessions (
 
 CREATE INDEX IF NOT EXISTS billing_checkout_sessions_user_id_idx
   ON billing_checkout_sessions (user_id);
+
+-- ── Credit increment RPC ──────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION increment_credits_used(p_user_id TEXT, p_credits REAL)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE cloud_accounts
+  SET runtime_credits_used = runtime_credits_used + p_credits,
+      updated_at = now()
+  WHERE user_id = p_user_id;
+END;
+$$;
 
 -- ── auto-update updated_at ─────────────────────────────────────────────────
 

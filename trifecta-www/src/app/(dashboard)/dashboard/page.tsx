@@ -9,15 +9,24 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Box, Play, CircleDot, AlertTriangle, CreditCard, ShieldCheck } from 'lucide-react';
+import { Plus, Box, Play, CircleDot, AlertTriangle, CreditCard, ShieldCheck, Clock } from 'lucide-react';
 import type { CloudAccount, SandboxRecord } from '@/lib/types';
 import { ACTIVE_SUBSCRIPTION_STATUSES, CLOUD_PLANS } from '@/lib/billing';
+
+interface AccountInfo {
+  account: CloudAccount | null;
+  isAdmin: boolean;
+  creditsUsedTotal: number;
+  creditsRemaining: number;
+  creditsTotal: number;
+}
 
 export default function Dashboard() {
   const [sandboxes, setSandboxes] = useState<SandboxRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [account, setAccount] = useState<CloudAccount | null>(null);
+  const [creditInfo, setCreditInfo] = useState<Omit<AccountInfo, 'account' | 'isAdmin'> | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   const fetchSandboxes = useCallback(async () => {
@@ -44,9 +53,14 @@ export default function Dashboard() {
     const id = window.setTimeout(() => {
       fetch('/api/billing/account')
         .then((r) => r.json())
-        .then((d) => {
+        .then((d: AccountInfo) => {
           setIsAdmin(d.isAdmin === true);
           setAccount(d.account ?? null);
+          setCreditInfo({
+            creditsUsedTotal: d.creditsUsedTotal ?? 0,
+            creditsRemaining: d.creditsRemaining ?? 0,
+            creditsTotal: d.creditsTotal ?? 0,
+          });
         })
         .catch(() => setIsAdmin(false));
     }, 0);
@@ -105,28 +119,54 @@ export default function Dashboard() {
         {!loading && (
           <div className="mb-6 rounded-xl border border-border bg-card p-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-1 min-w-0">
                 {isAdmin ? (
                   <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
                 ) : (
                   <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
                 )}
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground">
                     {isAdmin ? 'Admin god mode' : hasActivePlan && currentPlan ? `${currentPlan.name} plan` : 'Choose a cloud plan'}
                   </p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {isAdmin
-                      ? 'This account can create and manage all sandbox sizes.'
-                      : hasActivePlan && currentPlan
-                        ? `${currentPlan.monthlyLaunchHours} Launch-hours included each month.`
+                  {!isAdmin && hasActivePlan && currentPlan && creditInfo ? (
+                    <div className="mt-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 mb-1">
+                        <span className="text-xs text-muted-foreground">
+                          {creditInfo.creditsUsedTotal.toFixed(1)} / {creditInfo.creditsTotal} Launch-hours used
+                        </span>
+                        {creditInfo.creditsRemaining <= 0 && (
+                          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Credits exhausted — overages apply</span>
+                        )}
+                        {creditInfo.creditsRemaining > 0 && creditInfo.creditsRemaining < creditInfo.creditsTotal * 0.1 && (
+                          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">&lt;10% remaining</span>
+                        )}
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            creditInfo.creditsRemaining <= 0 ? 'bg-amber-500' : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${Math.min(100, (creditInfo.creditsUsedTotal / Math.max(1, creditInfo.creditsTotal)) * 100).toFixed(1)}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>Idle auto-stop: {currentPlan.idleTimeoutMinutes} min</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {isAdmin
+                        ? 'This account can create and manage all sandbox sizes.'
                         : 'Sandbox creation unlocks after a plan is active on your account.'}
-                  </p>
+                    </p>
+                  )}
                 </div>
               </div>
               <Link
                 href="/dashboard/billing"
-                className={`inline-flex h-8 items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors ${
+                className={`inline-flex h-8 shrink-0 items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors ${
                   canCreate
                     ? 'border border-border bg-background text-foreground hover:bg-muted'
                     : 'bg-primary text-primary-foreground hover:bg-primary/80'
@@ -209,7 +249,12 @@ export default function Dashboard() {
       </main>
 
       {showModal && canCreate && (
-        <CreateSandboxModal allowedTiers={allowedTiers} onClose={() => setShowModal(false)} onSuccess={fetchSandboxes} />
+        <CreateSandboxModal
+          allowedTiers={allowedTiers}
+          gpuEnabled={isAdmin || (account?.gpu_enabled ?? false)}
+          onClose={() => setShowModal(false)}
+          onSuccess={fetchSandboxes}
+        />
       )}
     </div>
   );

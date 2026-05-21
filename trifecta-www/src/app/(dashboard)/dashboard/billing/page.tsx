@@ -2,11 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Check, CreditCard, ExternalLink, ShieldCheck, Zap } from 'lucide-react';
+import { Check, CreditCard, ExternalLink, ShieldCheck, Zap, Clock, Server } from 'lucide-react';
 import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CLOUD_PLANS, type CloudPlanId } from '@/lib/billing';
+import { CLOUD_PLANS, GPU_ADDON_TIERS, type CloudPlanId } from '@/lib/billing';
 
 interface CloudAccount {
   plan: CloudPlanId | null;
@@ -15,14 +15,19 @@ interface CloudAccount {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   runtime_credits_monthly: number;
+  runtime_credits_used: number;
   running_sandbox_limit: number;
   stored_sandbox_limit: number;
   gpu_enabled: boolean;
+  idle_timeout_minutes: number;
 }
 
 interface AccountResponse {
   account: CloudAccount | null;
   isAdmin: boolean;
+  creditsUsedTotal: number;
+  creditsRemaining: number;
+  creditsTotal: number;
 }
 
 const planList = Object.values(CLOUD_PLANS);
@@ -68,6 +73,9 @@ function BillingContent() {
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creditsUsedTotal, setCreditsUsedTotal] = useState(0);
+  const [creditsTotal, setCreditsTotal] = useState(0);
+  const [creditsRemaining, setCreditsRemaining] = useState(0);
 
   const fetchAccount = useCallback(async () => {
     const res = await fetch('/api/billing/account');
@@ -75,6 +83,9 @@ function BillingContent() {
     const data = (await res.json()) as AccountResponse;
     setAccount(data.account);
     setIsAdmin(data.isAdmin);
+    setCreditsUsedTotal(data.creditsUsedTotal ?? 0);
+    setCreditsTotal(data.creditsTotal ?? 0);
+    setCreditsRemaining(data.creditsRemaining ?? 0);
     setLoading(false);
   }, []);
 
@@ -179,6 +190,35 @@ function BillingContent() {
           </div>
         </section>
 
+        {!isAdmin && account?.plan && account.subscription_status === 'active' && (
+          <section className="mb-8 rounded-xl border border-border bg-card p-5">
+            <h2 className="text-base font-black text-foreground mb-4">Launch-Hour Credits</h2>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
+              <span className="text-sm text-muted-foreground">
+                {creditsUsedTotal.toFixed(2)} of {creditsTotal} hours used this period
+              </span>
+              <span className={`text-sm font-semibold ${creditsRemaining <= 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                {creditsRemaining <= 0 ? 'Exhausted' : `${creditsRemaining.toFixed(2)} hrs remaining`}
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-secondary overflow-hidden mb-3">
+              <div
+                className={`h-full rounded-full transition-all ${creditsRemaining <= 0 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                style={{ width: `${Math.min(100, (creditsUsedTotal / Math.max(1, creditsTotal)) * 100).toFixed(1)}%` }}
+              />
+            </div>
+            {creditsRemaining <= 0 && (
+              <p className="text-xs text-muted-foreground">
+                Included credits are exhausted. Running sandboxes continue at pay-as-you-go rates starting at $0.12/hr.
+              </p>
+            )}
+            <div className="flex items-center gap-1.5 mt-3 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" />
+              <span>Idle auto-stop: {account.idle_timeout_minutes} minutes of inactivity</span>
+            </div>
+          </section>
+        )}
+
         {isAdmin && (
           <section className="mb-8 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">
             <div className="flex gap-3">
@@ -228,6 +268,7 @@ function BillingContent() {
                   <ul className="mt-5 space-y-3 text-sm text-foreground">
                     <PlanFeature>{plan.runningSandboxLimit} running sandbox{plan.runningSandboxLimit === 1 ? '' : 'es'}</PlanFeature>
                     <PlanFeature>{plan.storedSandboxLimit} stored sandboxes</PlanFeature>
+                    <PlanFeature icon={<Clock className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />}>{plan.idleTimeoutMinutes}-min idle auto-stop</PlanFeature>
                     <PlanFeature>{plan.gpuEnabled ? 'GPU add-ons available' : 'CPU sandboxes only'}</PlanFeature>
                   </ul>
 
@@ -244,15 +285,45 @@ function BillingContent() {
             })}
           </div>
         </section>
+
+        {(isAdmin || (account?.gpu_enabled && account.subscription_status === 'active')) && (
+          <section className="mt-8 rounded-xl border border-border bg-card p-5">
+            <div className="flex gap-3 mb-4">
+              <Server className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+              <div>
+                <h2 className="text-base font-black text-foreground">GPU Add-ons</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  GPU sandboxes are available as pay-as-you-go add-ons. Select a GPU tier when creating a new sandbox.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {Object.values(GPU_ADDON_TIERS).map((gpu) => (
+                <div key={gpu.id} className="rounded-lg border border-border bg-secondary/30 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{gpu.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Pro and Team plans · billed while running</p>
+                    </div>
+                    <span className="text-sm font-black text-foreground shrink-0">{gpu.price}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              GPU sandboxes are billed only while running. Select a GPU tier from the &quot;New Sandbox&quot; dialog.
+            </p>
+          </section>
+        )}
       </main>
     </div>
   );
 }
 
-function PlanFeature({ children }: { children: React.ReactNode }) {
+function PlanFeature({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <li className="flex gap-2">
-      <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+      {icon ?? <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />}
       <span>{children}</span>
     </li>
   );

@@ -4,6 +4,7 @@ import { getAllSandboxes, getCloudAccount, getSandbox, updateSandbox } from '@/l
 import { startSandbox as daytonaStartSandbox } from '@/lib/daytona';
 import { getIsAdmin } from '@/lib/admin';
 import { canStartSandbox } from '@/lib/cloud-access';
+import { isCloudPlanId, CLOUD_PLANS } from '@/lib/billing';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
@@ -26,8 +27,13 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
-    await daytonaStartSandbox(sandbox.daytona_sandbox_id, sandbox.pairing_token);
-    await updateSandbox(id, userId, { status: 'running' });
+    const planId = account?.plan && isCloudPlanId(account.plan) ? account.plan : null;
+    const idleTimeoutMinutes = (planId ? CLOUD_PLANS[planId].idleTimeoutMinutes : null)
+      ?? account?.idle_timeout_minutes
+      ?? 15;
+
+    await daytonaStartSandbox(sandbox.daytona_sandbox_id, sandbox.pairing_token, idleTimeoutMinutes);
+    await updateSandbox(id, userId, { status: 'running', started_at: new Date().toISOString() });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Failed to start sandbox:', error);

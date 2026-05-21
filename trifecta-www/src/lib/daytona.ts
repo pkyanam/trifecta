@@ -130,23 +130,38 @@ async function waitForTrifecta(sandbox: Sandbox): Promise<void> {
   }
 }
 
-export async function createSandbox(opts: { name: string; tier: SandboxTier; pairingToken: string }): Promise<SandboxInfo> {
+export async function createSandbox(opts: { name: string; tier: SandboxTier; pairingToken: string; idleTimeoutMinutes?: number; gpuCount?: number; diskGiB?: number }): Promise<SandboxInfo> {
   try {
     const client = getDaytonaClient();
 
     console.log(`[Daytona] Creating sandbox: ${opts.name} (${opts.tier})`);
 
+    const useGpu = (opts.gpuCount ?? 0) > 0;
+    if (useGpu && !config.trifecta.gpuSnapshotName) {
+      throw new Error('GPU sandboxes require TRIFECTA_GPU_SNAPSHOT_NAME to be configured.');
+    }
+
+    const snapshot = useGpu ? config.trifecta.gpuSnapshotName : config.trifecta.snapshotName;
+    const diskGiB = opts.diskGiB ?? 10;
+
+    // Daytona's runtime checks 'snapshot' and 'resources' independently — both work
+    // together even though the TypeScript overloads treat them as mutually exclusive.
+    // @ts-expect-error: resources is only typed on CreateSandboxFromImageParams but
+    // the SDK's create() forwards disk to the API regardless of the snapshot/image path.
     const sandbox = await client.create({
       name: opts.name,
-      snapshot: config.trifecta.snapshotName,
+      snapshot,
+      resources: { disk: diskGiB },
       labels: {
         app: 'trifecta-cloud',
         name: opts.name,
         tier: opts.tier,
+        ...(useGpu ? { gpu: 'true' } : {}),
       },
       envVars: {
         ...trifectaEnv(opts.pairingToken),
       },
+      autoStopInterval: opts.idleTimeoutMinutes ?? 15,
     });
 
     console.log(`[Daytona] Sandbox created: ${sandbox.id}`);
@@ -177,12 +192,19 @@ export async function createSandbox(opts: { name: string; tier: SandboxTier; pai
   }
 }
 
-export async function startSandbox(daytonaSandboxId: string, pairingToken: string): Promise<void> {
+export async function startSandbox(daytonaSandboxId: string, pairingToken: string, idleTimeoutMinutes?: number): Promise<void> {
   try {
     const client = getDaytonaClient();
     const sandbox = await client.get(daytonaSandboxId);
     console.log(`[Daytona] Starting sandbox: ${daytonaSandboxId}`);
     await sandbox.start();
+
+    // Apply the plan's idle timeout on (re)start
+    if (idleTimeoutMinutes !== undefined) {
+      await sandbox.setAutostopInterval(idleTimeoutMinutes).catch((e) =>
+        console.warn(`[Daytona] Could not set autostop interval: ${e}`)
+      );
+    }
 
     // Start the terminal (ttyd) first
     const terminalStart = await sandbox.process.executeCommand(startTerminalCommand(), DATA_DIR, undefined, 15);

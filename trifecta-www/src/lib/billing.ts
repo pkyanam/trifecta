@@ -9,6 +9,7 @@ export const CLOUD_PLANS = {
     storedSandboxLimit: 1,
     allowedSandboxTiers: ['launch'],
     gpuEnabled: false,
+    idleTimeoutMinutes: 15,
     isFree: true,
   },
   starter: {
@@ -21,6 +22,7 @@ export const CLOUD_PLANS = {
     storedSandboxLimit: 3,
     allowedSandboxTiers: ['launch'],
     gpuEnabled: false,
+    idleTimeoutMinutes: 30,
     isFree: false,
     stripePriceEnv: 'STRIPE_PRICE_STARTER',
   },
@@ -34,6 +36,7 @@ export const CLOUD_PLANS = {
     storedSandboxLimit: 8,
     allowedSandboxTiers: ['launch', 'build'],
     gpuEnabled: true,
+    idleTimeoutMinutes: 60,
     isFree: false,
     stripePriceEnv: 'STRIPE_PRICE_PRO',
   },
@@ -47,6 +50,7 @@ export const CLOUD_PLANS = {
     storedSandboxLimit: 20,
     allowedSandboxTiers: ['launch', 'build', 'max-cpu'],
     gpuEnabled: true,
+    idleTimeoutMinutes: 120,
     isFree: false,
     stripePriceEnv: 'STRIPE_PRICE_TEAM',
   },
@@ -86,6 +90,42 @@ export const SANDBOX_SIZE_TIERS = {
 
 export type SandboxSizeTier = keyof typeof SANDBOX_SIZE_TIERS;
 
+export const DISK_INCLUDED_GIB = 10;
+export const DISK_RATE_PER_GIB_MONTH = 0.12;
+export const DISK_MIN_GIB = 10;
+export const DISK_MAX_GIB = 500;
+
+export const DISK_PRESETS = [
+  { gib: 10,  label: '10 GiB',  tag: 'Included' },
+  { gib: 25,  label: '25 GiB',  tag: null },
+  { gib: 50,  label: '50 GiB',  tag: null },
+  { gib: 100, label: '100 GiB', tag: null },
+  { gib: 200, label: '200 GiB', tag: null },
+] as const;
+
+export function extraStorageCostPerMonth(diskGiB: number): number {
+  return Math.max(0, diskGiB - DISK_INCLUDED_GIB) * DISK_RATE_PER_GIB_MONTH;
+}
+
+export const GPU_ADDON_TIERS = {
+  'rtx-pro-6000': {
+    id: 'rtx-pro-6000',
+    label: 'Nvidia RTX PRO 6000',
+    price: '$4.75/hr',
+    ratePerHour: 4.75,
+    requiredPlans: ['pro', 'team'] as CloudPlanId[],
+  },
+  'h100': {
+    id: 'h100',
+    label: 'Nvidia H100',
+    price: '$5.95/hr',
+    ratePerHour: 5.95,
+    requiredPlans: ['pro', 'team'] as CloudPlanId[],
+  },
+} as const;
+
+export type GpuAddonTier = keyof typeof GPU_ADDON_TIERS;
+
 export const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active']);
 
 export function isCloudPlanId(value: string): value is CloudPlanId {
@@ -119,4 +159,11 @@ export function planFromStripePriceId(priceId: string | null | undefined): Cloud
 export function canUseSandboxTier(planId: CloudPlanId | null, sandboxTier: SandboxSizeTier): boolean {
   if (!planId) return false;
   return (CLOUD_PLANS[planId].allowedSandboxTiers as readonly SandboxSizeTier[]).includes(sandboxTier);
+}
+
+/** Credits consumed by a running sandbox session, in launch-hour units. */
+export function sessionCredits(tierKey: SandboxSizeTier, startedAt: string): number {
+  const multiplier = SANDBOX_SIZE_TIERS[tierKey]?.creditMultiplier ?? 1;
+  const hoursElapsed = (Date.now() - new Date(startedAt).getTime()) / 3_600_000;
+  return hoursElapsed * multiplier;
 }
