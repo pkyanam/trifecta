@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "snapshot:create": "tsx scripts/create-snapshot.ts",
+    "sandbox:seed": "tsx scripts/seed-sandbox.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

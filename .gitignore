@@ -8,8 +8,8 @@ _reference/
 tempAssetsDoNotCommit/
 
 # monorepo root — local-only folders not shipped to GitHub
-docs/
-scripts/
+/docs/
+/scripts/
 
 # standalone cloud app — superseded by trifecta-www unified app
 trifecta-cloud/
