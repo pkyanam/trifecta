@@ -27,6 +27,12 @@ export function Navbar() {
         >
           Dashboard
         </Link>
+        <Link
+          href="/dashboard/billing"
+          className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Account
+        </Link>
 
         <div className="flex-1" />
 

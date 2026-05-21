@@ -16,7 +16,7 @@ async function main() {
   try {
     const info = await createSandbox({
       name,
-      tier: 'starter',
+      tier: 'launch',
       pairingToken,
     });
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { Navbar } from '@/components/Navbar';
 import { SandboxCard } from '@/components/SandboxCard';
 import { CreateSandboxModal } from '@/components/CreateSandboxModal';
@@ -8,15 +9,15 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Box, Play, CircleDot, AlertTriangle, Copy, Check } from 'lucide-react';
-import type { SandboxRecord } from '@/lib/types';
+import { Plus, Box, Play, CircleDot, AlertTriangle, CreditCard, ShieldCheck } from 'lucide-react';
+import type { CloudAccount, SandboxRecord } from '@/lib/types';
+import { ACTIVE_SUBSCRIPTION_STATUSES, CLOUD_PLANS } from '@/lib/billing';
 
 export default function Dashboard() {
   const [sandboxes, setSandboxes] = useState<SandboxRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [clerkUserId, setClerkUserId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [account, setAccount] = useState<CloudAccount | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   const fetchSandboxes = useCallback(async () => {
@@ -31,27 +32,26 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    fetchSandboxes();
+    const timeoutId = window.setTimeout(fetchSandboxes, 0);
     const id = setInterval(fetchSandboxes, 12000);
-    return () => clearInterval(id);
+    return () => {
+      window.clearTimeout(timeoutId);
+      clearInterval(id);
+    };
   }, [fetchSandboxes]);
 
   useEffect(() => {
-    fetch('/api/me')
-      .then((r) => r.json())
-      .then((d) => {
-        setIsAdmin(d.isAdmin === true);
-        if (d.userId) setClerkUserId(d.userId);
-      })
-      .catch(() => setIsAdmin(false));
+    const id = window.setTimeout(() => {
+      fetch('/api/billing/account')
+        .then((r) => r.json())
+        .then((d) => {
+          setIsAdmin(d.isAdmin === true);
+          setAccount(d.account ?? null);
+        })
+        .catch(() => setIsAdmin(false));
+    }, 0);
+    return () => window.clearTimeout(id);
   }, []);
-
-  const copyUserId = () => {
-    if (!clerkUserId) return;
-    navigator.clipboard.writeText(clerkUserId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const running = sandboxes.filter((s) => s.status === 'running');
   const stopped = sandboxes.filter((s) => s.status === 'stopped');
@@ -63,6 +63,12 @@ export default function Dashboard() {
     { value: 'stopped', label: 'Stopped', items: stopped,            count: stopped.length },
     ...(errored.length > 0 ? [{ value: 'error', label: 'Error', items: errored, count: errored.length }] : []),
   ];
+  const hasActivePlan = ACTIVE_SUBSCRIPTION_STATUSES.has(account?.subscription_status ?? '');
+  const canCreate = isAdmin || hasActivePlan;
+  const currentPlan = account?.plan ? CLOUD_PLANS[account.plan as keyof typeof CLOUD_PLANS] : null;
+  const allowedTiers = isAdmin
+    ? ['launch', 'build', 'max-cpu']
+    : [...(currentPlan?.allowedSandboxTiers ?? [])];
 
   return (
     <div className="min-h-screen bg-background">
@@ -74,10 +80,10 @@ export default function Dashboard() {
           <div>
             <h1 className="text-2xl font-black tracking-tight text-foreground">Sandboxes</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Isolated AI coding agent environments, powered by Daytona
+              Isolated cloud environments for AI coding agents
             </p>
           </div>
-          {isAdmin && (
+          {canCreate && (
             <Button onClick={() => setShowModal(true)} className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />
               New Sandbox
@@ -95,29 +101,40 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Guest notice */}
-        {!isAdmin && !loading && (
+        {/* Account notice */}
+        {!loading && (
           <div className="mb-6 rounded-xl border border-border bg-card p-4">
-            <p className="text-sm font-semibold text-foreground">Guest access</p>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Sandbox creation requires an admin account. Payments &amp; self-serve plans coming soon.
-            </p>
-            {clerkUserId && (
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-xs text-muted-foreground shrink-0">Your Clerk ID:</span>
-                <code className="flex-1 truncate rounded border border-border bg-secondary px-2 py-1 text-xs font-mono text-foreground/70">
-                  {clerkUserId}
-                </code>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0 shrink-0"
-                  onClick={copyUserId}
-                >
-                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                </Button>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex gap-3">
+                {isAdmin ? (
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
+                ) : (
+                  <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                )}
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {isAdmin ? 'Admin god mode' : hasActivePlan && currentPlan ? `${currentPlan.name} plan` : 'Choose a cloud plan'}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {isAdmin
+                      ? 'This account can create and manage all sandbox sizes.'
+                      : hasActivePlan && currentPlan
+                        ? `${currentPlan.monthlyLaunchHours} Launch-hours included each month.`
+                        : 'Sandbox creation unlocks after a plan is active on your account.'}
+                  </p>
+                </div>
               </div>
-            )}
+              <Link
+                href="/dashboard/billing"
+                className={`inline-flex h-8 items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors ${
+                  canCreate
+                    ? 'border border-border bg-background text-foreground hover:bg-muted'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/80'
+                }`}
+              >
+                {canCreate ? 'Manage Account' : 'Choose Plan'}
+              </Link>
+            </div>
           </div>
         )}
 
@@ -130,7 +147,7 @@ export default function Dashboard() {
           <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-20 text-center">
             <Box className="h-10 w-10 text-muted-foreground/20 mb-4" />
             <h3 className="font-semibold text-foreground text-base">No sandboxes yet</h3>
-            {isAdmin ? (
+            {canCreate ? (
               <>
                 <p className="text-sm text-muted-foreground mt-2 mb-5">Create your first sandbox to get started.</p>
                 <Button onClick={() => setShowModal(true)} className="gap-2">
@@ -139,7 +156,15 @@ export default function Dashboard() {
                 </Button>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground mt-2">Contact your admin to provision a sandbox.</p>
+              <>
+                <p className="text-sm text-muted-foreground mt-2 mb-5">Choose a plan to unlock cloud sandboxes.</p>
+                <Link
+                  href="/dashboard/billing"
+                  className="inline-flex h-8 items-center justify-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+                >
+                  Choose Plan
+                </Link>
+              </>
             )}
           </div>
         ) : (
@@ -183,8 +208,8 @@ export default function Dashboard() {
         )}
       </main>
 
-      {showModal && isAdmin && (
-        <CreateSandboxModal onClose={() => setShowModal(false)} onSuccess={fetchSandboxes} />
+      {showModal && canCreate && (
+        <CreateSandboxModal allowedTiers={allowedTiers} onClose={() => setShowModal(false)} onSuccess={fetchSandboxes} />
       )}
     </div>
   );

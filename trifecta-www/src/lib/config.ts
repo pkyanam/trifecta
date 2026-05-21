@@ -1,8 +1,6 @@
-export const SANDBOX_TIERS = {
-  starter: { cpu: 1, memory: 2, disk: 10, label: 'Starter', price: '$9/mo' },
-  pro: { cpu: 2, memory: 4, disk: 20, label: 'Pro', price: '$19/mo' },
-  team: { cpu: 4, memory: 8, disk: 50, label: 'Team', price: '$39/mo' },
-} as const;
+import { SANDBOX_SIZE_TIERS } from './billing';
+
+export const SANDBOX_TIERS = SANDBOX_SIZE_TIERS;
 
 export type SandboxTier = keyof typeof SANDBOX_TIERS;
 

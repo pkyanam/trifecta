@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Zap, Rocket, Users } from 'lucide-react';
+import { Zap, Rocket, Gauge } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,14 +15,22 @@ import {
 import { cn } from '@/lib/utils';
 
 const TIERS = [
-  { id: 'starter', label: 'Starter', specs: '1 vCPU · 2 GB RAM · 10 GB', icon: Zap,    price: '$9/mo'  },
-  { id: 'pro',     label: 'Pro',     specs: '2 vCPU · 4 GB RAM · 20 GB', icon: Rocket, price: '$19/mo' },
-  { id: 'team',    label: 'Team',    specs: '4 vCPU · 8 GB RAM · 50 GB', icon: Users,  price: '$39/mo' },
+  { id: 'launch',  label: 'Launch',  specs: '1 vCPU · 2 GiB RAM · 10 GiB', icon: Zap,    price: '$0.12/hr' },
+  { id: 'build',   label: 'Build',   specs: '2 vCPU · 4 GiB RAM · 10 GiB', icon: Rocket, price: '$0.24/hr' },
+  { id: 'max-cpu', label: 'Max CPU', specs: '4 vCPU · 8 GiB RAM · 10 GiB', icon: Gauge,  price: '$0.48/hr' },
 ];
 
-export function CreateSandboxModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+export function CreateSandboxModal({
+  onClose,
+  onSuccess,
+  allowedTiers = TIERS.map((tier) => tier.id),
+}: {
+  onClose: () => void;
+  onSuccess: () => void;
+  allowedTiers?: string[];
+}) {
   const [name, setName] = useState('');
-  const [tier, setTier] = useState('starter');
+  const [tier, setTier] = useState(allowedTiers[0] ?? 'launch');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,7 +86,7 @@ export function CreateSandboxModal({ onClose, onSuccess }: { onClose: () => void
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Plan</Label>
             <div className="flex flex-col gap-2">
-              {TIERS.map((t) => {
+              {TIERS.filter((t) => allowedTiers.includes(t.id)).map((t) => {
                 const Icon = t.icon;
                 const selected = tier === t.id;
                 return (

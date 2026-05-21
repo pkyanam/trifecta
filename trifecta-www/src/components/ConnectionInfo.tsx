@@ -29,9 +29,19 @@ export function ConnectionInfo({ sandboxId, status }: { sandboxId: string; statu
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (status !== 'running') { setInfo(null); setQrDataUrl(''); return; }
-
     let mounted = true;
+    if (status !== 'running') {
+      const id = window.setTimeout(() => {
+        if (!mounted) return;
+        setInfo(null);
+        setQrDataUrl('');
+      }, 0);
+      return () => {
+        mounted = false;
+        window.clearTimeout(id);
+      };
+    }
+
     const load = async () => {
       try {
         setError('');
@@ -52,8 +62,11 @@ export function ConnectionInfo({ sandboxId, status }: { sandboxId: string; statu
         if (mounted) setError('Connection error');
       }
     };
-    load();
-    return () => { mounted = false; };
+    const id = window.setTimeout(load, 0);
+    return () => {
+      mounted = false;
+      window.clearTimeout(id);
+    };
   }, [sandboxId, status]);
 
   if (status !== 'running') {
