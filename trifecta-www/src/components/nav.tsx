@@ -153,7 +153,7 @@ export function Footer() {
           <Link href="https://github.com/pkyanam/trifecta" target="_blank" className="hover:text-foreground transition-colors">
             GitHub
           </Link>
-          <Link href="https://discord.gg/jn4EGJjrvv" target="_blank" className="hover:text-foreground transition-colors">
+          <Link href="https://discord.gg/JvjG4yjQVY" target="_blank" className="hover:text-foreground transition-colors">
             Discord
           </Link>
           <Link href="https://app.trifecta.belweave.com" target="_blank" className="hover:text-foreground transition-colors">
