@@ -5,30 +5,8 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { ExternalLink, Terminal } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 
-export function TerminalEmbed({ sandboxId, status }: { sandboxId: string; status: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (status !== 'running') { setUrl(null); return; }
-    let mounted = true;
-
-    const load = async () => {
-      try {
-        setError(null);
-        const res = await fetch(`/api/sandboxes/${sandboxId}/terminal`);
-        if (res.ok && mounted) setUrl((await res.json()).url);
-        else if (mounted) setError('Failed to load terminal');
-      } catch {
-        if (mounted) setError('Connection error');
-      }
-    };
-
-    load();
-    return () => { mounted = false; };
-  }, [sandboxId, status]);
-
-  const Shell = ({ children }: { children: React.ReactNode }) => (
+function TerminalShell({ children }: { children: React.ReactNode }) {
+  return (
     <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-[#0a0e17] min-h-[540px]">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-black/30 shrink-0">
         <span className="flex items-center gap-2 text-sm text-white/40">
@@ -41,33 +19,68 @@ export function TerminalEmbed({ sandboxId, status }: { sandboxId: string; status
       </div>
     </div>
   );
+}
+
+export function TerminalEmbed({ sandboxId, status }: { sandboxId: string; status: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    if (status !== 'running') {
+      const id = window.setTimeout(() => {
+        if (mounted) setUrl(null);
+      }, 0);
+      return () => {
+        mounted = false;
+        window.clearTimeout(id);
+      };
+    }
+
+    const load = async () => {
+      try {
+        setError(null);
+        const res = await fetch(`/api/sandboxes/${sandboxId}/terminal`);
+        if (res.ok && mounted) setUrl((await res.json()).url);
+        else if (mounted) setError('Failed to load terminal');
+      } catch {
+        if (mounted) setError('Connection error');
+      }
+    };
+
+    const id = window.setTimeout(load, 0);
+    return () => {
+      mounted = false;
+      window.clearTimeout(id);
+    };
+  }, [sandboxId, status]);
 
   if (status === 'creating') return (
-    <Shell>
+    <TerminalShell>
       <LoadingSpinner size={28} />
       <p className="text-sm text-white/40">Provisioning sandbox…</p>
       <p className="text-xs text-white/20">This takes about 30–60 seconds</p>
-    </Shell>
+    </TerminalShell>
   );
 
   if (status === 'stopped') return (
-    <Shell>
+    <TerminalShell>
       <Terminal className="h-8 w-8 text-white/10" />
       <p className="text-sm text-white/40">Sandbox is stopped</p>
       <p className="text-xs text-white/20">Start the sandbox to access the terminal</p>
-    </Shell>
+    </TerminalShell>
   );
 
   if (error) return (
-    <Shell>
+    <TerminalShell>
       <p className="text-sm text-red-400">{error}</p>
-    </Shell>
+    </TerminalShell>
   );
 
   if (!url) return (
-    <Shell>
+    <TerminalShell>
       <LoadingSpinner size={24} />
-    </Shell>
+    </TerminalShell>
   );
 
   return (

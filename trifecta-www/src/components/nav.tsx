@@ -7,16 +7,19 @@ import { useEffect, useState } from "react"
 import { Sun, Moon, Menu, X } from "lucide-react"
 
 export function Nav() {
-  const { theme, setTheme, resolvedTheme } = useTheme()
+  const { setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
+    const frame = requestAnimationFrame(() => setMounted(true))
     const handleScroll = () => setScrolled(window.scrollY > 10)
     window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener("scroll", handleScroll)
+    }
   }, [])
 
   return (
@@ -51,6 +54,7 @@ export function Nav() {
 
           <span className="mx-2 h-4 w-px bg-border/60" />
 
+          <NavLink href="/pricing">Pricing</NavLink>
           <NavLink href="/dashboard">Dashboard</NavLink>
 
           <Link
@@ -101,6 +105,7 @@ export function Nav() {
           <div className="flex flex-col gap-1 text-sm font-medium">
             {[
               { href: "https://github.com/pkyanam/trifecta", label: "GitHub", external: true },
+              { href: "/pricing", label: "Pricing" },
               { href: "/dashboard", label: "Dashboard" },
               { href: "https://testflight.apple.com/join/M5FkR4R8", label: "iOS (TestFlight)", external: true },
               { href: "https://forms.gle/WPHxw8axUs6QanXBA", label: "Android (Beta)", external: true },
@@ -151,6 +156,7 @@ export function Footer() {
           {[
             { href: "https://github.com/pkyanam/trifecta", label: "GitHub" },
             { href: "https://discord.gg/JvjG4yjQVY", label: "Discord" },
+            { href: "/pricing", label: "Pricing" },
             { href: "https://app.trifecta.belweave.com", label: "Web App" },
             { href: "/privacy", label: "Privacy" },
           ].map((link) => (

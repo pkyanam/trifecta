@@ -77,12 +77,10 @@ function AnimatedStat({ value, label, suffix = "" }: { value: number; label: str
 function ProviderChip({
   icon,
   name,
-  accent,
   comingSoon,
 }: {
   icon: React.ReactNode
   name: string
-  accent?: string
   comingSoon?: boolean
 }) {
   return (
@@ -147,8 +145,8 @@ const FAQ_ITEMS = [
     a: "Clone the repo, add your provider driver in the packages directory, and register it in the config. The architecture is fully documented in CONTRIBUTING.md.",
   },
   {
-    q: "What's the Daytona sandbox dashboard for?",
-    a: "It's an optional cloud tier that provisions isolated Daytona sandbox environments for running agents remotely, without tying up your local machine. Still in early access.",
+    q: "What's the cloud sandbox dashboard for?",
+    a: "It's an optional cloud tier that provisions isolated Trifecta Cloud sandboxes for running agents remotely, without tying up your local machine. Still in early access.",
   },
 ]
 

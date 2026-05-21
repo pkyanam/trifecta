@@ -34,9 +34,12 @@ export default function SandboxDetail() {
   }, [sandboxId]);
 
   useEffect(() => {
-    fetchSandbox();
+    const timeoutId = window.setTimeout(fetchSandbox, 0);
     const id = setInterval(fetchSandbox, 10000);
-    return () => clearInterval(id);
+    return () => {
+      window.clearTimeout(timeoutId);
+      clearInterval(id);
+    };
   }, [fetchSandbox]);
 
   const doAction = async (action: string) => {
@@ -61,7 +64,7 @@ export default function SandboxDetail() {
       const res = await fetch(`/api/sandboxes/${sandboxId}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Sandbox deleted');
-        window.location.href = '/dashboard';
+        window.location.assign('/dashboard');
       } else {
         toast.error('Failed to delete sandbox');
         setActing(false);

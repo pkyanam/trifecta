@@ -1,10 +1,11 @@
 import { after } from 'next/server';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getAllSandboxes, createSandbox as dbCreateSandbox, updateSandbox } from '@/lib/db';
+import { getAllSandboxes, createSandbox as dbCreateSandbox, getCloudAccount, updateSandbox } from '@/lib/db';
 import { createSandbox as daytonaCreateSandbox } from '@/lib/daytona';
 import { SandboxTier } from '@/lib/config';
 import { getIsAdmin } from '@/lib/admin';
+import { canCreateSandbox } from '@/lib/cloud-access';
 import { z } from 'zod';
 import crypto from 'crypto';
 
@@ -13,7 +14,7 @@ export const maxDuration = 300;
 
 const createSchema = z.object({
   name: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/, 'Use lowercase letters, numbers, and hyphens only'),
-  tier: z.enum(['starter', 'pro', 'team'] as const),
+  tier: z.enum(['launch', 'build', 'max-cpu'] as const),
 });
 
 export async function GET() {
@@ -33,18 +34,25 @@ export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const isAdmin = await getIsAdmin();
-  if (!isAdmin) {
-    return NextResponse.json(
-      { error: 'Sandbox creation is currently limited to admin users. Payments coming soon.' },
-      { status: 403 },
-    );
-  }
-
   try {
     const body = await request.json();
     const { name, tier } = createSchema.parse(body);
     const pairingToken = crypto.randomBytes(9).toString('base64url');
+    const [isAdmin, account, existingSandboxes] = await Promise.all([
+      getIsAdmin(),
+      getCloudAccount(userId),
+      getAllSandboxes(userId),
+    ]);
+
+    const access = canCreateSandbox({
+      account,
+      isAdmin,
+      requestedTier: tier,
+      existingSandboxes,
+    });
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
+    }
 
     const record = await dbCreateSandbox({ name, tier, pairing_token: pairingToken, user_id: userId });
 
