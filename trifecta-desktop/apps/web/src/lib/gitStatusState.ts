@@ -36,6 +36,7 @@ interface WatchedGitStatus {
 interface GitStatusTarget {
   readonly environmentId: EnvironmentId | null;
   readonly cwd: string | null;
+  readonly automaticRemoteRefresh?: boolean | undefined;
 }
 
 const EMPTY_GIT_STATUS_STATE = Object.freeze<GitStatusState>({
@@ -74,7 +75,8 @@ function getGitStatusTargetKey(target: GitStatusTarget): string | null {
     return null;
   }
 
-  return `${target.environmentId}:${target.cwd}`;
+  const refreshMode = target.automaticRemoteRefresh === false ? "manual" : "auto";
+  return `${target.environmentId}:${refreshMode}:${target.cwd}`;
 }
 
 function readResolvedGitStatusClient(target: GitStatusTarget): ResolvedGitStatusClient | null {
@@ -165,8 +167,13 @@ export function resetGitStatusStateForTests(): void {
 export function useGitStatus(target: GitStatusTarget): GitStatusState {
   const targetKey = getGitStatusTargetKey(target);
   useEffect(
-    () => watchGitStatus({ environmentId: target.environmentId, cwd: target.cwd }),
-    [target.environmentId, target.cwd],
+    () =>
+      watchGitStatus({
+        automaticRemoteRefresh: target.automaticRemoteRefresh,
+        environmentId: target.environmentId,
+        cwd: target.cwd,
+      }),
+    [target.automaticRemoteRefresh, target.environmentId, target.cwd],
   );
 
   const state = useAtomValue(
@@ -227,7 +234,7 @@ function subscribeToGitStatusTarget(
 
     currentUnsubscribe();
     currentClientIdentity = resolved.clientIdentity;
-    currentUnsubscribe = subscribeToGitStatus(targetKey, cwd, resolved.client);
+    currentUnsubscribe = subscribeToGitStatus(targetKey, target, cwd, resolved.client);
   };
 
   const unsubscribeRegistry = providedClient
@@ -241,10 +248,15 @@ function subscribeToGitStatusTarget(
   };
 }
 
-function subscribeToGitStatus(targetKey: string, cwd: string, client: GitStatusClient): () => void {
+function subscribeToGitStatus(
+  targetKey: string,
+  target: GitStatusTarget,
+  cwd: string,
+  client: GitStatusClient,
+): () => void {
   markGitStatusPending(targetKey);
   return client.onStatus(
-    { cwd },
+    { cwd, automaticRemoteRefresh: target.automaticRemoteRefresh !== false },
     (status: VcsStatusResult) => {
       appAtomRegistry.set(gitStatusStateAtom(targetKey), {
         data: status,

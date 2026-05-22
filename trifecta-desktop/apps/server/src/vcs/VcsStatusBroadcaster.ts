@@ -273,6 +273,11 @@ export const layer = Layer.effect(
       cwd: string,
       automaticRemoteRefreshInterval: Effect.Effect<Duration.Duration, never>,
     ) {
+      const initialInterval = yield* automaticRemoteRefreshInterval;
+      if (Duration.isZero(initialInterval)) {
+        return;
+      }
+
       yield* SynchronizedRef.modifyEffect(pollersRef, (activePollers) => {
         const existing = activePollers.get(cwd);
         if (existing) {

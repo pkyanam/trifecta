@@ -371,6 +371,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   );
   const gitCwd = thread.worktreePath ?? threadProjectCwd ?? props.projectCwd;
   const gitStatus = useGitStatus({
+    automaticRemoteRefresh: false,
     environmentId: thread.environmentId,
     cwd: thread.branch != null ? gitCwd : null,
   });

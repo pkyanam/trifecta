@@ -1,7 +1,9 @@
 import type { ServerProvider } from "@belweave/contracts";
+import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
+import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
@@ -16,6 +18,21 @@ interface ProviderSnapshotState {
   readonly snapshot: ServerProvider;
   readonly enrichmentGeneration: number;
 }
+
+interface RefreshClaim {
+  readonly activeRefresh: Deferred.Deferred<ServerProvider, ServerSettingsError>;
+  readonly ownsRefresh: boolean;
+}
+
+const MIN_BACKGROUND_REFRESH_INTERVAL = Duration.minutes(30);
+
+const settleRefresh = (
+  deferred: Deferred.Deferred<ServerProvider, ServerSettingsError>,
+  exit: Exit.Exit<ServerProvider, ServerSettingsError>,
+) =>
+  Exit.isSuccess(exit)
+    ? Deferred.succeed(deferred, exit.value)
+    : Deferred.failCause(deferred, exit.cause);
 
 export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(function* <
   Settings,
@@ -47,6 +64,8 @@ export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(
   });
   const settingsRef = yield* Ref.make(initialSettings);
   const enrichmentFiberRef = yield* Ref.make<Fiber.Fiber<void, unknown> | null>(null);
+  const refreshInFlightRef =
+    yield* Ref.make<Deferred.Deferred<ServerProvider, ServerSettingsError> | null>(null);
   const scope = yield* Effect.scope;
 
   const publishEnrichedSnapshot = Effect.fn("publishEnrichedSnapshot")(function* (
@@ -129,17 +148,51 @@ export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(
   const applySnapshot = (nextSettings: Settings, options?: { readonly forceRefresh?: boolean }) =>
     refreshSemaphore.withPermits(1)(applySnapshotBase(nextSettings, options));
 
+  const refreshSnapshotBase: Effect.Effect<ServerProvider, ServerSettingsError> = Effect.gen(
+    function* () {
+      const nextSettings = yield* input.getSettings;
+      return yield* applySnapshot(nextSettings, { forceRefresh: true });
+    },
+  );
+
   const refreshSnapshot = Effect.fn("refreshSnapshot")(function* () {
-    const nextSettings = yield* input.getSettings;
-    return yield* applySnapshot(nextSettings, { forceRefresh: true });
+    const deferred = yield* Deferred.make<ServerProvider, ServerSettingsError>();
+    const claim = yield* Ref.modify(refreshInFlightRef, (current): readonly [
+      RefreshClaim,
+      Deferred.Deferred<ServerProvider, ServerSettingsError> | null,
+    ] => {
+      if (current !== null) {
+        return [{ activeRefresh: current, ownsRefresh: false }, current] as const;
+      }
+      return [{ activeRefresh: deferred, ownsRefresh: true }, deferred] as const;
+    });
+
+    if (!claim.ownsRefresh) {
+      return yield* Deferred.await(claim.activeRefresh);
+    }
+
+    const exit = yield* Effect.exit(refreshSnapshotBase);
+    yield* settleRefresh(deferred, exit).pipe(Effect.ignore);
+    yield* Ref.set(refreshInFlightRef, null);
+    if (Exit.isSuccess(exit)) {
+      return exit.value;
+    }
+    return yield* Effect.failCause(exit.cause);
   });
 
   yield* Stream.runForEach(input.streamSettings, (nextSettings) =>
     Effect.asVoid(applySnapshot(nextSettings)),
   ).pipe(Effect.forkScoped);
 
+  const backgroundRefreshInterval = Duration.millis(
+    Math.max(
+      Duration.toMillis(Duration.fromInputUnsafe(input.refreshInterval ?? "60 seconds")),
+      Duration.toMillis(MIN_BACKGROUND_REFRESH_INTERVAL),
+    ),
+  );
+
   yield* Effect.forever(
-    Effect.sleep(input.refreshInterval ?? "60 seconds").pipe(
+    Effect.sleep(backgroundRefreshInterval).pipe(
       Effect.flatMap(() => refreshSnapshot()),
       Effect.ignoreCause({ log: true }),
     ),

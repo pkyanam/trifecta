@@ -45,9 +45,10 @@ import {
 
 const DEFAULT_HISTORY_LINE_LIMIT = 5_000;
 const DEFAULT_PERSIST_DEBOUNCE_MS = 40;
-const DEFAULT_SUBPROCESS_POLL_INTERVAL_MS = 1_000;
+const DEFAULT_SUBPROCESS_POLL_INTERVAL_MS = 10_000;
 const DEFAULT_PROCESS_KILL_GRACE_MS = 1_000;
 const DEFAULT_MAX_RETAINED_INACTIVE_SESSIONS = 128;
+const SUBPROCESS_POLL_CONCURRENCY = 4;
 const DEFAULT_OPEN_COLS = 120;
 const DEFAULT_OPEN_ROWS = 30;
 const TERMINAL_ENV_BLOCKLIST = new Set(["PORT", "ELECTRON_RENDERER_PORT", "ELECTRON_RUN_AS_NODE"]);
@@ -1614,7 +1615,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
       });
 
       yield* Effect.forEach(runningSessions, checkSubprocessActivity, {
-        concurrency: "unbounded",
+        concurrency: SUBPROCESS_POLL_CONCURRENCY,
         discard: true,
       });
     });
