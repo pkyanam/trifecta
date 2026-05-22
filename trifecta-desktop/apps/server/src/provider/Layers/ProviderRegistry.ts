@@ -59,6 +59,7 @@ const GEMINI_KIND = ProviderDriverKind.make("gemini");
 const HERMES_KIND = ProviderDriverKind.make("hermesAgent");
 const DEVIN_KIND = ProviderDriverKind.make("devinAgent");
 const ACP_REGISTRY_KIND = ProviderDriverKind.make("acpRegistry");
+const BOOT_REFRESH_CONCURRENCY = 2;
 
 const shouldStaggerAcpBootProbe = (instance: ProviderInstance): boolean =>
   instance.driverKind === GEMINI_KIND ||
@@ -631,7 +632,7 @@ export const ProviderRegistryLive = Layer.effect(
               }
               yield* refreshOneSource(buildSnapshotSource(instance));
             }).pipe(Effect.ignoreCause({ log: true }), Effect.forkScoped),
-          { concurrency: "unbounded", discard: true },
+          { concurrency: BOOT_REFRESH_CONCURRENCY, discard: true },
         );
         yield* upsertProviders(unavailableProviders, {
           persist: false,

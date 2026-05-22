@@ -190,6 +190,11 @@ describe("gitStatusState", () => {
     const releaseB = watchGitStatus(TARGET, gitClient);
 
     expect(gitClient.onStatus).toHaveBeenCalledOnce();
+    expect(gitClient.onStatus).toHaveBeenCalledWith(
+      { cwd: "/repo", automaticRemoteRefresh: true },
+      expect.any(Function),
+      expect.any(Object),
+    );
     expect(getGitStatusSnapshot(TARGET)).toEqual({
       data: null,
       error: null,
@@ -211,6 +216,28 @@ describe("gitStatusState", () => {
 
     releaseB();
     expect(gitStatusListeners.size).toBe(0);
+  });
+
+  it("keeps manual git status subscriptions from requesting automatic remote refresh", () => {
+    const manualTarget = { ...TARGET, automaticRemoteRefresh: false } as const;
+    const releaseAuto = watchGitStatus(TARGET, gitClient);
+    const releaseManual = watchGitStatus(manualTarget, gitClient);
+
+    expect(gitClient.onStatus).toHaveBeenNthCalledWith(
+      1,
+      { cwd: "/repo", automaticRemoteRefresh: true },
+      expect.any(Function),
+      expect.any(Object),
+    );
+    expect(gitClient.onStatus).toHaveBeenNthCalledWith(
+      2,
+      { cwd: "/repo", automaticRemoteRefresh: false },
+      expect.any(Function),
+      expect.any(Object),
+    );
+
+    releaseAuto();
+    releaseManual();
   });
 
   it("refreshes git status through the unary RPC without restarting the stream", async () => {

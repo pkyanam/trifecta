@@ -144,6 +144,39 @@ describe("makeManagedServerProvider", () => {
     ),
   );
 
+  it.effect("shares one provider probe across concurrent refresh callers", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const checkCalls = yield* Ref.make(0);
+        const releaseCheck = yield* Deferred.make<void>();
+        const provider = yield* makeManagedServerProvider<TestSettings>({
+          maintenanceCapabilities,
+          getSettings: Effect.succeed({ enabled: true }),
+          streamSettings: Stream.empty,
+          haveSettingsChanged: (previous, next) => previous.enabled !== next.enabled,
+          initialSnapshot: () => Effect.succeed(initialSnapshot),
+          checkProvider: Ref.update(checkCalls, (count) => count + 1).pipe(
+            Effect.flatMap(() => Deferred.await(releaseCheck)),
+            Effect.as(refreshedSnapshot),
+          ),
+          refreshInterval: "1 hour",
+        });
+
+        const firstRefresh = yield* provider.refresh.pipe(Effect.forkChild);
+        yield* Effect.yieldNow;
+        const secondRefresh = yield* provider.refresh.pipe(Effect.forkChild);
+        yield* Effect.yieldNow;
+
+        assert.strictEqual(yield* Ref.get(checkCalls), 1);
+
+        yield* Deferred.succeed(releaseCheck, undefined);
+        assert.deepStrictEqual(yield* Fiber.join(firstRefresh), refreshedSnapshot);
+        assert.deepStrictEqual(yield* Fiber.join(secondRefresh), refreshedSnapshot);
+        assert.strictEqual(yield* Ref.get(checkCalls), 1);
+      }),
+    ),
+  );
+
   it.effect("streams supplemental snapshot updates after the base provider check completes", () =>
     Effect.scoped(
       Effect.gen(function* () {

@@ -1173,7 +1173,10 @@ const makeWsRpcLayer = (session: AuthenticatedSession) =>
           observeRpcStream(
             WS_METHODS.subscribeVcsStatus,
             vcsStatusBroadcaster.streamStatus(input, {
-              automaticRemoteRefreshInterval: automaticGitFetchInterval,
+              automaticRemoteRefreshInterval:
+                input.automaticRemoteRefresh === false
+                  ? Effect.succeed(Duration.zero)
+                  : automaticGitFetchInterval,
             }),
             {
               "rpc.aggregate": "vcs",
@@ -1416,10 +1419,6 @@ const makeWsRpcLayer = (session: AuthenticatedSession) =>
                   payload: { settings },
                 })),
               );
-
-              yield* providerRegistry
-                .refresh()
-                .pipe(Effect.ignoreCause({ log: true }), Effect.forkScoped);
 
               const liveUpdates = Stream.merge(
                 keybindingsUpdates,

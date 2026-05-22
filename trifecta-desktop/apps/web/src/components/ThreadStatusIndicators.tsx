@@ -151,6 +151,7 @@ export function ThreadRowLeadingStatus({ thread }: { thread: SidebarThreadSummar
   );
   const gitCwd = thread.worktreePath ?? threadProjectCwd;
   const gitStatus = useGitStatus({
+    automaticRemoteRefresh: false,
     environmentId: thread.environmentId,
     cwd: thread.branch != null ? gitCwd : null,
   });
