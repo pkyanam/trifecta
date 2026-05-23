@@ -5,7 +5,6 @@ import Link from "next/link"
 import { type PointerEvent, useCallback, useEffect, useRef, useState } from "react"
 import { UserButton, useClerk, useUser } from "@clerk/nextjs"
 import { dark } from "@clerk/themes"
-import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import {
   Bot,
@@ -27,7 +26,6 @@ import {
   LockKeyhole,
   Loader2,
   Minus,
-  Moon,
   MonitorUp,
   Play,
   Plus,
@@ -38,7 +36,6 @@ import {
   Smartphone,
   Sparkles,
   Square,
-  Sun,
   Terminal as TerminalIcon,
   Trash2,
   UserRound,
@@ -533,8 +530,6 @@ export default function Home() {
 
 function MenuBar({ clock, openApp, openSearch }: { clock: { time: string; date: string }; openApp: (id: AppId) => void; openSearch: () => void }) {
   const { isLoaded, isSignedIn } = useUser()
-  const { resolvedTheme, setTheme } = useTheme()
-  const isLight = resolvedTheme === "light"
 
   const navItems: Array<[string, AppId]> = [
     ["Agents", "agents"],
@@ -572,14 +567,6 @@ function MenuBar({ clock, openApp, openSearch }: { clock: { time: string; date: 
         </button>
         <button onClick={openSearch} className="os-raised grid h-8 w-8 place-items-center rounded-lg border os-muted md:hidden" aria-label="Search OS">
           <Search className="h-4 w-4" />
-        </button>
-        <button
-          onClick={() => setTheme(isLight ? "dark" : "light")}
-          className="os-raised grid h-8 w-8 place-items-center rounded-lg border os-muted hover:text-white"
-          aria-label="Toggle theme"
-        >
-          <Sun className="h-4 w-4 dark:hidden" />
-          <Moon className="hidden h-4 w-4 dark:block" />
         </button>
         {isLoaded && !isSignedIn && (
           <button onClick={() => openApp("auth")} className="rounded-md px-3 py-1.5 text-sm font-semibold os-muted hover:bg-white/8 hover:text-white">

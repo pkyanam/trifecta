@@ -2,22 +2,17 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
-import { Sun, Moon, Menu, X } from "lucide-react"
+import { Menu, X } from "lucide-react"
 
 export function Nav() {
-  const { setTheme, resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setMounted(true))
     const handleScroll = () => setScrolled(window.scrollY > 10)
     window.addEventListener("scroll", handleScroll, { passive: true })
     return () => {
-      cancelAnimationFrame(frame)
       window.removeEventListener("scroll", handleScroll)
     }
   }, [])
@@ -66,29 +61,10 @@ export function Nav() {
             Launch App
           </Link>
 
-          {mounted && (
-            <button
-              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-              className="ml-1 flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
-              aria-label="Toggle theme"
-            >
-              <Sun className="h-3.5 w-3.5 text-amber-400 dark:hidden" />
-              <Moon className="hidden h-3.5 w-3.5 dark:block" />
-            </button>
-          )}
         </div>
 
         {/* Mobile controls */}
         <div className="flex items-center gap-2 md:hidden">
-          {mounted && (
-            <button
-              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground"
-            >
-              <Sun className="h-3.5 w-3.5 text-amber-400 dark:hidden" />
-              <Moon className="hidden h-3.5 w-3.5 dark:block" />
-            </button>
-          )}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground"

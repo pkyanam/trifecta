@@ -36,8 +36,7 @@ export default function RootLayout({
         <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-primary/20">
           <ThemeProvider
             attribute="class"
-            defaultTheme="dark"
-            enableSystem
+            forcedTheme="dark"
             disableTransitionOnChange
           >
             {children}
