@@ -103,7 +103,7 @@ export function SandboxCard({ sandbox, onRefresh }: { sandbox: SandboxRecord; on
           <div className="flex gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <Cpu className="h-3 w-3" />
-              {tier.label} tier · snapshot resources
+              {tier.cpu} vCPU · {tier.memory} GB · {sandbox.disk_gib ?? tier.disk} GiB
             </span>
             <span className="flex items-center gap-1.5">
               <Clock className="h-3 w-3" />

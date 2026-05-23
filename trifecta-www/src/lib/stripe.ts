@@ -77,8 +77,8 @@ export async function createStripeCheckoutSession(opts: {
   body.set('customer', opts.customerId);
   body.set('line_items[0][price]', opts.priceId);
   body.set('line_items[0][quantity]', '1');
-  body.set('success_url', `${appUrl()}/?app=pricing&checkout=success&plan=${opts.planId}`);
-  body.set('cancel_url', `${appUrl()}/?app=pricing&checkout=cancel`);
+  body.set('success_url', `${appUrl()}/dashboard/billing?checkout=success&plan=${opts.planId}`);
+  body.set('cancel_url', `${appUrl()}/pricing`);
   body.set('client_reference_id', opts.userId);
   body.set('metadata[user_id]', opts.userId);
   body.set('metadata[plan]', opts.planId);
@@ -92,7 +92,7 @@ export async function createStripeCheckoutSession(opts: {
 export async function createStripePortalSession(customerId: string): Promise<StripePortalSession> {
   const body = new URLSearchParams();
   body.set('customer', customerId);
-  body.set('return_url', `${appUrl()}/?app=pricing`);
+  body.set('return_url', `${appUrl()}/dashboard/billing`);
 
   return stripeRequest<StripePortalSession>('/billing_portal/sessions', body);
 }

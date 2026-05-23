@@ -72,8 +72,11 @@ export function Nav() {
               className="ml-1 flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-all"
               aria-label="Toggle theme"
             >
-              <Sun className="h-3.5 w-3.5 text-amber-400 dark:hidden" />
-              <Moon className="hidden h-3.5 w-3.5 dark:block" />
+              {resolvedTheme === "dark" ? (
+                <Sun className="h-3.5 w-3.5 text-amber-400" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
             </button>
           )}
         </div>
@@ -85,8 +88,7 @@ export function Nav() {
               onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground"
             >
-              <Sun className="h-3.5 w-3.5 text-amber-400 dark:hidden" />
-              <Moon className="hidden h-3.5 w-3.5 dark:block" />
+              {resolvedTheme === "dark" ? <Sun className="h-3.5 w-3.5 text-amber-400" /> : <Moon className="h-3.5 w-3.5" />}
             </button>
           )}
           <button
@@ -157,7 +159,6 @@ export function Footer() {
             { href: "/pricing", label: "Pricing" },
             { href: "https://app.trifecta.belweave.com", label: "Web App" },
             { href: "/privacy", label: "Privacy" },
-            { href: "/terms-of-service", label: "Terms" },
           ].map((link) => (
             <Link
               key={link.href}

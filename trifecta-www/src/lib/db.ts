@@ -1,15 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { CloudAccount, SandboxRecord } from './types';
-import {
-  CLOUD_PLANS,
-  GPU_ADDON_TIERS,
-  isSandboxSizeTier,
-  sessionCredits,
-  sessionGpuCost,
-  sessionRuntimeHours,
-  type CloudPlanId,
-  type GpuAddonTier,
-} from './billing';
+import { CLOUD_PLANS, type CloudPlanId } from './billing';
 
 // Service-level client for API routes — bypasses RLS when service role key is set,
 // otherwise falls back to the publishable (anon) key and relies on query-level user_id filtering.
@@ -23,22 +14,6 @@ function getClient() {
 
 export { getClient as getSupabaseServiceClient };
 
-function normalizeSandboxRecord(row: Record<string, unknown>): SandboxRecord {
-  return {
-    ...row,
-    disk_gib: typeof row.disk_gib === 'number' ? row.disk_gib : 10,
-    gpu_addon: typeof row.gpu_addon === 'string' ? row.gpu_addon : null,
-  } as SandboxRecord;
-}
-
-function normalizeSandboxRecords(rows: Record<string, unknown>[] | null): SandboxRecord[] {
-  return (rows ?? []).map(normalizeSandboxRecord);
-}
-
-function isMissingColumnError(error: { code?: string; message?: string } | null, column: string): boolean {
-  return error?.code === 'PGRST204' && (error.message ?? '').includes(`'${column}'`);
-}
-
 export async function getAllSandboxes(userId: string): Promise<SandboxRecord[]> {
   const { data, error } = await getClient()
     .from('sandboxes')
@@ -46,7 +21,7 @@ export async function getAllSandboxes(userId: string): Promise<SandboxRecord[]> 
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return normalizeSandboxRecords(data);
+  return (data ?? []) as SandboxRecord[];
 }
 
 export async function getSandbox(id: string, userId: string): Promise<SandboxRecord | null> {
@@ -57,41 +32,23 @@ export async function getSandbox(id: string, userId: string): Promise<SandboxRec
     .eq('user_id', userId)
     .maybeSingle();
   if (error) throw error;
-  return data ? normalizeSandboxRecord(data) : null;
+  return data as SandboxRecord | null;
 }
 
 export async function createSandbox(data: {
   name: string;
   tier: string;
   disk_gib?: number;
-  gpu_addon?: string | null;
   pairing_token: string;
   user_id: string;
 }): Promise<SandboxRecord> {
-  const insert = { ...data, disk_gib: data.disk_gib ?? 10, status: 'creating' };
   const { data: row, error } = await getClient()
     .from('sandboxes')
-    .insert(insert)
+    .insert({ ...data, disk_gib: data.disk_gib ?? 10, status: 'creating' })
     .select()
     .single();
-  if (isMissingColumnError(error, 'disk_gib') || isMissingColumnError(error, 'gpu_addon')) {
-    const fallbackInsert = {
-      name: insert.name,
-      tier: insert.tier,
-      pairing_token: insert.pairing_token,
-      user_id: insert.user_id,
-      status: insert.status,
-    };
-    const { data: fallbackRow, error: fallbackError } = await getClient()
-      .from('sandboxes')
-      .insert(fallbackInsert)
-      .select()
-      .single();
-    if (fallbackError) throw fallbackError;
-    return normalizeSandboxRecord(fallbackRow);
-  }
   if (error) throw error;
-  return normalizeSandboxRecord(row);
+  return row as SandboxRecord;
 }
 
 export async function updateSandbox(
@@ -123,7 +80,7 @@ export async function getCloudAccount(userId: string): Promise<CloudAccount | nu
     .eq('user_id', userId)
     .maybeSingle();
   if (error) throw error;
-  return data ? { gpu_usage_usd: 0, ...data } as CloudAccount : null;
+  return data as CloudAccount | null;
 }
 
 export async function getCloudAccountByStripeCustomer(stripeCustomerId: string): Promise<CloudAccount | null> {
@@ -133,7 +90,7 @@ export async function getCloudAccountByStripeCustomer(stripeCustomerId: string):
     .eq('stripe_customer_id', stripeCustomerId)
     .maybeSingle();
   if (error) throw error;
-  return data ? { gpu_usage_usd: 0, ...data } as CloudAccount : null;
+  return data as CloudAccount | null;
 }
 
 export async function upsertCloudAccount(data: Partial<CloudAccount> & { user_id: string }): Promise<CloudAccount> {
@@ -143,7 +100,7 @@ export async function upsertCloudAccount(data: Partial<CloudAccount> & { user_id
     .select()
     .single();
   if (error) throw error;
-  return { gpu_usage_usd: 0, ...row } as CloudAccount;
+  return row as CloudAccount;
 }
 
 export async function upsertCloudAccountForPlan(data: {
@@ -171,10 +128,7 @@ export async function upsertCloudAccountForPlan(data: {
     gpu_enabled: plan?.gpuEnabled ?? false,
     idle_timeout_minutes: plan?.idleTimeoutMinutes ?? 15,
   };
-  if (data.reset_credits) {
-    base.runtime_credits_used = 0;
-    base.gpu_usage_usd = 0;
-  }
+  if (data.reset_credits) base.runtime_credits_used = 0;
   return upsertCloudAccount(base);
 }
 
@@ -223,98 +177,11 @@ export async function addRuntimeCreditsUsed(userId: string, credits: number): Pr
   if (error) throw error;
 }
 
-export async function addGpuUsageUsd(userId: string, amountUsd: number): Promise<void> {
-  if (amountUsd <= 0) return;
-  const { error } = await getClient().rpc('increment_gpu_usage_usd', {
-    p_user_id: userId,
-    p_amount_usd: amountUsd,
-  });
-  if (error) throw error;
-}
-
-export async function startSandboxUsageSession(sandbox: SandboxRecord, startedAt: string): Promise<void> {
-  const tierKey = isSandboxSizeTier(sandbox.tier) ? sandbox.tier : 'launch';
-  const gpuAddon = sandbox.gpu_addon && sandbox.gpu_addon in GPU_ADDON_TIERS ? sandbox.gpu_addon : null;
-  const { error } = await getClient()
-    .from('sandbox_usage_sessions')
-    .insert({
-      user_id: sandbox.user_id,
-      sandbox_id: sandbox.id,
-      sandbox_tier: tierKey,
-      gpu_addon: gpuAddon,
-      started_at: startedAt,
-    });
-  if (error && error.code !== '23505') throw error;
-}
-
-export async function finishSandboxUsageSession(
-  sandbox: SandboxRecord,
-  endedAt = new Date().toISOString(),
-): Promise<{ launchHours: number; runtimeHours: number; gpuCostUsd: number }> {
-  if (!sandbox.started_at) {
-    return { launchHours: 0, runtimeHours: 0, gpuCostUsd: 0 };
-  }
-
-  const tierKey = isSandboxSizeTier(sandbox.tier) ? sandbox.tier : 'launch';
-  const gpuAddon = sandbox.gpu_addon && sandbox.gpu_addon in GPU_ADDON_TIERS
-    ? (sandbox.gpu_addon as GpuAddonTier)
-    : null;
-  const runtimeHours = sessionRuntimeHours(sandbox.started_at, endedAt);
-  const launchHours = sessionCredits(tierKey, sandbox.started_at, endedAt);
-  const gpuCostUsd = sessionGpuCost(gpuAddon, sandbox.started_at, endedAt);
-  const client = getClient();
-
-  const { data: activeSession, error: activeError } = await client
-    .from('sandbox_usage_sessions')
-    .select('id')
-    .eq('sandbox_id', sandbox.id)
-    .is('ended_at', null)
-    .order('started_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (activeError) throw activeError;
-
-  if (activeSession?.id) {
-    const { error } = await client
-      .from('sandbox_usage_sessions')
-      .update({
-        ended_at: endedAt,
-        runtime_hours: runtimeHours,
-        launch_hours: launchHours,
-        gpu_cost_usd: gpuCostUsd,
-      })
-      .eq('id', activeSession.id);
-    if (error) throw error;
-  } else {
-    const { error } = await client
-      .from('sandbox_usage_sessions')
-      .insert({
-        user_id: sandbox.user_id,
-        sandbox_id: sandbox.id,
-        sandbox_tier: tierKey,
-        gpu_addon: gpuAddon,
-        started_at: sandbox.started_at,
-        ended_at: endedAt,
-        runtime_hours: runtimeHours,
-        launch_hours: launchHours,
-        gpu_cost_usd: gpuCostUsd,
-      });
-    if (error) throw error;
-  }
-
-  await Promise.all([
-    addRuntimeCreditsUsed(sandbox.user_id, launchHours),
-    addGpuUsageUsd(sandbox.user_id, gpuCostUsd),
-  ]);
-
-  return { launchHours, runtimeHours, gpuCostUsd };
-}
-
 export async function getAllRunningSandboxes(): Promise<SandboxRecord[]> {
   const { data, error } = await getClient()
     .from('sandboxes')
     .select('*')
     .eq('status', 'running');
   if (error) throw error;
-  return normalizeSandboxRecords(data);
+  return (data ?? []) as SandboxRecord[];
 }

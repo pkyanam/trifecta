@@ -1,12 +1,12 @@
 import { after } from 'next/server';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getAllSandboxes, createSandbox as dbCreateSandbox, getCloudAccount, updateSandbox, finishSandboxUsageSession, startSandboxUsageSession } from '@/lib/db';
+import { getAllSandboxes, createSandbox as dbCreateSandbox, getCloudAccount, updateSandbox, addRuntimeCreditsUsed } from '@/lib/db';
 import { createSandbox as daytonaCreateSandbox, getSandboxStatus } from '@/lib/daytona';
 import { SandboxTier } from '@/lib/config';
 import { getIsAdmin } from '@/lib/admin';
 import { canCreateSandbox } from '@/lib/cloud-access';
-import { isCloudPlanId, CLOUD_PLANS, DISK_MIN_GIB, DISK_MAX_GIB } from '@/lib/billing';
+import { isCloudPlanId, CLOUD_PLANS, isSandboxSizeTier, sessionCredits, DISK_MIN_GIB, DISK_MAX_GIB } from '@/lib/billing';
 import { z } from 'zod';
 import crypto from 'crypto';
 
@@ -49,10 +49,14 @@ export async function GET() {
             const info = await getSandboxStatus(sandbox.daytona_sandbox_id!);
             const state = info.state.toLowerCase();
             if (state === 'stopped' || state === 'archived') {
-              await finishSandboxUsageSession(sandbox).catch((e) =>
-                console.error(`[list] Failed to record usage for ${sandbox.id}:`, e),
-              );
+              const tierKey = isSandboxSizeTier(sandbox.tier) ? sandbox.tier : 'launch';
+              const credits = sandbox.started_at ? sessionCredits(tierKey, sandbox.started_at) : 0;
               await updateSandbox(sandbox.id, sandbox.user_id, { status: 'stopped', started_at: null });
+              if (credits > 0) {
+                await addRuntimeCreditsUsed(sandbox.user_id, credits).catch((e) =>
+                  console.error(`[list] Failed to deduct credits for ${sandbox.id}:`, e),
+                );
+              }
             }
           }),
         ),
@@ -94,7 +98,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'GPU add-ons are available on Pro and Team plans.' }, { status: 403 });
     }
 
-    const record = await dbCreateSandbox({ name, tier, disk_gib: diskGiB, gpu_addon: gpuAddon ?? null, pairing_token: pairingToken, user_id: userId });
+    const record = await dbCreateSandbox({ name, tier, disk_gib: diskGiB, pairing_token: pairingToken, user_id: userId });
 
     const planId = account?.plan && isCloudPlanId(account.plan) ? account.plan : null;
     const idleTimeoutMinutes = (planId ? CLOUD_PLANS[planId].idleTimeoutMinutes : null)
@@ -105,15 +109,11 @@ export async function POST(request: Request) {
 
     after(
       daytonaCreateSandbox({ name, tier: tier as SandboxTier, pairingToken, idleTimeoutMinutes, gpuCount, diskGiB })
-        .then(async (info) => {
-          const startedAt = new Date().toISOString();
-          await updateSandbox(record.id, userId, {
-            daytona_sandbox_id: info.daytonaSandboxId,
-            status: 'running',
-            started_at: startedAt,
-          });
-          await startSandboxUsageSession({ ...record, daytona_sandbox_id: info.daytonaSandboxId, status: 'running', started_at: startedAt }, startedAt);
-        })
+        .then((info) => updateSandbox(record.id, userId, {
+          daytona_sandbox_id: info.daytonaSandboxId,
+          status: 'running',
+          started_at: new Date().toISOString(),
+        }))
         .catch((err) => {
           console.error('Background sandbox creation failed:', err);
           updateSandbox(record.id, userId, { status: 'error' });

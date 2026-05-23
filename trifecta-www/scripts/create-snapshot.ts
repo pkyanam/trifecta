@@ -6,7 +6,6 @@ dotenv.config();
 
 const snapshotName = process.env.TRIFECTA_SNAPSHOT_NAME || 'trifecta-server-v1';
 const trifectaVersion = process.env.TRIFECTA_NPM_VERSION || '0.0.35-alpha.2';
-const snapshotResources = { disk: 10 };
 
 async function main() {
   const daytona = new Daytona({
@@ -16,7 +15,6 @@ async function main() {
 
   console.log(`Building Daytona snapshot: ${snapshotName}`);
   console.log(`Installing @belweave/trifecta@${trifectaVersion}`);
-  console.log(`Snapshot disk: ${snapshotResources.disk} GiB`);
 
   const image = Image.debianSlim('3.12')
     .runCommands(
@@ -91,7 +89,6 @@ async function main() {
       {
         name: snapshotName,
         image,
-        resources: snapshotResources,
       },
       {
         onLogs: (chunk) => process.stdout.write(chunk.toString()),

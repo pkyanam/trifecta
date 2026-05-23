@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { finishSandboxUsageSession, getSandbox, updateSandbox } from '@/lib/db';
+import { getSandbox, updateSandbox, addRuntimeCreditsUsed } from '@/lib/db';
 import { stopSandbox as daytonaStopSandbox } from '@/lib/daytona';
+import { isSandboxSizeTier, sessionCredits } from '@/lib/billing';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
@@ -15,10 +16,16 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   try {
     await daytonaStopSandbox(sandbox.daytona_sandbox_id);
 
+    const tierKey = isSandboxSizeTier(sandbox.tier) ? sandbox.tier : 'launch';
+    const credits = sandbox.started_at ? sessionCredits(tierKey, sandbox.started_at) : 0;
     const updates: Record<string, unknown> = { status: 'stopped', started_at: null };
 
-    await finishSandboxUsageSession(sandbox);
     await updateSandbox(id, userId, updates);
+    if (credits > 0) {
+      await addRuntimeCreditsUsed(userId, credits).catch((e) =>
+        console.error('Failed to deduct credits on stop:', e)
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

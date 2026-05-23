@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { finishSandboxUsageSession, getAllRunningSandboxes, updateSandbox } from '@/lib/db';
+import { getAllRunningSandboxes, updateSandbox, addRuntimeCreditsUsed } from '@/lib/db';
 import { getSandboxStatus } from '@/lib/daytona';
+import { isSandboxSizeTier, sessionCredits } from '@/lib/billing';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -28,17 +29,18 @@ export async function GET(request: Request) {
 
       // Daytona stopped the sandbox (idle auto-stop or manual)
       if (rawState === 'stopped' || rawState === 'archived') {
-        const usage = await finishSandboxUsageSession(sandbox).catch((e) => {
-          console.error(`[cron/usage] Failed to record usage for ${sandbox.id}:`, e);
-          return null;
-        });
+        const tierKey = isSandboxSizeTier(sandbox.tier) ? sandbox.tier : 'launch';
+        const credits = sandbox.started_at ? sessionCredits(tierKey, sandbox.started_at) : 0;
 
         await updateSandbox(sandbox.id, sandbox.user_id, {
           status: 'stopped',
           started_at: null,
         });
 
-        if (usage && usage.launchHours > 0) {
+        if (credits > 0) {
+          await addRuntimeCreditsUsed(sandbox.user_id, credits).catch((e) =>
+            console.error(`[cron/usage] Failed to deduct credits for ${sandbox.id}:`, e)
+          );
           credited++;
         }
         synced++;

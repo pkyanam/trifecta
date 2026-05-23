@@ -93,10 +93,14 @@ export type SandboxSizeTier = keyof typeof SANDBOX_SIZE_TIERS;
 export const DISK_INCLUDED_GIB = 10;
 export const DISK_RATE_PER_GIB_MONTH = 0.12;
 export const DISK_MIN_GIB = 10;
-export const DISK_MAX_GIB = 10;
+export const DISK_MAX_GIB = 500;
 
 export const DISK_PRESETS = [
   { gib: 10,  label: '10 GiB',  tag: 'Included' },
+  { gib: 25,  label: '25 GiB',  tag: null },
+  { gib: 50,  label: '50 GiB',  tag: null },
+  { gib: 100, label: '100 GiB', tag: null },
+  { gib: 200, label: '200 GiB', tag: null },
 ] as const;
 
 export function extraStorageCostPerMonth(diskGiB: number): number {
@@ -104,18 +108,18 @@ export function extraStorageCostPerMonth(diskGiB: number): number {
 }
 
 export const GPU_ADDON_TIERS = {
-  'h100': {
-    id: 'h100',
-    label: 'Nvidia H100',
-    price: '$4.45/h',
-    ratePerHour: 4.45,
-    requiredPlans: ['pro', 'team'] as CloudPlanId[],
-  },
   'rtx-pro-6000': {
     id: 'rtx-pro-6000',
     label: 'Nvidia RTX PRO 6000',
-    price: '$3.49/h',
-    ratePerHour: 3.49,
+    price: '$4.75/hr',
+    ratePerHour: 4.75,
+    requiredPlans: ['pro', 'team'] as CloudPlanId[],
+  },
+  'h100': {
+    id: 'h100',
+    label: 'Nvidia H100',
+    price: '$5.95/hr',
+    ratePerHour: 5.95,
     requiredPlans: ['pro', 'team'] as CloudPlanId[],
   },
 } as const;
@@ -158,19 +162,8 @@ export function canUseSandboxTier(planId: CloudPlanId | null, sandboxTier: Sandb
 }
 
 /** Credits consumed by a running sandbox session, in launch-hour units. */
-export function sessionCredits(tierKey: SandboxSizeTier, startedAt: string, endedAt = new Date().toISOString()): number {
+export function sessionCredits(tierKey: SandboxSizeTier, startedAt: string): number {
   const multiplier = SANDBOX_SIZE_TIERS[tierKey]?.creditMultiplier ?? 1;
-  const hoursElapsed = (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 3_600_000;
+  const hoursElapsed = (Date.now() - new Date(startedAt).getTime()) / 3_600_000;
   return hoursElapsed * multiplier;
-}
-
-export function sessionRuntimeHours(startedAt: string, endedAt = new Date().toISOString()): number {
-  return Math.max(0, (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 3_600_000);
-}
-
-export function sessionGpuCost(gpuAddon: GpuAddonTier | null | undefined, startedAt: string, endedAt = new Date().toISOString()): number {
-  if (!gpuAddon) return 0;
-  const gpu = GPU_ADDON_TIERS[gpuAddon];
-  if (!gpu) return 0;
-  return sessionRuntimeHours(startedAt, endedAt) * gpu.ratePerHour;
 }
