@@ -2321,11 +2321,31 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     }
 
     if (message.type === "rate_limit_event") {
+      const info = message.rate_limit_info;
+      const windowDurationMins =
+        info.rateLimitType === "five_hour"
+          ? 300
+          : info.rateLimitType === "seven_day" ||
+              info.rateLimitType === "seven_day_opus" ||
+              info.rateLimitType === "seven_day_sonnet"
+            ? 7 * 24 * 60
+            : null;
       yield* offerRuntimeEvent({
         ...base,
         type: "account.rate-limits.updated",
         payload: {
-          rateLimits: message,
+          rateLimits: {
+            limitName: info.rateLimitType ?? null,
+            primary:
+              info.utilization !== undefined || info.resetsAt !== undefined
+                ? {
+                    usedPercent: info.utilization ?? 0,
+                    resetsAt: info.resetsAt ?? null,
+                    windowDurationMins,
+                  }
+                : null,
+            rateLimitReachedType: info.status === "rejected" ? info.rateLimitType ?? null : null,
+          },
         },
       });
       return;
