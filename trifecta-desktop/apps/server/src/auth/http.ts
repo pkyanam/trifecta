@@ -17,6 +17,7 @@ import { isReviewSession, REVIEW_ACCESS_DENIED_MESSAGE } from "./reviewAccess.ts
 import { deriveAuthClientMetadata } from "./utils.ts";
 import { ServerConfig } from "../config.ts";
 import { browserApiCorsHeaders } from "../httpCors.ts";
+import { AnalyticsService } from "../telemetry/Services/AnalyticsService.ts";
 
 export const respondToAuthError = (error: AuthError) =>
   Effect.gen(function* () {
@@ -87,6 +88,11 @@ export const authBootstrapRouteLayer = HttpRouter.add(
       deriveAuthClientMetadata({ request }),
     );
 
+    const analytics = yield* AnalyticsService;
+    yield* analytics.record("auth.session.created", {
+      role: result.response.role,
+    });
+
     return yield* HttpServerResponse.jsonUnsafe(result.response, {
       status: 200,
       headers: browserApiCorsHeaders,
@@ -121,6 +127,10 @@ export const authBearerBootstrapRouteLayer = HttpRouter.add(
       payload.credential,
       deriveAuthClientMetadata({ request }),
     );
+    const analytics = yield* AnalyticsService;
+    yield* analytics.record("auth.session.bearer_created", {
+      role: result.role,
+    });
     return HttpServerResponse.jsonUnsafe(result satisfies AuthBearerBootstrapResult, {
       status: 200,
       headers: browserApiCorsHeaders,
@@ -186,6 +196,8 @@ export const authPairingCredentialRouteLayer = HttpRouter.add(
         )
       : {};
     const result = yield* serverAuth.issuePairingCredential(payload);
+    const analytics = yield* AnalyticsService;
+    yield* analytics.record("auth.pairing_credential.issued");
     return HttpServerResponse.jsonUnsafe(result, { status: 200 });
   }).pipe(Effect.catchTag("AuthError", (error) => respondToAuthError(error))),
 );
@@ -236,6 +248,8 @@ export const authPairingLinksRevokeRouteLayer = HttpRouter.add(
       ),
     );
     const revoked = yield* serverAuth.revokePairingLink(payload.id);
+    const analytics = yield* AnalyticsService;
+    yield* analytics.record("auth.pairing_link.revoked", { revoked });
     return HttpServerResponse.jsonUnsafe({ revoked }, { status: 200 });
   }).pipe(Effect.catchTag("AuthError", (error) => respondToAuthError(error))),
 );
@@ -266,6 +280,8 @@ export const authClientsRevokeRouteLayer = HttpRouter.add(
       ),
     );
     const revoked = yield* serverAuth.revokeClientSession(session.sessionId, payload.sessionId);
+    const analytics = yield* AnalyticsService;
+    yield* analytics.record("auth.client.revoked", { revoked });
     return HttpServerResponse.jsonUnsafe({ revoked }, { status: 200 });
   }).pipe(Effect.catchTag("AuthError", (error) => respondToAuthError(error))),
 );
@@ -276,6 +292,8 @@ export const authClientsRevokeOthersRouteLayer = HttpRouter.add(
   Effect.gen(function* () {
     const { serverAuth, session } = yield* authenticateOwnerSession;
     const revokedCount = yield* serverAuth.revokeOtherClientSessions(session.sessionId);
+    const analytics = yield* AnalyticsService;
+    yield* analytics.record("auth.clients.revoked_all", { revokedCount });
     return HttpServerResponse.jsonUnsafe({ revokedCount }, { status: 200 });
   }).pipe(Effect.catchTag("AuthError", (error) => respondToAuthError(error))),
 );

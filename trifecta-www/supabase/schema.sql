@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS sandboxes (
   name               TEXT NOT NULL,
   tier               TEXT NOT NULL DEFAULT 'launch',
   disk_gib           INTEGER NOT NULL DEFAULT 10,
+  gpu_addon          TEXT CHECK (gpu_addon IN ('rtx-pro-6000', 'h100')),
   daytona_sandbox_id TEXT,
   status             TEXT NOT NULL DEFAULT 'creating',
   pairing_token      TEXT,
@@ -22,6 +23,14 @@ CREATE TABLE IF NOT EXISTS sandboxes (
 
 ALTER TABLE sandboxes ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
 ALTER TABLE sandboxes ADD COLUMN IF NOT EXISTS disk_gib INTEGER NOT NULL DEFAULT 10;
+ALTER TABLE sandboxes ADD COLUMN IF NOT EXISTS gpu_addon TEXT;
+
+ALTER TABLE sandboxes
+  DROP CONSTRAINT IF EXISTS sandboxes_gpu_addon_check;
+
+ALTER TABLE sandboxes
+  ADD CONSTRAINT sandboxes_gpu_addon_check
+  CHECK (gpu_addon IN ('rtx-pro-6000', 'h100'));
 
 ALTER TABLE sandboxes
   ALTER COLUMN tier SET DEFAULT 'launch';
@@ -76,6 +85,7 @@ CREATE TABLE IF NOT EXISTS cloud_accounts (
   cancel_at_period_end       BOOLEAN NOT NULL DEFAULT false,
   runtime_credits_monthly    INTEGER NOT NULL DEFAULT 0,
   runtime_credits_used       REAL NOT NULL DEFAULT 0,
+  gpu_usage_usd              NUMERIC(12, 4) NOT NULL DEFAULT 0,
   running_sandbox_limit      INTEGER NOT NULL DEFAULT 0,
   stored_sandbox_limit       INTEGER NOT NULL DEFAULT 0,
   gpu_enabled                BOOLEAN NOT NULL DEFAULT false,
@@ -85,6 +95,7 @@ CREATE TABLE IF NOT EXISTS cloud_accounts (
 );
 
 ALTER TABLE cloud_accounts ADD COLUMN IF NOT EXISTS runtime_credits_used REAL NOT NULL DEFAULT 0;
+ALTER TABLE cloud_accounts ADD COLUMN IF NOT EXISTS gpu_usage_usd NUMERIC(12, 4) NOT NULL DEFAULT 0;
 ALTER TABLE cloud_accounts ADD COLUMN IF NOT EXISTS idle_timeout_minutes INTEGER NOT NULL DEFAULT 15;
 
 ALTER TABLE cloud_accounts
@@ -113,6 +124,37 @@ CREATE TABLE IF NOT EXISTS billing_checkout_sessions (
 CREATE INDEX IF NOT EXISTS billing_checkout_sessions_user_id_idx
   ON billing_checkout_sessions (user_id);
 
+-- ── Sandbox usage ledger ───────────────────────────────────────────────────
+-- Each row represents one running session for one sandbox. launch_hours are
+-- normalized CPU credits: Launch = 1x, Build = 2x, Max CPU = 4x. GPU add-ons
+-- are tracked separately in dollars so subscription launch-hours and GPU usage
+-- do not get blended together.
+
+CREATE TABLE IF NOT EXISTS sandbox_usage_sessions (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        TEXT NOT NULL,
+  sandbox_id     UUID NOT NULL REFERENCES sandboxes(id) ON DELETE CASCADE,
+  sandbox_tier   TEXT NOT NULL DEFAULT 'launch'
+                       CHECK (sandbox_tier IN ('launch', 'build', 'max-cpu')),
+  gpu_addon      TEXT CHECK (gpu_addon IN ('rtx-pro-6000', 'h100')),
+  started_at     TIMESTAMPTZ NOT NULL,
+  ended_at       TIMESTAMPTZ,
+  runtime_hours  REAL NOT NULL DEFAULT 0,
+  launch_hours   REAL NOT NULL DEFAULT 0,
+  gpu_cost_usd   NUMERIC(12, 4) NOT NULL DEFAULT 0,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS sandbox_usage_sessions_user_id_idx
+  ON sandbox_usage_sessions (user_id);
+
+CREATE INDEX IF NOT EXISTS sandbox_usage_sessions_sandbox_id_idx
+  ON sandbox_usage_sessions (sandbox_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS sandbox_usage_sessions_one_open_idx
+  ON sandbox_usage_sessions (sandbox_id)
+  WHERE ended_at IS NULL;
+
 -- ── Credit increment RPC ──────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION increment_credits_used(p_user_id TEXT, p_credits REAL)
@@ -120,6 +162,16 @@ RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE cloud_accounts
   SET runtime_credits_used = runtime_credits_used + p_credits,
+      updated_at = now()
+  WHERE user_id = p_user_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION increment_gpu_usage_usd(p_user_id TEXT, p_amount_usd NUMERIC)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE cloud_accounts
+  SET gpu_usage_usd = gpu_usage_usd + p_amount_usd,
       updated_at = now()
   WHERE user_id = p_user_id;
 END;

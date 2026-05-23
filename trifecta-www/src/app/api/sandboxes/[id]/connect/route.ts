@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSandbox } from '@/lib/db';
-import { getTrifectaUrl, toCloudflareProxyUrl } from '@/lib/daytona';
+import { getTrifectaUrl, issueSandboxPairingCredential, toCloudflareProxyUrl } from '@/lib/daytona';
 import { config } from '@/lib/config';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -15,7 +15,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   try {
     const rawTrifectaUrl = await getTrifectaUrl(sandbox.daytona_sandbox_id);
-    const token = sandbox.pairing_token ?? '';
+    const ownerBootstrapToken = sandbox.pairing_token ?? '';
+    if (!ownerBootstrapToken) {
+      return NextResponse.json({ error: 'Sandbox missing pairing token' }, { status: 400 });
+    }
+
+    const nativeToken = await issueSandboxPairingCredential(
+      sandbox.daytona_sandbox_id,
+      ownerBootstrapToken,
+      `Native client for ${sandbox.name}`,
+    );
+    const webToken = await issueSandboxPairingCredential(
+      sandbox.daytona_sandbox_id,
+      ownerBootstrapToken,
+      `Web client for ${sandbox.name}`,
+    );
 
     // Use the Cloudflare proxy URL for browser clients (strips Origin header so
     // Daytona doesn't intercept with its auth wall). Falls back to the raw Daytona
@@ -26,21 +40,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // Native clients use the raw Daytona URL — they don't send Origin headers
     // so they already pass through fine without the Cloudflare proxy.
     const pairingUrl = new URL(`${rawTrifectaUrl}/pair`);
-    pairingUrl.hash = new URLSearchParams({ token }).toString();
+    pairingUrl.hash = new URLSearchParams({ token: nativeToken }).toString();
 
     // Web browser pairing URL — opens app.trifecta.belweave.com.
     // Pass the Cloudflare-proxied server URL so browser requests get CORS headers.
     const webPairingUrl = new URL(`${config.app.webAppUrl}/pair`);
     webPairingUrl.searchParams.set('host', proxiedTrifectaUrl);
     webPairingUrl.searchParams.set('label', sandbox.name);
-    webPairingUrl.hash = new URLSearchParams({ token }).toString();
+    webPairingUrl.hash = new URLSearchParams({ token: webToken }).toString();
 
     return NextResponse.json({
       trifectaUrl: proxiedTrifectaUrl,
       rawTrifectaUrl,
       pairingUrl: pairingUrl.toString(),
       webPairingUrl: webPairingUrl.toString(),
-      pairingToken: token,
+      pairingToken: nativeToken,
       status: sandbox.status,
     });
   } catch (error) {

@@ -44,6 +44,7 @@ import {
   type SshSessionManagerShape,
 } from "../Services/SshSessionManager.ts";
 import { SshTokenAuthority } from "../Services/SshTokenAuthority.ts";
+import { AnalyticsService } from "../../telemetry/Services/AnalyticsService.ts";
 
 const MAX_SESSIONS = 16;
 const IDLE_TIMEOUT = Duration.minutes(15);
@@ -108,6 +109,7 @@ const make = Effect.gen(function* () {
   const processRunner = yield* ProcessRunner;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  const analytics = yield* AnalyticsService;
 
   const callbackContext = yield* Effect.context<never>();
   const runFork = Effect.runForkWith(callbackContext);
@@ -326,6 +328,11 @@ const make = Effect.gen(function* () {
             : reason === "error"
               ? "Session ended due to error"
               : "Session closed by client",
+      });
+      yield* analytics.record("ssh.session.closed", {
+        reason,
+        authMethod: state.credential.method,
+        exitCode: state.exitCode,
       });
     });
 
@@ -563,6 +570,10 @@ const make = Effect.gen(function* () {
         authMethod: host.authMethod,
         sshSessionId: sessionId,
         message: `Session opened (status=${state.status})`,
+      });
+      yield* analytics.record("ssh.session.opened", {
+        authMethod: host.authMethod,
+        status: state.status,
       });
 
       if (expected === null) {

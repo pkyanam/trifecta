@@ -389,6 +389,7 @@ export const makeOrchestrationIntegrationHarness = (
       Layer.provideMerge(ServerConfig.layerTest(workspaceDir, rootDir)),
       Layer.provideMerge(NodeServices.layer),
       Layer.provideMerge(Layer.succeed(ProviderRegistry, harnessProviderRegistryMock)),
+      Layer.provideMerge(AnalyticsService.layerTest),
     );
 
     const runtime = ManagedRuntime.make(layer);

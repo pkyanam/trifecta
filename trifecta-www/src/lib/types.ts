@@ -4,6 +4,7 @@ export interface SandboxRecord {
   name: string;
   tier: string;
   disk_gib: number;
+  gpu_addon: string | null;
   daytona_sandbox_id: string | null;
   status: string;
   pairing_token: string | null;
@@ -25,6 +26,7 @@ export interface CloudAccount {
   cancel_at_period_end: boolean;
   runtime_credits_monthly: number;
   runtime_credits_used: number;
+  gpu_usage_usd: number;
   running_sandbox_limit: number;
   stored_sandbox_limit: number;
   gpu_enabled: boolean;
