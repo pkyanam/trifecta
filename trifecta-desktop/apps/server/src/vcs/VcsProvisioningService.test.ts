@@ -8,7 +8,6 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import * as VcsDriver from "./VcsDriver.ts";
 import * as VcsDriverRegistry from "./VcsDriverRegistry.ts";
 import * as VcsProvisioningService from "./VcsProvisioningService.ts";
-import { AnalyticsService } from "../telemetry/Services/AnalyticsService.ts";
 
 const TEST_EPOCH = DateTime.makeUnsafe("1970-01-01T00:00:00.000Z");
 
@@ -68,7 +67,6 @@ it.effect("routes repository initialization through an explicit VCS driver kind"
         get: (kind) => (kind === "git" ? Effect.succeed(driver) : Effect.die("unexpected kind")),
       }),
     ),
-    Layer.provide(AnalyticsService.layerTest),
   );
 
   return Effect.gen(function* () {
@@ -88,7 +86,6 @@ it.effect("defaults repository initialization to Git until callers choose a VCS 
         get: (kind) => (kind === "git" ? Effect.succeed(driver) : Effect.die("unexpected kind")),
       }),
     ),
-    Layer.provide(AnalyticsService.layerTest),
   );
 
   return Effect.gen(function* () {

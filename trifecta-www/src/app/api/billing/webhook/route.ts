@@ -66,8 +66,6 @@ async function updateFromSubscription(subscription: StripeSubscription, fallback
 
   const priceId = subscription.items?.data?.[0]?.price?.id ?? null;
   const plan = planFromStripePriceId(priceId) ?? fallback?.plan ?? (account?.plan as CloudPlanId | null) ?? null;
-  const currentPeriodEnd = unixSecondsToIso(subscription.current_period_end);
-  const resetUsage = account?.current_period_end !== currentPeriodEnd;
 
   await upsertCloudAccountForPlan({
     user_id: userId,
@@ -75,9 +73,8 @@ async function updateFromSubscription(subscription: StripeSubscription, fallback
     subscription_status: subscription.status,
     stripe_customer_id: customerId,
     stripe_subscription_id: subscription.id,
-    current_period_end: currentPeriodEnd,
+    current_period_end: unixSecondsToIso(subscription.current_period_end),
     cancel_at_period_end: subscription.cancel_at_period_end,
-    reset_credits: resetUsage,
   });
 }
 

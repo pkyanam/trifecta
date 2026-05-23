@@ -168,7 +168,6 @@ describe("DesktopAppIdentity", () => {
       {
         calls,
         environment: {
-          isPackaged: false,
           env: {
             BELWEAVE_COMMIT_HASH: "0123456789abcdef",
           },

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getAllSandboxes, getCloudAccount, getSandbox, startSandboxUsageSession, updateSandbox } from '@/lib/db';
+import { getAllSandboxes, getCloudAccount, getSandbox, updateSandbox } from '@/lib/db';
 import { startSandbox as daytonaStartSandbox } from '@/lib/daytona';
 import { getIsAdmin } from '@/lib/admin';
 import { canStartSandbox } from '@/lib/cloud-access';
@@ -33,9 +33,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       ?? 15;
 
     await daytonaStartSandbox(sandbox.daytona_sandbox_id, sandbox.pairing_token, idleTimeoutMinutes);
-    const startedAt = new Date().toISOString();
-    await updateSandbox(id, userId, { status: 'running', started_at: startedAt });
-    await startSandboxUsageSession({ ...sandbox, status: 'running', started_at: startedAt }, startedAt);
+    await updateSandbox(id, userId, { status: 'running', started_at: new Date().toISOString() });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Failed to start sandbox:', error);

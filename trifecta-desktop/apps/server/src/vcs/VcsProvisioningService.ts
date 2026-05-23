@@ -9,7 +9,6 @@ import {
   VcsUnsupportedOperationError,
 } from "@belweave/contracts";
 import * as VcsDriverRegistry from "./VcsDriverRegistry.ts";
-import { AnalyticsService } from "../telemetry/Services/AnalyticsService.ts";
 
 export interface VcsProvisioningServiceShape {
   readonly initRepository: (input: VcsInitInput) => Effect.Effect<void, VcsError>;
@@ -40,18 +39,13 @@ function resolveRequestedKind(
 
 export const make = Effect.fn("makeVcsProvisioningService")(function* () {
   const registry = yield* VcsDriverRegistry.VcsDriverRegistry;
-  const analytics = yield* AnalyticsService;
 
   const initRepository: VcsProvisioningServiceShape["initRepository"] = Effect.fn(
     "VcsProvisioningService.initRepository",
   )(function* (input) {
     const kind = yield* resolveRequestedKind(input.kind);
     const driver = yield* registry.get(kind);
-    yield* driver.initRepository(input);
-    yield* analytics.record("vcs.repository.initialized", {
-      kind,
-      cwd: input.cwd,
-    });
+    return yield* driver.initRepository(input);
   });
 
   return VcsProvisioningService.of({
