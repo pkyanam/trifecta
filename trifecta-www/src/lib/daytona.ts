@@ -26,6 +26,7 @@ export interface SandboxStatus {
 const DATA_DIR = '/home/daytona/data';
 const TRIFECTA_LOG = `${DATA_DIR}/trifecta.log`;
 const TRIFECTA_PID = `${DATA_DIR}/trifecta.pid`;
+const OWNER_SESSION_TOKEN = `${DATA_DIR}/www-owner-session.token`;
 const TERMINAL_PORT = 22222; // Daytona's built-in terminal port — no preview-URL warning
 
 // Execute a multi-line script by encoding it to base64 and decoding in the sandbox.
@@ -36,19 +37,27 @@ function execScriptCommand(scriptLines: string[]): string {
   return `echo "${encoded}" | base64 -d | bash`;
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function trifectaEnv(pairingToken?: string): Record<string, string> {
+function trifectaEnv(): Record<string, string> {
   return {
     BELWEAVE_HOST: '0.0.0.0',
     BELWEAVE_PORT: config.trifecta.serverPort.toString(),
     BELWEAVE_HOME: DATA_DIR,
     BELWEAVE_MODE: 'server',
     BELWEAVE_NO_BROWSER: 'true',
-    ...(pairingToken ? { BELWEAVE_REVIEW_PAIRING_TOKEN: pairingToken } : {}),
   };
+}
+
+function desktopBootstrapEnvelope(pairingToken: string): string {
+  return JSON.stringify({
+    mode: 'desktop',
+    noBrowser: true,
+    port: config.trifecta.serverPort,
+    belweaveHome: DATA_DIR,
+    host: '0.0.0.0',
+    desktopBootstrapToken: pairingToken,
+    tailscaleServeEnabled: false,
+    tailscaleServePort: 443,
+  });
 }
 
 function startTrifectaCommand(pairingToken: string): string {
@@ -61,17 +70,25 @@ function startTrifectaCommand(pairingToken: string): string {
   //      Debian's PAM config has `pam_rootok.so` so root can su without a password or TTY.
   //   3. The login shell (`-`) sources /etc/profile.d so /usr/local/bin (trifecta) is in PATH.
   //   4. All BELWEAVE env vars are exported explicitly — su -l creates a clean environment.
+  //   5. The bootstrap file seeds a normal owner session token. Do not use the
+  //      review token path here; review sessions intentionally block project
+  //      creation and other administrative server capabilities.
   //
   // If su fails the outer script exits non-zero and createSandbox throws immediately,
   // making the failure loud rather than silently running trifecta as root.
+  const bootstrapPath = `${DATA_DIR}/desktop-bootstrap.json`;
+  const bootstrapJson = desktopBootstrapEnvelope(pairingToken);
   const innerLines = [
     `export BELWEAVE_HOST=0.0.0.0`,
     `export BELWEAVE_PORT=${config.trifecta.serverPort}`,
     `export BELWEAVE_HOME=${DATA_DIR}`,
     `export BELWEAVE_MODE=server`,
     `export BELWEAVE_NO_BROWSER=true`,
-    `export BELWEAVE_REVIEW_PAIRING_TOKEN=${shellQuote(pairingToken)}`,
-    `nohup trifecta serve --mode server --host 0.0.0.0 --port ${config.trifecta.serverPort} --base-dir ${DATA_DIR} --no-browser ${DATA_DIR} >${TRIFECTA_LOG} 2>&1 </dev/null &`,
+    `cat >${bootstrapPath} <<'JSON'`,
+    bootstrapJson,
+    `JSON`,
+    `chmod 600 ${bootstrapPath}`,
+    `nohup bash -lc 'exec 3<${bootstrapPath}; trifecta serve --mode server --host 0.0.0.0 --port ${config.trifecta.serverPort} --base-dir ${DATA_DIR} --no-browser --bootstrap-fd 3 ${DATA_DIR}' >${TRIFECTA_LOG} 2>&1 </dev/null &`,
     `echo $! >${TRIFECTA_PID}`,
   ];
   const innerB64 = Buffer.from(innerLines.join('\n')).toString('base64');
@@ -82,6 +99,60 @@ function startTrifectaCommand(pairingToken: string): string {
     `su - daytona -c "echo ${innerB64} | base64 -d | bash"`,
   ];
   return execScriptCommand(outerLines);
+}
+
+function ensureOwnerSessionCommand(pairingToken: string): string {
+  const bootstrapPayload = JSON.stringify({ credential: pairingToken });
+  const script = [
+    'set -euo pipefail',
+    `mkdir -p ${DATA_DIR}`,
+    `chown -R daytona:daytona ${DATA_DIR}`,
+    `AUTH_URL=http://127.0.0.1:${config.trifecta.serverPort}/api/auth`,
+    `export OWNER_SESSION=${OWNER_SESSION_TOKEN}`,
+    'if [ -s "$OWNER_SESSION" ]; then',
+    '  existing_token="$(cat "$OWNER_SESSION")"',
+    '  status="$(curl -sS -o /tmp/trifecta-session-check.json -w "%{http_code}" -H "Authorization: Bearer ${existing_token}" "${AUTH_URL}/session" || true)"',
+    '  if [ "$status" = "200" ] && node -e \'const fs=require("fs"); const body=JSON.parse(fs.readFileSync("/tmp/trifecta-session-check.json","utf8")); process.exit(body.authenticated ? 0 : 1)\' >/dev/null 2>&1; then',
+    '    exit 0',
+    '  fi',
+    'fi',
+    `cat >/tmp/trifecta-bootstrap-owner.json <<'JSON'`,
+    bootstrapPayload,
+    'JSON',
+    'status="$(curl -sS -o /tmp/trifecta-bootstrap-owner-response.json -w "%{http_code}" -H "Content-Type: application/json" -d @/tmp/trifecta-bootstrap-owner.json "${AUTH_URL}/bootstrap/bearer" || true)"',
+    'if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then',
+    '  cat /tmp/trifecta-bootstrap-owner-response.json >&2 || true',
+    '  exit 1',
+    'fi',
+    'node -e \'const fs=require("fs"); const body=JSON.parse(fs.readFileSync("/tmp/trifecta-bootstrap-owner-response.json","utf8")); if (!body.sessionToken) process.exit(1); fs.writeFileSync(process.env.OWNER_SESSION, body.sessionToken);\'',
+    'chmod 600 "$OWNER_SESSION"',
+    `chown daytona:daytona "$OWNER_SESSION"`,
+  ];
+  return execScriptCommand(script);
+}
+
+function issuePairingCredentialCommand(label: string): string {
+  const payload = JSON.stringify({ label });
+  const script = [
+    'set -euo pipefail',
+    `AUTH_URL=http://127.0.0.1:${config.trifecta.serverPort}/api/auth`,
+    `export OWNER_SESSION=${OWNER_SESSION_TOKEN}`,
+    'if [ ! -s "$OWNER_SESSION" ]; then',
+    '  echo "Owner session is not initialized." >&2',
+    '  exit 1',
+    'fi',
+    `cat >/tmp/trifecta-pairing-request.json <<'JSON'`,
+    payload,
+    'JSON',
+    'owner_token="$(cat "$OWNER_SESSION")"',
+    'status="$(curl -sS -o /tmp/trifecta-pairing-response.json -w "%{http_code}" -H "Authorization: Bearer ${owner_token}" -H "Content-Type: application/json" -d @/tmp/trifecta-pairing-request.json "${AUTH_URL}/pairing-token" || true)"',
+    'if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then',
+    '  cat /tmp/trifecta-pairing-response.json >&2 || true',
+    '  exit 1',
+    'fi',
+    'node -e \'const fs=require("fs"); const body=JSON.parse(fs.readFileSync("/tmp/trifecta-pairing-response.json","utf8")); if (!body.credential) process.exit(1); process.stdout.write(body.credential);\'',
+  ];
+  return execScriptCommand(script);
 }
 
 function startTerminalCommand(): string {
@@ -142,24 +213,19 @@ export async function createSandbox(opts: { name: string; tier: SandboxTier; pai
     }
 
     const snapshot = useGpu ? config.trifecta.gpuSnapshotName : config.trifecta.snapshotName;
-    const diskGiB = opts.diskGiB ?? 10;
 
-    // Daytona's runtime checks 'snapshot' and 'resources' independently — both work
-    // together even though the TypeScript overloads treat them as mutually exclusive.
-    // @ts-expect-error: resources is only typed on CreateSandboxFromImageParams but
-    // the SDK's create() forwards disk to the API regardless of the snapshot/image path.
     const sandbox = await client.create({
       name: opts.name,
       snapshot,
-      resources: { disk: diskGiB },
       labels: {
         app: 'trifecta-cloud',
         name: opts.name,
         tier: opts.tier,
+        disk: String(opts.diskGiB ?? 10),
         ...(useGpu ? { gpu: 'true' } : {}),
       },
       envVars: {
-        ...trifectaEnv(opts.pairingToken),
+        ...trifectaEnv(),
       },
       autoStopInterval: opts.idleTimeoutMinutes ?? 15,
     });
@@ -173,11 +239,15 @@ export async function createSandbox(opts: { name: string; tier: SandboxTier; pai
     }
 
     // Start the Trifecta server
-    const trifectaStart = await sandbox.process.executeCommand(startTrifectaCommand(opts.pairingToken), DATA_DIR, trifectaEnv(opts.pairingToken), 15);
+    const trifectaStart = await sandbox.process.executeCommand(startTrifectaCommand(opts.pairingToken), DATA_DIR, trifectaEnv(), 15);
     if (trifectaStart.exitCode !== 0) {
       throw new Error(trifectaStart.result || 'Failed to start Trifecta.');
     }
     await waitForTrifecta(sandbox);
+    const ownerSession = await sandbox.process.executeCommand(ensureOwnerSessionCommand(opts.pairingToken), DATA_DIR, undefined, 15);
+    if (ownerSession.exitCode !== 0) {
+      throw new Error(ownerSession.result || 'Failed to initialize owner session.');
+    }
 
     console.log(`[Daytona] Trifecta server started on ${sandbox.id}`);
 
@@ -213,11 +283,15 @@ export async function startSandbox(daytonaSandboxId: string, pairingToken: strin
     }
 
     // Start the Trifecta server
-    const trifectaStart = await sandbox.process.executeCommand(startTrifectaCommand(pairingToken), DATA_DIR, trifectaEnv(pairingToken), 15);
+    const trifectaStart = await sandbox.process.executeCommand(startTrifectaCommand(pairingToken), DATA_DIR, trifectaEnv(), 15);
     if (trifectaStart.exitCode !== 0) {
       throw new Error(trifectaStart.result || 'Failed to start Trifecta.');
     }
     await waitForTrifecta(sandbox);
+    const ownerSession = await sandbox.process.executeCommand(ensureOwnerSessionCommand(pairingToken), DATA_DIR, undefined, 15);
+    if (ownerSession.exitCode !== 0) {
+      throw new Error(ownerSession.result || 'Failed to initialize owner session.');
+    }
 
     console.log(`[Daytona] Sandbox ${daytonaSandboxId} started successfully`);
   } catch (error) {
@@ -280,6 +354,35 @@ export async function getTrifectaUrl(daytonaSandboxId: string): Promise<string> 
     return link.url;
   } catch (error) {
     console.error(`[Daytona] Failed to get Trifecta URL for ${daytonaSandboxId}:`, error);
+    throw error;
+  }
+}
+
+export async function issueSandboxPairingCredential(
+  daytonaSandboxId: string,
+  pairingToken: string,
+  label: string,
+): Promise<string> {
+  try {
+    const client = getDaytonaClient();
+    const sandbox = await client.get(daytonaSandboxId);
+    const ownerSession = await sandbox.process.executeCommand(ensureOwnerSessionCommand(pairingToken), DATA_DIR, undefined, 15);
+    if (ownerSession.exitCode !== 0) {
+      throw new Error(ownerSession.result || 'Failed to initialize owner session.');
+    }
+
+    const issued = await sandbox.process.executeCommand(issuePairingCredentialCommand(label), DATA_DIR, undefined, 15);
+    if (issued.exitCode !== 0) {
+      throw new Error(issued.result || 'Failed to issue pairing credential.');
+    }
+
+    const credential = issued.result.trim();
+    if (!credential) {
+      throw new Error('Pairing credential response was empty.');
+    }
+    return credential;
+  } catch (error) {
+    console.error(`[Daytona] Failed to issue pairing credential for ${daytonaSandboxId}:`, error);
     throw error;
   }
 }

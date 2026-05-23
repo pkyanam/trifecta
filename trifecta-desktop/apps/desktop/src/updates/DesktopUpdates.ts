@@ -21,6 +21,7 @@ import * as Scope from "effect/Scope";
 import * as DesktopBackendManager from "../backend/DesktopBackendManager.ts";
 import * as DesktopConfig from "../app/DesktopConfig.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
+import { markQuitAllowed } from "../app/DesktopLifecycle.ts";
 import * as DesktopObservability from "../app/DesktopObservability.ts";
 import * as DesktopState from "../app/DesktopState.ts";
 import * as ElectronUpdater from "../electron/ElectronUpdater.ts";
@@ -370,6 +371,7 @@ const make = Effect.gen(function* () {
     return yield* Effect.gen(function* () {
       yield* backendManager.stop({ timeout: Duration.seconds(5) });
       yield* electronWindow.destroyAll;
+      yield* Effect.sync(markQuitAllowed);
       yield* electronUpdater.quitAndInstall({
         isSilent: true,
         isForceRunAfter: true,
