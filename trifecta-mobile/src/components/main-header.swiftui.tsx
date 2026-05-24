@@ -1,0 +1,146 @@
+import { useModel } from "@/components/model-context";
+import { useActiveThread } from "@/stores/active-thread";
+import { useWsClient } from "@/stores/ws-client";
+import {
+  Button,
+  Host,
+  HStack,
+  Menu,
+  Section,
+  Image as SUIImage,
+  Text as SUIText,
+  VStack,
+} from "@expo/ui/swift-ui";
+import {
+  font,
+  foregroundStyle,
+} from "@expo/ui/swift-ui/modifiers";
+import { Stack, useRouter } from "expo-router";
+import { Alert, useColorScheme } from "react-native";
+import { useDrawer } from "./drawer-content";
+
+function randomId(): string {
+  let result = "";
+  while (result.length < 32) {
+    result += Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, "0");
+  }
+  return result.slice(0, 32);
+}
+
+function HeaderTitleMenu() {
+  const { selectedModelLabel } = useModel();
+  const { activeThreadId } = useActiveThread();
+  const { request } = useWsClient();
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const headerFg = isDark ? "#fff" : "#000";
+  const headerFgMuted = isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.5)";
+
+  function handleRename() {
+    if (!activeThreadId) return;
+    Alert.prompt(
+      "Rename Thread",
+      undefined,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "OK",
+          onPress: async (title?: string) => {
+            if (!title?.trim()) return;
+            try {
+              await request("orchestration.dispatchCommand", {
+                type: "thread.meta.update",
+                commandId: randomId(),
+                threadId: activeThreadId,
+                title: title.trim(),
+              });
+            } catch {}
+          },
+        },
+      ],
+      "plain-text",
+    );
+  }
+
+  function handleDelete() {
+    if (!activeThreadId) return;
+    Alert.alert("Delete Thread", "This cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await request("orchestration.dispatchCommand", {
+              type: "thread.delete",
+              commandId: randomId(),
+              threadId: activeThreadId,
+              createdAt: new Date().toISOString(),
+            });
+            router.replace("/chats");
+          } catch {}
+        },
+      },
+    ]);
+  }
+
+  return (
+    <Host style={{ minWidth: 200, minHeight: 40 }}>
+      <Menu
+        label={
+          <VStack spacing={0}>
+            <HStack spacing={4} alignment="center">
+              <SUIText
+                modifiers={[
+                  foregroundStyle(headerFg),
+                  font({ weight: "semibold", size: 17 }),
+                ]}
+                numberOfLines={2}
+              >
+                {selectedModelLabel}
+              </SUIText>
+              <SUIImage systemName="chevron.down" size={10} color={headerFg} />
+            </HStack>
+            <SUIText modifiers={[foregroundStyle(headerFgMuted), font({ size: 12 })]}>
+              Change model
+            </SUIText>
+          </VStack>
+        }
+      >
+        <Section title="Model">
+          <Button
+            systemImage="cpu"
+            label="Change model…"
+            onPress={() => router.navigate("/model-picker")}
+          />
+        </Section>
+        {activeThreadId ? (
+          <Section title="Thread">
+            <Button systemImage="pencil" label="Rename" onPress={handleRename} />
+            <Button
+              systemImage="trash"
+              label="Delete"
+              role="destructive"
+              onPress={handleDelete}
+            />
+          </Section>
+        ) : null}
+      </Menu>
+    </Host>
+  );
+}
+
+export function MainHeader() {
+  const { openDrawer } = useDrawer();
+  return (
+    <>
+      <Stack.Screen.Title asChild>
+        <HeaderTitleMenu />
+      </Stack.Screen.Title>
+      <Stack.Toolbar placement="left">
+        <Stack.Toolbar.Button icon="list.bullet" onPress={openDrawer} />
+      </Stack.Toolbar>
+    </>
+  );
+}
