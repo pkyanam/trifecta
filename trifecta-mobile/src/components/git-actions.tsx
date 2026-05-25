@@ -66,7 +66,8 @@ export function GitActions({ visible, onClose, cwd }: GitActionsProps) {
     setActionInProgress("pull");
     try {
       await git.pull(cwd);
-      await git.refreshStatus(cwd);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
       showToast("Pull successful", true);
     } catch (error) {
       console.error("Pull failed:", error);
@@ -82,7 +83,8 @@ export function GitActions({ visible, onClose, cwd }: GitActionsProps) {
     const actionId = `commit-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit");
-      await git.refreshStatus(cwd);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
       showToast("Commit successful", true);
     } catch (error) {
       console.error("Commit failed:", error);
@@ -98,7 +100,8 @@ export function GitActions({ visible, onClose, cwd }: GitActionsProps) {
     const actionId = `push-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "push");
-      await git.refreshStatus(cwd);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
       showToast("Push successful", true);
     } catch (error) {
       console.error("Push failed:", error);
@@ -115,7 +118,8 @@ export function GitActions({ visible, onClose, cwd }: GitActionsProps) {
     const actionId = `commit-push-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit_push");
-      await git.refreshStatus(cwd);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
       showToast("Commit & push successful", true);
     } catch (error) {
       console.error("Commit & push failed:", error);
@@ -132,7 +136,8 @@ export function GitActions({ visible, onClose, cwd }: GitActionsProps) {
     const actionId = `commit-push-pr-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit_push_pr");
-      await git.refreshStatus(cwd);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
       showToast("Commit, push & PR successful", true);
     } catch (error) {
       console.error("Commit, push & PR failed:", error);
@@ -148,7 +153,8 @@ export function GitActions({ visible, onClose, cwd }: GitActionsProps) {
     const actionId = `push-pr-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "create_pr");
-      await git.refreshStatus(cwd);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
       showToast("Push & create PR successful", true);
     } catch (error) {
       console.error("Push & create PR failed:", error);
