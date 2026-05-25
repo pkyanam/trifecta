@@ -1,6 +1,7 @@
 import type { ModelSelection, ThreadId } from "@/types/thread";
-import React, { createContext, use, useCallback, useState } from "react";
+import React, { createContext, use, useCallback, useState, useEffect } from "react";
 import { useWsClient } from "./ws-client";
+import * as SecureStore from "expo-secure-store";
 
 interface ActiveThreadContextValue {
   activeThreadId: ThreadId | null;
@@ -26,6 +27,7 @@ interface ActiveThreadContextValue {
 }
 
 const ActiveThreadContext = createContext<ActiveThreadContextValue | null>(null);
+const THREAD_ID_KEY = "trifecta_active_thread_id";
 
 function randomId(): string {
   let result = "";
@@ -45,7 +47,33 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
   const [activeThreadId, setActiveThreadId] = useState<ThreadId | null>(null);
   const [newChatMode, setNewChatMode] = useState(false);
   const [newChatProjectId, setNewChatProjectId] = useState<string | null>(null);
-  const { request } = useWsClient();
+  const { request, status } = useWsClient();
+
+  // Persist active thread ID to survive connection drops
+  useEffect(() => {
+    async function load() {
+      try {
+        const saved = await SecureStore.getItemAsync(THREAD_ID_KEY);
+        if (saved) {
+          setActiveThreadId(saved as ThreadId);
+        }
+      } catch {}
+    }
+    load();
+  }, []);
+
+  useEffect(() => {
+    async function save() {
+      try {
+        if (activeThreadId) {
+          await SecureStore.setItemAsync(THREAD_ID_KEY, activeThreadId);
+        } else {
+          await SecureStore.deleteItemAsync(THREAD_ID_KEY);
+        }
+      } catch {}
+    }
+    save();
+  }, [activeThreadId]);
 
   const startNewChat = useCallback((projectId?: string | null) => {
     setActiveThreadId(null);
@@ -61,6 +89,12 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
       runtimeMode = "full-access",
       interactionMode = "default",
     ) => {
+      // Don't attempt to dispatch if not connected
+      if (status !== "connected") {
+        console.warn("Cannot dispatch turn - not connected");
+        return;
+      }
+      
       const payload: Record<string, unknown> = {
         type: "thread.turn.start",
         commandId: randomId(),
@@ -78,7 +112,7 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
       };
       await request("orchestration.dispatchCommand", payload);
     },
-    [request],
+    [request, status],
   );
 
   const createThread = useCallback(
@@ -89,6 +123,12 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
       runtimeMode = "full-access",
       interactionMode = "default",
     ): Promise<ThreadId> => {
+      // Don't attempt to create thread if not connected
+      if (status !== "connected") {
+        console.warn("Cannot create thread - not connected");
+        throw new Error("Not connected");
+      }
+      
       const threadId = randomId();
       const now = nowISO();
       const titleSeed = text.slice(0, 80).trim();
@@ -128,7 +168,7 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
       setNewChatProjectId(null);
       return threadId;
     },
-    [request],
+    [request, status],
   );
 
   const handleSetActiveThreadId = useCallback((id: ThreadId | null) => {

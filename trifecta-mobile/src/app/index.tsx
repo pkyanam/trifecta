@@ -21,6 +21,7 @@ import { useActiveThread } from "@/stores/active-thread";
 import { useConnection } from "@/stores/connection";
 import { usePreferences } from "@/stores/preferences";
 import { useThreadList } from "@/stores/thread-list";
+import { useWsClient } from "@/stores/ws-client";
 import { useThread } from "@/hooks/use-thread";
 import { Redirect, Link, useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
@@ -126,14 +127,16 @@ function useRealChat() {
 export default function ChatScreen() {
   const { isPaired, isLoading } = useConnection();
   const { activeThreadId, newChatMode } = useActiveThread();
+  const { status } = useWsClient();
   const chat = useRealChat();
   const { isGenerating, streamingStore } = chat;
 
   if (isLoading) return null;
   if (!isPaired) return <Redirect href="/pair" />;
   
-  // Redirect to default view if no active thread AND not in new chat mode (app first launch)
-  if (!activeThreadId && !newChatMode) {
+  // Only redirect to default view if no active thread AND not in new chat mode AND connected
+  // This prevents redirecting during temporary connection drops
+  if (!activeThreadId && !newChatMode && status === "connected") {
     return <Redirect href="/default-view" />;
   }
 
