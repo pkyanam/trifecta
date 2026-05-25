@@ -35,6 +35,7 @@ interface ActiveThreadContextValue {
 
 const ActiveThreadContext = createContext<ActiveThreadContextValue | null>(null);
 const ACTIVE_THREAD_KEY = "trifecta.activeThreadId";
+const LEGACY_ACTIVE_THREAD_KEY = "trifecta_active_thread_id";
 
 function randomId(): string {
   let result = "";
@@ -59,11 +60,16 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     let cancelled = false;
-    SecureStore.getItemAsync(ACTIVE_THREAD_KEY)
+    Promise.all([
+      SecureStore.getItemAsync(ACTIVE_THREAD_KEY),
+      SecureStore.getItemAsync(LEGACY_ACTIVE_THREAD_KEY),
+    ])
       .then((storedThreadId) => {
         if (cancelled) return;
-        if (storedThreadId) {
-          setActiveThreadId(storedThreadId);
+        const [currentKeyThreadId, legacyKeyThreadId] = storedThreadId;
+        const restoredThreadId = currentKeyThreadId ?? legacyKeyThreadId;
+        if (restoredThreadId) {
+          setActiveThreadId(restoredThreadId);
         }
       })
       .catch((error) => {
@@ -85,10 +91,12 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
       void SecureStore.setItemAsync(ACTIVE_THREAD_KEY, id).catch((error) => {
         console.warn("Failed to persist active thread:", error);
       });
+      void SecureStore.setItemAsync(LEGACY_ACTIVE_THREAD_KEY, id).catch(() => {});
     } else {
       void SecureStore.deleteItemAsync(ACTIVE_THREAD_KEY).catch((error) => {
         console.warn("Failed to clear active thread:", error);
       });
+      void SecureStore.deleteItemAsync(LEGACY_ACTIVE_THREAD_KEY).catch(() => {});
     }
   }, []);
 

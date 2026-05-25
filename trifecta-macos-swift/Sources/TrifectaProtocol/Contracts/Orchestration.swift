@@ -6,7 +6,7 @@ public struct OrchestrationSession: Decodable {
     public let threadId: String
     public let status: String  // "idle"|"starting"|"running"|"ready"|"interrupted"|"stopped"|"error"
     public let providerName: String?
-    public let runtimeMode: String
+    public let runtimeMode: String?  // server uses withDecodingDefault; field may be absent
     public let activeTurnId: String?
     public let lastError: String?
     public let updatedAt: String

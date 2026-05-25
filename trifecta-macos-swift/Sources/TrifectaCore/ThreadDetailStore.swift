@@ -27,9 +27,14 @@ public final class ThreadDetailStore {
         subscriptionTask = Task {
             do {
                 for try await value in stream {
-                    let data = try JSONEncoder().encode(value)
-                    let item = try JSONDecoder().decode(OrchestrationThreadStreamItem.self, from: data)
-                    self.apply(item)
+                    do {
+                        let data = try JSONEncoder().encode(value)
+                        let item = try JSONDecoder().decode(OrchestrationThreadStreamItem.self, from: data)
+                        self.apply(item)
+                    } catch {
+                        // Skip undecodable events rather than killing the subscription
+                        print("[ThreadDetailStore] skipping undecodable event: \(error)")
+                    }
                 }
             } catch {
                 self.error = error.localizedDescription

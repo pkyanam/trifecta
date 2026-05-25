@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/set-state-in-effect, react-hooks/purity */
+/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -11,6 +11,10 @@ import {
 } from "react-native";
 import { SymbolImage } from "@/components/symbol-image";
 import { useGitService, type VcsStatusResult, type VcsRef, type GitStackedAction } from "@/services/git";
+import {
+  clearGitActionsRestore,
+  markGitActionsRestore,
+} from "@/utils/git-actions-restore";
 import { cn } from "@/utils/tailwind";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
@@ -19,6 +23,8 @@ interface GitActionsSheetProps {
   onClose: () => void;
   cwd: string;
 }
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps) {
   const git = useGitService();
@@ -65,32 +71,40 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     
     setSwitchingBranch(true);
     setSwitchingBranchName(refName);
+    markGitActionsRestore(cwd);
     try {
-      const result = await git.switchRef(cwd, refName);
+      await git.switchRef(cwd, refName);
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
+      clearGitActionsRestore();
       showToast("Branch switched successfully", true);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error("Branch switch failed:", error);
-      
-      // If it's a connection error, the branch might have still switched
-      // Try to refresh status to see if it actually worked
-      if (errorMessage.includes("Not connected") || errorMessage.includes("RPC request failed")) {
-        try {
-          const fallbackStatus = await git.refreshStatus(cwd);
-          setStatus(fallbackStatus);
-          if (fallbackStatus.refName === refName) {
-            showToast("Branch switched (connection recovered)", true);
-          } else {
-            showToast("Branch switch failed - connection lost", false, errorMessage);
+      const mayHaveReloadedBundle =
+        errorMessage.includes("Not connected") ||
+        errorMessage.includes("RPC request failed");
+
+      if (mayHaveReloadedBundle) {
+        for (let attempt = 0; attempt < 8; attempt++) {
+          try {
+            await sleep(750);
+            const recoveredStatus = await git.refreshStatus(cwd);
+            setStatus(recoveredStatus);
+            if (recoveredStatus.refName === refName) {
+              clearGitActionsRestore();
+              showToast("Branch switched successfully", true);
+              return;
+            }
+          } catch {
           }
-        } catch (refreshError) {
-          showToast("Branch switch failed - connection lost", false, errorMessage);
         }
-      } else {
-        showToast("Branch switch failed", false, errorMessage);
+        showToast("Branch switched; reconnecting", true);
+        return;
       }
+
+      clearGitActionsRestore();
+      console.error("Branch switch failed:", error);
+      showToast("Branch switch failed", false, errorMessage);
     } finally {
       setSwitchingBranch(false);
       setSwitchingBranchName(null);
