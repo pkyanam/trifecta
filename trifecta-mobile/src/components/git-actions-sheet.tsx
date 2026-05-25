@@ -96,19 +96,30 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
         console.error("[GitActionsSheet] Action error (non-blocking):", err);
       });
       
-      // Wait a bit for the action to complete, then refresh status
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log("[GitActionsSheet] Refreshing status after delay");
-      const newStatus = await git.refreshStatus(cwd);
-      console.log("[GitActionsSheet] After commit - status:", newStatus);
-      console.log("[GitActionsSheet] canPush check:", {
-        isRepo: newStatus?.isRepo,
-        hasUpstream: newStatus?.hasUpstream,
-        aheadCount: newStatus?.aheadCount,
-        canPush: newStatus?.isRepo && newStatus?.hasUpstream && newStatus?.aheadCount > 0
-      });
-      // Manually update local state to ensure UI refreshes immediately
-      setStatus(newStatus);
+      // Wait for the status to change via subscription (hasWorkingTreeChanges to become false)
+      const initialHasChanges = status?.hasWorkingTreeChanges;
+      console.log("[GitActionsSheet] Waiting for status to change (initial hasChanges:", initialHasChanges, ")");
+      
+      // Poll for status change with timeout
+      let attempts = 0;
+      const maxAttempts = 15; // 15 seconds max
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const currentStatus = await git.refreshStatus(cwd);
+        console.log("[GitActionsSheet] Poll attempt", attempts + 1, "- hasWorkingTreeChanges:", currentStatus?.hasWorkingTreeChanges);
+        
+        if (currentStatus?.hasWorkingTreeChanges === false && initialHasChanges === true) {
+          console.log("[GitActionsSheet] Status changed to no working tree changes");
+          setStatus(currentStatus);
+          showToast("Commit successful", true);
+          return;
+        }
+        attempts++;
+      }
+      
+      console.log("[GitActionsSheet] Timeout waiting for status change, using latest status");
+      const finalStatus = await git.refreshStatus(cwd);
+      setStatus(finalStatus);
       showToast("Commit successful", true);
     } catch (err) {
       console.error("[GitActionsSheet] Commit error:", err);
