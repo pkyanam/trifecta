@@ -10,7 +10,10 @@ export default function DefaultView() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   if (isLoading) return null;

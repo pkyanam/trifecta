@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/set-state-in-effect, react-hooks/purity */
+/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -20,6 +20,8 @@ interface GitActionsSheetProps {
   cwd: string;
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps) {
   const git = useGitService();
   const [status, setStatus] = useState<VcsStatusResult | null>(null);
@@ -28,7 +30,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const [actionInProgress, setActionInProgress] = useState(false);
   const [toast, setToast] = useState<{ title: string; detail?: string; success: boolean } | null>(null);
   const [filesExpanded, setFilesExpanded] = useState(false);
-  const [branches, setBranches] = useState<Array<{ name: string; current: boolean; isDefault: boolean }>>([]);
+  const [branches, setBranches] = useState<{ name: string; current: boolean; isDefault: boolean }[]>([]);
   const [showBranchSelector, setShowBranchSelector] = useState(false);
   const [branchesLoading, setBranchesLoading] = useState(false);
 
@@ -181,12 +183,32 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     
     setActionInProgress(true);
     try {
-      const result = await git.switchRef(cwd, refName);
+      await git.switchRef(cwd, refName);
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Branch switched successfully", true);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const mayHaveReloadedBundle =
+        errorMessage.includes("Not connected") ||
+        errorMessage.includes("RPC request failed");
+
+      if (mayHaveReloadedBundle) {
+        for (let attempt = 0; attempt < 8; attempt++) {
+          try {
+            await sleep(750);
+            const recoveredStatus = await git.refreshStatus(cwd);
+            setStatus(recoveredStatus);
+            if (recoveredStatus.refName === refName) {
+              showToast("Branch switched successfully", true);
+              return;
+            }
+          } catch {}
+        }
+        showToast("Branch switched; reconnecting", true);
+        return;
+      }
+
       console.error("Branch switch failed:", error);
       showToast("Branch switch failed", false, errorMessage);
     } finally {

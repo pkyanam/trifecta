@@ -149,8 +149,12 @@ export function MainHeader() {
   const project = activeThread?.projectId ? getProject(activeThread.projectId) : null;
   const newChatProject = newChatProjectId ? getProject(newChatProjectId) : null;
 
-  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project > server cwd
-  const cwd = activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
+  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project > server cwd.
+  // If an active thread exists but its snapshot has not rehydrated after a
+  // branch-triggered Metro reload, avoid falling back to the server home cwd.
+  const cwd = activeThreadId && !activeThread
+    ? ""
+    : activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
 
   // Fetch git status whenever the thread changes
   useEffect(() => {

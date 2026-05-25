@@ -126,7 +126,7 @@ function useRealChat() {
 
 export default function ChatScreen() {
   const { isPaired, isLoading } = useConnection();
-  const { activeThreadId, newChatMode } = useActiveThread();
+  const { activeThreadId, activeThreadHydrated, newChatMode } = useActiveThread();
   const { status } = useWsClient();
   const chat = useRealChat();
   const { isGenerating, streamingStore } = chat;
@@ -134,9 +134,15 @@ export default function ChatScreen() {
   if (isLoading) return null;
   if (!isPaired) return <Redirect href="/pair" />;
   
-  // Only redirect to default view if no active thread AND not in new chat mode AND connected
-  // This prevents redirecting during temporary connection drops
-  if (!activeThreadId && !newChatMode && status === "connected") {
+  // Only redirect after the persisted thread ID has had a chance to restore.
+  // Branch switching can trigger a Metro reload because this app is served from
+  // the same repo; without this guard the initial null state wins the race.
+  if (
+    activeThreadHydrated &&
+    status === "connected" &&
+    !activeThreadId &&
+    !newChatMode
+  ) {
     return <Redirect href="/default-view" />;
   }
 

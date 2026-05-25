@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 
 interface ActiveThreadContextValue {
   activeThreadId: ThreadId | null;
+  activeThreadHydrated: boolean;
   /** True when user explicitly started a new chat (composer shows, no redirect to /chats) */
   newChatMode: boolean;
   /** Project ID to create new thread under */
@@ -45,41 +46,48 @@ function nowISO(): string {
 
 export function ActiveThreadProvider({ children }: { children: React.ReactNode }) {
   const [activeThreadId, setActiveThreadId] = useState<ThreadId | null>(null);
+  const [activeThreadHydrated, setActiveThreadHydrated] = useState(false);
   const [newChatMode, setNewChatMode] = useState(false);
   const [newChatProjectId, setNewChatProjectId] = useState<string | null>(null);
   const { request, status } = useWsClient();
 
-  // Persist active thread ID to survive connection drops
+  // Restore active thread ID after a Metro reload caused by switching the repo
+  // branch that is serving this mobile bundle.
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       try {
         const saved = await SecureStore.getItemAsync(THREAD_ID_KEY);
-        if (saved) {
+        if (!cancelled && saved) {
           setActiveThreadId(saved as ThreadId);
         }
-      } catch {}
+      } catch {
+      } finally {
+        if (!cancelled) {
+          setActiveThreadHydrated(true);
+        }
+      }
     }
     load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  useEffect(() => {
-    async function save() {
-      try {
-        if (activeThreadId) {
-          await SecureStore.setItemAsync(THREAD_ID_KEY, activeThreadId);
-        } else {
-          await SecureStore.deleteItemAsync(THREAD_ID_KEY);
-        }
-      } catch {}
+  const persistActiveThreadId = useCallback((id: ThreadId | null) => {
+    if (id) {
+      void SecureStore.setItemAsync(THREAD_ID_KEY, id).catch(() => {});
+    } else {
+      void SecureStore.deleteItemAsync(THREAD_ID_KEY).catch(() => {});
     }
-    save();
-  }, [activeThreadId]);
+  }, []);
 
   const startNewChat = useCallback((projectId?: string | null) => {
     setActiveThreadId(null);
+    persistActiveThreadId(null);
     setNewChatProjectId(projectId ?? null);
     setNewChatMode(true);
-  }, []);
+  }, [persistActiveThreadId]);
 
   const dispatchTurnStart = useCallback(
     async (
@@ -164,25 +172,28 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
 
       await request("orchestration.dispatchCommand", payload);
       setActiveThreadId(threadId);
+      persistActiveThreadId(threadId);
       setNewChatMode(false);
       setNewChatProjectId(null);
       return threadId;
     },
-    [request, status],
+    [persistActiveThreadId, request, status],
   );
 
   const handleSetActiveThreadId = useCallback((id: ThreadId | null) => {
     setActiveThreadId(id);
+    persistActiveThreadId(id);
     if (id !== null) {
       setNewChatMode(false);
       setNewChatProjectId(null);
     }
-  }, []);
+  }, [persistActiveThreadId]);
 
   return (
     <ActiveThreadContext
       value={{
         activeThreadId,
+        activeThreadHydrated,
         newChatMode,
         newChatProjectId,
         setActiveThreadId: handleSetActiveThreadId,

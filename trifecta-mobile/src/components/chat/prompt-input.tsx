@@ -42,6 +42,7 @@ export function PromptInput({ children }: { children: ReactNode }) {
     const activeThread = activeThreadId ? getThread(activeThreadId) : null;
     const project = activeThread?.projectId ? getProject(activeThread.projectId) : null;
     const newChatProject = newChatProjectId ? getProject(newChatProjectId) : null;
+    if (activeThreadId && !activeThread) return "";
     return activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
   }, [activeThreadId, newChatProjectId, getThread, getProject, serverConfig?.cwd]);
   
