@@ -96,30 +96,10 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
         console.error("[GitActionsSheet] Action error (non-blocking):", err);
       });
       
-      // Wait for the status to change via subscription (hasWorkingTreeChanges to become false)
-      const initialHasChanges = status?.hasWorkingTreeChanges;
-      console.log("[GitActionsSheet] Waiting for status to change (initial hasChanges:", initialHasChanges, ")");
-      
-      // Poll for status change with timeout
-      let attempts = 0;
-      const maxAttempts = 15; // 15 seconds max
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const currentStatus = await git.refreshStatus(cwd);
-        console.log("[GitActionsSheet] Poll attempt", attempts + 1, "- hasWorkingTreeChanges:", currentStatus?.hasWorkingTreeChanges);
-        
-        if (currentStatus?.hasWorkingTreeChanges === false && initialHasChanges === true) {
-          console.log("[GitActionsSheet] Status changed to no working tree changes");
-          setStatus(currentStatus);
-          showToast("Commit successful", true);
-          return;
-        }
-        attempts++;
-      }
-      
-      console.log("[GitActionsSheet] Timeout waiting for status change, using latest status");
-      const finalStatus = await git.refreshStatus(cwd);
-      setStatus(finalStatus);
+      // Wait a bit for the action to complete, then clear actionInProgress
+      // The WebSocket subscription will handle updating the status
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log("[GitActionsSheet] Clearing actionInProgress after 3s");
       showToast("Commit successful", true);
     } catch (err) {
       console.error("[GitActionsSheet] Commit error:", err);
