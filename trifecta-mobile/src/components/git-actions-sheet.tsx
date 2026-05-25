@@ -415,14 +415,14 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                           onPress={handlePushPr}
                           disabled={!canPush || actionInProgress}
                           className={cn(
-                            "flex-row items-center gap-3 px-4 py-3 rounded-lg bg-accent active:bg-accent/80",
+                            "flex-row items-center gap-3 px-4 py-3 rounded-lg bg-blue-500 active:bg-blue-600",
                             (!canPush || actionInProgress) && "opacity-50"
                           )}
                         >
-                          <SymbolImage name="arrow.triangle.2.circlepath" size={16} className="text-background" />
+                          <SymbolImage name="arrow.triangle.2.circlepath" size={16} className="text-white" />
                           <View className="flex-1">
-                            <Text className="text-sm font-semibold text-background">Push & Create PR</Text>
-                            <Text className="text-xs text-background/80">Push commits and create pull request</Text>
+                            <Text className="text-sm font-semibold text-white">Push & Create PR</Text>
+                            <Text className="text-xs text-white/80">Push commits and create pull request</Text>
                           </View>
                         </Pressable>
                       ) : (
@@ -430,14 +430,14 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                           onPress={handlePush}
                           disabled={!canPush || actionInProgress}
                           className={cn(
-                            "flex-row items-center gap-3 px-4 py-3 rounded-lg bg-accent active:bg-accent/80",
+                            "flex-row items-center gap-3 px-4 py-3 rounded-lg bg-blue-500 active:bg-blue-600",
                             (!canPush || actionInProgress) && "opacity-50"
                           )}
                         >
-                          <SymbolImage name="arrow.up.circle" size={16} className="text-background" />
+                          <SymbolImage name="arrow.up.circle" size={16} className="text-white" />
                           <View className="flex-1">
-                            <Text className="text-sm font-semibold text-background">Push</Text>
-                            <Text className="text-xs text-background/80">
+                            <Text className="text-sm font-semibold text-white">Push</Text>
+                            <Text className="text-xs text-white/80">
                               {(status?.aheadCount ?? 0) > 0 ? `Ahead by ${status?.aheadCount} commits` : "Nothing to push"}
                             </Text>
                           </View>
