@@ -47,75 +47,45 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   };
 
   const handleSwitchBranch = async (refName: string) => {
+    // Close the branch selector overlay first
+    setShowBranchSelector(false);
+    
+    // Check if there are uncommitted changes
+    if (status?.hasWorkingTreeChanges) {
+      // Show alert asking user to commit first
+      Alert.alert(
+        "Uncommitted Changes",
+        "You have uncommitted changes. Please commit or stash them before switching branches.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+    
     setActionInProgress(true);
     try {
-      console.log("Switching to branch:", refName, "in directory:", cwd);
-      
-      // Check if the branch exists locally
-      const branchExists = branches.some(b => b.name === refName);
-      if (!branchExists) {
-        throw new Error(`Branch "${refName}" does not exist locally`);
-      }
-      
       const result = await git.switchRef(cwd, refName);
-      console.log("Switch result:", result);
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
-      setShowBranchSelector(false);
       showToast("Branch switched successfully", true);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("Branch switch failed:", error);
       
-      // Check if the error is about uncommitted changes
-      if (errorMessage.includes("would be overwritten by checkout") || 
-          errorMessage.includes("commit your changes or stash them")) {
-        // This is expected - don't log as error, just show the alert
-        console.log("Uncommitted changes detected, asking user to commit first");
-        
-        // Ask user if they want to commit changes first
-        setShowBranchSelector(false);
-        setActionInProgress(false);
-        
-        // Show a React Native alert asking if they want to commit
-        Alert.alert(
-          "Uncommitted Changes",
-          "You have uncommitted changes. Would you like to commit them before switching branches?",
-          [
-            {
-              text: "Cancel",
-              style: "cancel",
-              onPress: () => {
-                showToast("Branch switch cancelled", false, "Commit your changes first");
-              }
-            },
-            {
-              text: "Commit & Switch",
-              onPress: async () => {
-                setActionInProgress(true);
-                try {
-                  await runAction("commit");
-                  const newStatus = await git.refreshStatus(cwd);
-                  setStatus(newStatus);
-                  
-                  // Now try switching to the original branch (using refName from closure)
-                  const result = await git.switchRef(cwd, refName);
-                  const finalStatus = await git.refreshStatus(cwd);
-                  setStatus(finalStatus);
-                  showToast("Changes committed and branch switched successfully", true);
-                } catch (commitError) {
-                  console.error("Commit or switch failed:", commitError);
-                  showToast("Failed to commit changes", false, commitError instanceof Error ? commitError.message : "Unknown error");
-                } finally {
-                  setActionInProgress(false);
-                }
-              }
-            }
-          ]
-        );
+      // If it's a connection error, the branch might have still switched
+      // Try to refresh status to see if it actually worked
+      if (errorMessage.includes("Not connected") || errorMessage.includes("RPC request failed")) {
+        try {
+          const fallbackStatus = await git.refreshStatus(cwd);
+          setStatus(fallbackStatus);
+          if (fallbackStatus.refName === refName) {
+            showToast("Branch switched (connection recovered)", true);
+          } else {
+            showToast("Branch switch failed - connection lost", false, errorMessage);
+          }
+        } catch (refreshError) {
+          showToast("Branch switch failed - connection lost", false, errorMessage);
+        }
       } else {
-        // Other errors - log and show the error message
-        console.error("Branch switch failed:", error);
-        setShowBranchSelector(false);
         showToast("Branch switch failed", false, errorMessage);
       }
     } finally {
