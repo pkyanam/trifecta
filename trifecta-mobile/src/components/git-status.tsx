@@ -117,7 +117,6 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
         visible={showActions}
         onClose={() => setShowActions(false)}
         cwd={cwd}
-        status={status}
       />
     </>
   );

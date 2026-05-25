@@ -5,7 +5,7 @@ import {
   GlassView,
   isLiquidGlassAvailable,
 } from "expo-glass-effect";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useGitService, GitStackedAction, type VcsStatusResult } from "@/services/git";
@@ -14,13 +14,47 @@ interface GitActionsProps {
   visible: boolean;
   onClose: () => void;
   cwd: string;
-  status: VcsStatusResult | null;
 }
 
-export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
+export function GitActions({ visible, onClose, cwd }: GitActionsProps) {
   const git = useGitService();
+  const [status, setStatus] = useState<VcsStatusResult | null>(null);
   const [actionInProgress, setActionInProgress] = useState<GitStackedAction | null>(null);
   const [toast, setToast] = useState<{ title: string; detail?: string; success: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!visible || !cwd) return;
+
+    // Initial load
+    const loadStatus = async () => {
+      try {
+        const result = await git.refreshStatus(cwd);
+        setStatus(result);
+      } catch (error) {
+        console.error("Failed to load git status:", error);
+      }
+    };
+
+    loadStatus();
+
+    // Subscribe to status updates
+    const unsubscribe = git.subscribeVcsStatus(cwd, (event) => {
+      if (event._tag === "snapshot" || event._tag === "localUpdated") {
+        setStatus((prev) => ({
+          ...prev,
+          ...event.local,
+          ...(event._tag === "snapshot" && event.remote ? event.remote : {}),
+        }) as VcsStatusResult);
+      } else if (event._tag === "remoteUpdated") {
+        setStatus((prev) => ({
+          ...prev,
+          ...event.remote,
+        }) as VcsStatusResult);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [visible, cwd, git]);
 
   const showToast = (title: string, success: boolean, detail?: string) => {
     setToast({ title, detail, success });
@@ -32,7 +66,6 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     setActionInProgress("pull");
     try {
       await git.pull(cwd);
-      await git.refreshStatus(cwd);
       showToast("Pull successful", true);
     } catch (error) {
       console.error("Pull failed:", error);
@@ -48,7 +81,6 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     const actionId = `commit-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit");
-      await git.refreshStatus(cwd);
       showToast("Commit successful", true);
     } catch (error) {
       console.error("Commit failed:", error);
@@ -64,7 +96,6 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     const actionId = `push-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "push");
-      await git.refreshStatus(cwd);
       showToast("Push successful", true);
     } catch (error) {
       console.error("Push failed:", error);
@@ -81,7 +112,6 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     const actionId = `commit-push-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit_push");
-      await git.refreshStatus(cwd);
       showToast("Commit & push successful", true);
     } catch (error) {
       console.error("Commit & push failed:", error);
@@ -98,7 +128,6 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     const actionId = `commit-push-pr-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit_push_pr");
-      await git.refreshStatus(cwd);
       showToast("Commit, push & PR successful", true);
     } catch (error) {
       console.error("Commit, push & PR failed:", error);
@@ -114,7 +143,6 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     const actionId = `push-pr-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "create_pr");
-      await git.refreshStatus(cwd);
       showToast("Push & create PR successful", true);
     } catch (error) {
       console.error("Push & create PR failed:", error);
