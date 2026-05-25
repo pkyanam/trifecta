@@ -90,6 +90,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
     setActionInProgress("pull");
     try {
       await git.pull(cwd);
+      await git.refreshStatus(cwd);
       showToast("Pull successful", true);
     } catch (error) {
       console.error("Pull failed:", error);
@@ -105,6 +106,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
     const actionId = `commit-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit");
+      await git.refreshStatus(cwd);
       showToast("Commit successful", true);
     } catch (error) {
       console.error("Commit failed:", error);
@@ -120,6 +122,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
     const actionId = `push-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "push");
+      await git.refreshStatus(cwd);
       showToast("Push successful", true);
     } catch (error) {
       console.error("Push failed:", error);
@@ -136,6 +139,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
     const actionId = `commit-push-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit_push");
+      await git.refreshStatus(cwd);
       showToast("Commit & push successful", true);
     } catch (error) {
       console.error("Commit & push failed:", error);
@@ -153,6 +157,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
     try {
       await git.createRef(cwd, branchName.trim(), true);
       setBranchName("");
+      await git.refreshStatus(cwd);
       loadBranches(); // Reload branches
       showToast("Branch created successfully", true);
     } catch (error) {
@@ -167,6 +172,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
     setActionInProgress("commit"); // Reuse for loading state
     try {
       await git.switchRef(cwd, refName);
+      await git.refreshStatus(cwd);
       loadBranches(); // Reload branches
       showToast("Branch switched successfully", true);
     } catch (error) {
@@ -189,6 +195,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
         featureBranch: true,
       });
       setPrTitle("");
+      await git.refreshStatus(cwd);
       showToast("Pull request created successfully", true);
     } catch (error) {
       console.error("PR creation failed:", error);

@@ -72,6 +72,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     setActionInProgress(true);
     try {
       await git.pull(cwd);
+      await git.refreshStatus(cwd);
       showToast("Pull successful", true);
     } catch (err) {
       setError("Pull failed");
@@ -85,6 +86,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     setActionInProgress(true);
     try {
       await git.runStackedAction(Date.now().toString(), cwd, "commit");
+      await git.refreshStatus(cwd);
       showToast("Commit successful", true);
     } catch (err) {
       setError("Commit failed");
@@ -98,6 +100,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     setActionInProgress(true);
     try {
       await git.runStackedAction(Date.now().toString(), cwd, "push");
+      await git.refreshStatus(cwd);
       showToast("Push successful", true);
     } catch (err) {
       setError("Push failed");
@@ -111,6 +114,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     setActionInProgress(true);
     try {
       await git.runStackedAction(Date.now().toString(), cwd, "commit_push");
+      await git.refreshStatus(cwd);
       showToast("Commit & push successful", true);
     } catch (err) {
       setError("Commit & push failed");
@@ -124,6 +128,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     setActionInProgress(true);
     try {
       await git.runStackedAction(Date.now().toString(), cwd, "commit_push_pr");
+      await git.refreshStatus(cwd);
       showToast("Commit, push & PR successful", true);
     } catch (err) {
       setError("Commit, push & PR failed");
@@ -137,6 +142,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     setActionInProgress(true);
     try {
       await git.runStackedAction(Date.now().toString(), cwd, "create_pr");
+      await git.refreshStatus(cwd);
       showToast("Push & create PR successful", true);
     } catch (err) {
       setError("Push & create PR failed");
