@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Alert as RNAlert,
 } from "react-native";
 import { SymbolImage } from "@/components/symbol-image";
 import { useGitService, type VcsStatusResult, type GitStackedAction } from "@/services/git";
@@ -27,6 +28,34 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const [actionInProgress, setActionInProgress] = useState(false);
   const [toast, setToast] = useState<{ title: string; detail?: string; success: boolean } | null>(null);
   const [filesExpanded, setFilesExpanded] = useState(false);
+  const [branches, setBranches] = useState<Array<{ name: string; current: boolean; isDefault: boolean }>>([]);
+  const [showBranchSelector, setShowBranchSelector] = useState(false);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+
+  const loadBranches = async () => {
+    console.log("loadBranches called");
+    setBranchesLoading(true);
+    try {
+      const result = await git.listRefs(cwd);
+      console.log("Branches loaded:", result);
+      // Filter to local branches only (exclude remote tracking branches)
+      const localBranches = result.refs
+        .filter(ref => !ref.isRemote)
+        .map(ref => ({
+          name: ref.name,
+          current: ref.current,
+          isDefault: ref.isDefault
+        }));
+      console.log("Local branches:", localBranches);
+      setBranches(localBranches);
+      console.log("Setting showBranchSelector to true");
+      setShowBranchSelector(true);
+    } catch (err) {
+      console.error("Failed to load branches:", err);
+    } finally {
+      setBranchesLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!visible || !cwd) return;
@@ -88,7 +117,10 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
         resolve();
       }, 30000);
       unsubscribe = git.subscribeGitActionProgress(actionId, cwd, action, (event) => {
-        console.log("[GitActionsSheet] Progress event:", event.kind, event.phase ?? "");
+        // Only log important events, not noisy hook_output events
+        if (event.kind !== "hook_output") {
+          console.log("[GitActionsSheet] Progress event:", event.kind, event.phase ?? "");
+        }
         if (event.kind === "action_finished") {
           clearTimeout(timeout);
           cleanup();
@@ -127,6 +159,36 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     } catch (err) {
       setError("Commit failed");
       showToast("Commit failed", false, err instanceof Error ? err.message : undefined);
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  const handleSwitchBranch = async (refName: string) => {
+    // Close the branch selector overlay first
+    setShowBranchSelector(false);
+    
+    // Check if there are uncommitted changes
+    if (status?.hasWorkingTreeChanges) {
+      // Show alert asking user to commit first
+      RNAlert.alert(
+        "Uncommitted Changes",
+        "You have uncommitted changes. Please commit or stash them before switching branches.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+    
+    setActionInProgress(true);
+    try {
+      const result = await git.switchRef(cwd, refName);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Branch switched successfully", true);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("Branch switch failed:", error);
+      showToast("Branch switch failed", false, errorMessage);
     } finally {
       setActionInProgress(false);
     }
@@ -229,7 +291,9 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <>
+      {/* Main Git Actions Modal */}
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 justify-end">
         {/* Backdrop */}
         <Pressable className="absolute inset-0 bg-black/60" onPress={onClose} />
@@ -282,13 +346,23 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                     {/* Status Block */}
                     <View className="p-4 bg-muted/30 rounded-xl border border-border/50">
                       <View className="flex-row items-center justify-between mb-2">
-                        <View className="flex-row items-center gap-2">
+                        <Pressable
+                          onPress={() => {
+                            console.log("Branch name pressed - loading branches");
+                            console.log("Current showBranchSelector state:", showBranchSelector);
+                            loadBranches();
+                          }}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          className="flex-row items-center gap-2 active:bg-muted/50 rounded-lg px-2 py-1"
+                          style={{ zIndex: 10 }}
+                        >
                           <SymbolImage name="arrow.triangle.branch" size={14} className="text-muted-foreground" />
                           <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
                             {status.refName || "No branch"}
                           </Text>
-                        </View>
-                        <View className="flex-row items-center gap-2">
+                          <SymbolImage name="chevron.down" size={12} className="text-muted-foreground" />
+                        </Pressable>
+                        <View className="flex-row items-center gap-2" style={{ zIndex: 1 }}>
                           {status.aheadCount > 0 && (
                             <View className="flex-row items-center gap-1 bg-blue-500/10 px-2 py-1 rounded-full">
                               <SymbolImage name="arrow.up" size={10} className="text-blue-500" />
@@ -542,6 +616,81 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
           </View>
         </Animated.View>
       </View>
+
+      {/* Branch Selector Overlay */}
+      {showBranchSelector && (
+        <Pressable 
+          className="absolute inset-0 bg-black/50 justify-end" 
+          style={{ zIndex: 1000 }}
+          onPress={() => setShowBranchSelector(false)}
+        >
+          <Animated.View entering={FadeIn} exiting={FadeOut} style={{ zIndex: 1000 }}>
+            <View className="bg-background rounded-t-3xl border-t border-border/50" style={{ zIndex: 1000 }}>
+              {/* Header */}
+              <View className="px-5 py-4 border-b border-border/50">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center gap-2">
+                    <SymbolImage name="arrow.triangle.branch" size={20} className="text-foreground" />
+                    <Text className="text-xl font-bold text-foreground">Switch Branch</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setShowBranchSelector(false)}
+                    className="w-8 h-8 items-center justify-center rounded-full active:bg-muted/50"
+                  >
+                    <SymbolImage name="xmark" size={18} className="text-foreground" />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Branch List */}
+              <ScrollView style={{ maxHeight: 400 }}>
+                {branchesLoading ? (
+                  <View className="items-center justify-center py-12">
+                    <ActivityIndicator size="small" />
+                    <Text className="text-sm text-muted-foreground mt-3">Loading branches…</Text>
+                  </View>
+                ) : branches.length === 0 ? (
+                  <View className="items-center justify-center py-12">
+                    <Text className="text-sm text-muted-foreground">No branches found</Text>
+                  </View>
+                ) : (
+                  <View className="p-2">
+                    {branches.map((branch) => (
+                      <Pressable
+                        key={branch.name}
+                        onPress={() => handleSwitchBranch(branch.name)}
+                        disabled={branch.current}
+                        className={cn(
+                          "flex-row items-center justify-between px-4 py-3 rounded-lg",
+                          branch.current ? "bg-muted/50" : "active:bg-muted/30"
+                        )}
+                      >
+                        <View className="flex-row items-center gap-3 flex-1">
+                          {branch.current && (
+                            <SymbolImage name="checkmark.circle.fill" size={16} className="text-success" />
+                          )}
+                          <Text className={cn(
+                            "text-sm font-medium",
+                            branch.current ? "text-foreground" : "text-muted-foreground"
+                          )}>
+                            {branch.name}
+                          </Text>
+                          {branch.isDefault && (
+                            <View className="px-2 py-0.5 bg-accent/20 rounded-full">
+                              <Text className="text-xs font-semibold text-accent">default</Text>
+                            </View>
+                          )}
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </Animated.View>
+        </Pressable>
+      )}
     </Modal>
+    </>
   );
 }

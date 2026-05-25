@@ -229,7 +229,7 @@ class WsRpcClient {
         slashCommands: ((p.slashCommands as Array<Record<string, unknown>>) ?? []).map((sc) => ({
           name: (sc.name as string) ?? "",
           description: sc.description as string | undefined,
-          input: sc.input as { hint?: string } | undefined,
+          input: (sc.input && typeof sc.input === "object") ? (sc.input as { hint?: string }) : undefined,
         })),
         skills: ((p.skills as Array<Record<string, unknown>>) ?? []).map((s) => ({
           name: (s.name as string) ?? "",
