@@ -178,6 +178,17 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const hasOpenPr = status?.pr?.state === "open";
   const hasDefaultBranchDelta = (status?.aheadOfDefaultCount ?? status?.aheadCount ?? 0) > 0;
   
+  // Debug logging
+  console.log("[GitActionsSheet] Button state check:", {
+    canPush,
+    canCommit,
+    canPull,
+    isDefaultRef,
+    hasOpenPr,
+    hasDefaultBranchDelta,
+    status: status
+  });
+  
   // Determine if we should show PR options instead of push
   const shouldShowPrOptions = !isDefaultRef && !hasOpenPr && hasDefaultBranchDelta && !status?.hasWorkingTreeChanges && canPush;
   const shouldShowCommitPushPr = !isDefaultRef && !hasOpenPr && status?.hasWorkingTreeChanges;
