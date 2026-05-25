@@ -15,13 +15,14 @@ public enum KeychainError: Error, LocalizedError {
 
 /// Simple Keychain wrapper for storing one bearer session token per environment UUID.
 ///
-/// Items are stored with kSecAttrAccessibleWhenUnlocked — no user-presence prompt required.
-/// An in-memory cache is maintained so the keychain is hit at most once per app session.
+/// Items are protected by SecAccessControl with .userPresence (Touch ID preferred, passcode
+/// fallback). This avoids app-ACL password dialogs that appear when the binary path changes
+/// between builds. The in-memory cache ensures at most one biometric scan per app session.
 /// All callers run on @MainActor; no lock is needed on the cache.
 public struct KeychainStore {
-    // v2 service name avoids conflicts with older items that have access-control prompts
+    // v2 service name so old items with traditional app-ACLs (which prompt for password)
+    // are never touched. Old environments will need to re-pair once.
     private static let service = "ai.belweave.trifecta.session-tokens.v2"
-    private static let legacyService = "ai.belweave.trifecta.session-tokens"
 
     private static var cache: [UUID: String] = [:]
 
@@ -33,24 +34,38 @@ public struct KeychainStore {
         let account = id.uuidString
         let data = Data(token.utf8)
 
-        // Delete any existing item (legacy or current) before adding fresh, so we never
-        // have to do a SecItemUpdate that might trigger access-control prompts.
-        for svc in [service, legacyService] {
-            let deleteQuery: [CFString: Any] = [
-                kSecClass: kSecClassGenericPassword,
-                kSecAttrService: svc,
-                kSecAttrAccount: account,
-            ]
-            SecItemDelete(deleteQuery as CFDictionary)
-        }
+        // Delete-then-add avoids SecItemUpdate, which can trigger its own auth prompt.
+        let deleteQuery: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecAttrAccount: account,
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
 
-        let addQuery: [CFString: Any] = [
+        // SecAccessControl with .userPresence: Touch ID preferred, passcode fallback.
+        // This policy is identity-independent (not tied to the app binary path), so the
+        // same item works across debug/release builds and swift run invocations.
+        var addQuery: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
             kSecAttrAccount: account,
             kSecValueData: data,
-            kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked,
         ]
+        // kSecAttrAccessibleWhenUnlocked (not ThisDeviceOnly) avoids Secure Enclave and
+        // the keychain-access-groups entitlement requirement — compatible with swift run
+        // ad-hoc signing. .userPresence still enforces Touch ID / passcode on read.
+        var cfErr: Unmanaged<CFError>?
+        if let ac = SecAccessControlCreateWithFlags(
+            kCFAllocatorDefault,
+            kSecAttrAccessibleWhenUnlocked,
+            .userPresence,
+            &cfErr
+        ) {
+            addQuery[kSecAttrAccessControl] = ac
+        } else {
+            addQuery[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlocked
+        }
+
         let status = SecItemAdd(addQuery as CFDictionary, nil)
         if status != errSecSuccess { throw KeychainError.unhandledError(status) }
     }
@@ -60,28 +75,24 @@ public struct KeychainStore {
     public static func load(for id: UUID) throws -> String? {
         if let cached = cache[id] { return cached }
 
-        // Try current service first, then legacy (which may have access-control items).
-        for svc in [service, legacyService] {
-            let query: [CFString: Any] = [
-                kSecClass: kSecClassGenericPassword,
-                kSecAttrService: svc,
-                kSecAttrAccount: id.uuidString,
-                kSecReturnData: true,
-                kSecMatchLimit: kSecMatchLimitOne,
-            ]
-            var ref: AnyObject?
-            let status = SecItemCopyMatching(query as CFDictionary, &ref)
-            if status == errSecItemNotFound { continue }
-            if status != errSecSuccess { throw KeychainError.unhandledError(status) }
-            guard let data = ref as? Data, let token = String(data: data, encoding: .utf8) else {
-                throw KeychainError.unexpectedData
-            }
-            cache[id] = token
-            // Migrate legacy item to current service (no access-control) silently
-            if svc == legacyService { try? save(token: token, for: id) }
-            return token
+        // Only look in v2. Old items (v1 with app-ACL) are deliberately skipped to
+        // avoid the macOS password dialog that appears when the binary path changes.
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecAttrAccount: id.uuidString,
+            kSecReturnData: true,
+            kSecMatchLimit: kSecMatchLimitOne,
+        ]
+        var ref: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &ref)
+        if status == errSecItemNotFound { return nil }
+        if status != errSecSuccess { throw KeychainError.unhandledError(status) }
+        guard let data = ref as? Data, let token = String(data: data, encoding: .utf8) else {
+            throw KeychainError.unexpectedData
         }
-        return nil
+        cache[id] = token
+        return token
     }
 
     // MARK: - Delete
