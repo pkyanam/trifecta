@@ -287,11 +287,12 @@ struct SettingsView: View {
                         Text("Accent")
                             .font(T3Typography.callout)
                             .foregroundStyle(T3Color.textSecondary)
-                        HStack(spacing: T3Spacing.md) {
+                        LazyVGrid(columns: Array(repeating: GridItem(.fixed(32), spacing: 12), count: 7),
+                                  alignment: .leading,
+                                  spacing: 12) {
                             ForEach(AppAccent.allCases) { accent in
                                 accentSwatch(accent)
                             }
-                            Spacer(minLength: 0)
                         }
                     }
                 }

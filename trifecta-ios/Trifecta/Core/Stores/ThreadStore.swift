@@ -314,6 +314,17 @@ final class ThreadStore {
             if let attachments, !attachments.isEmpty {
                 messages[i].attachments = attachments
             }
+            // Update the existing row in-place — sort order doesn't change
+            // during streaming, so avoid the full recompute+sort.
+            let updated = messages[i]
+            if let rowIdx = timelineRows.firstIndex(where: {
+                if case .message(let m) = $0 { return m.id == id }
+                return false
+            }) {
+                timelineRows[rowIdx] = .message(updated)
+            } else {
+                recomputeTimelineRows()
+            }
         } else {
             let msg = Message(id: id, role: role, text: payloadText,
                               attachments: attachments, turnId: turnId,
@@ -321,8 +332,8 @@ final class ThreadStore {
                               updatedAt: updatedAt)
             messages.append(msg)
             messages.sort { $0.createdAt < $1.createdAt }
+            recomputeTimelineRows()
         }
-        recomputeTimelineRows()
     }
 
     /// Merges top-level event payload with nested `message` object when present.

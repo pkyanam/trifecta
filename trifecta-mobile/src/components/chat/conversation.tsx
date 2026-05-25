@@ -194,7 +194,9 @@ export function Conversation({
   scrollToBottomRef.current = scrollToBottom;
 
   // -- Animated styles -----------------------------------------------------
-  const topPadding = IS_GLASS ? 128 : 16;
+  // Account for safe area + iOS navigation header (~44px) + breathing room.
+  // Using insets.top makes this work across all devices (notch, Dynamic Island, etc).
+  const topPadding = insets.top + 52;
 
   const footerSpacerStyle = useAnimatedStyle(() => {
     const scrollHeight = scrollViewHeight.value;
@@ -279,7 +281,6 @@ export function Conversation({
             keyExtractor={(item) => (item as ChatMessage).id}
             contentContainerStyle={{
               paddingHorizontal: 16,
-              paddingTop: topPadding,
               paddingBottom: composerOffsetHeight + Math.max(insets.bottom, 16) + 16,
             }}
             keyboardDismissMode="interactive"
@@ -291,6 +292,7 @@ export function Conversation({
             onScroll={onScroll}
             scrollEventThrottle={16}
             onContentSizeChange={onContentSizeChange}
+            ListHeaderComponent={<View style={{ height: topPadding }} />}
             ListFooterComponent={
               <Animated.View style={footerSpacerStyle} />
             }

@@ -1,6 +1,9 @@
 import { useModel } from "@/components/model-context";
 import { useActiveThread } from "@/stores/active-thread";
+import { useThreadList } from "@/stores/thread-list";
 import { useWsClient } from "@/stores/ws-client";
+import { GitActionsSheet } from "./git-actions-sheet";
+import { useState, useEffect } from "react";
 import {
   Button,
   Host,
@@ -16,8 +19,9 @@ import {
   foregroundStyle,
 } from "@expo/ui/swift-ui/modifiers";
 import { Stack, useRouter } from "expo-router";
-import { Alert, useColorScheme } from "react-native";
+import { Alert, useColorScheme, Pressable, Text, View } from "react-native";
 import { useDrawer } from "./drawer-content";
+import { SymbolImage } from "@/components/symbol-image";
 
 function randomId(): string {
   let result = "";
@@ -133,6 +137,53 @@ function HeaderTitleMenu() {
 
 export function MainHeader() {
   const { openDrawer } = useDrawer();
+  const { serverConfig, request } = useWsClient();
+  const { activeThreadId } = useActiveThread();
+  const { getThread, getProject } = useThreadList();
+  const [showGitActions, setShowGitActions] = useState(false);
+  const [branchName, setBranchName] = useState("");
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Get the actual thread data using the thread ID
+  const activeThread = activeThreadId ? getThread(activeThreadId) : null;
+  const project = activeThread?.projectId ? getProject(activeThread.projectId) : null;
+
+  // Get the correct CWD: thread worktreePath > project workspaceRoot > server cwd
+  const cwd = activeThread?.worktreePath || project?.workspaceRoot || serverConfig?.cwd || "";
+
+  // Fetch git status whenever the thread changes
+  useEffect(() => {
+    if (!cwd) {
+      setBranchName("");
+      setHasChanges(false);
+      return;
+    }
+
+    const fetchGitStatus = async () => {
+      try {
+        console.log("[MainHeader] Fetching git status for:", cwd);
+        const status = await request("vcs.refreshStatus", { cwd }) as any;
+        console.log("[MainHeader] Git status:", status);
+        if (status?.refName) {
+          setBranchName(status.refName);
+          setHasChanges(status?.hasWorkingTreeChanges || false);
+        } else {
+          setBranchName("");
+        }
+      } catch (error) {
+        console.error("[MainHeader] Git status error:", error);
+        setBranchName("");
+      }
+    };
+
+    fetchGitStatus();
+  }, [cwd, request]); // This will re-run whenever cwd changes (i.e., when thread changes)
+
+  const handleGitPress = () => {
+    setShowGitActions(true);
+  };
+
+  // For iOS, use the native SwiftUI header for better performance
   return (
     <>
       <Stack.Screen.Title asChild>
@@ -141,6 +192,26 @@ export function MainHeader() {
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button icon="list.bullet" onPress={openDrawer} />
       </Stack.Toolbar>
+      {cwd && branchName && (
+        <Stack.Toolbar placement="right" asChild>
+          <Pressable
+            onPress={handleGitPress}
+            className="flex-row items-center gap-1.5 px-2 py-1 active:opacity-60"
+          >
+            <SymbolImage
+              name={hasChanges ? "circle.fill" : "arrow.triangle.branch"}
+              size={10}
+              className={hasChanges ? "text-orange-500" : "text-foreground"}
+            />
+            <Text className="text-sm font-medium text-foreground">Git</Text>
+          </Pressable>
+        </Stack.Toolbar>
+      )}
+      <GitActionsSheet
+        visible={showGitActions}
+        onClose={() => setShowGitActions(false)}
+        cwd={cwd}
+      />
     </>
   );
 }

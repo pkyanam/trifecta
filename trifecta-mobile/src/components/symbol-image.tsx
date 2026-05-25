@@ -1,10 +1,29 @@
 import { Image as ExpoImage, ImageProps, type ImageStyle } from "expo-image";
 import {
+  AlertTriangle,
+  ArrowDown,
   ArrowUp,
+  BadgeCheck,
+  Check,
+  CheckCircle,
   ChevronDown,
+  Copy,
+  Cpu,
+  ExternalLink,
+  FileText,
+  Folder,
+  GitBranch,
   HelpCircle,
+  Menu,
   MessageSquare,
+  MoreHorizontal,
   Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  Trash2,
+  X,
+  XCircle,
   type LucideIcon,
 } from "lucide-react-native";
 
@@ -16,10 +35,39 @@ const Image = withUniwind(ExpoImage);
  * Map of SF Symbol names to Lucide icons for Android/web fallback.
  */
 const LUCIDE_FALLBACKS: Record<string, LucideIcon> = {
+  // Arrows
   "arrow.up": ArrowUp,
+  "arrow.down": ArrowDown,
+  "arrow.up.right.square": ExternalLink,
+  "arrow.triangle.branch": GitBranch,
+  "arrow.triangle.2.circlepath": RefreshCw,
+  // Chevrons
   "chevron.down": ChevronDown,
-  "bubble.left.and.bubble.right": MessageSquare,
+  // Actions
   plus: Plus,
+  "xmark": X,
+  "xmark.circle.fill": XCircle,
+  "checkmark": Check,
+  "checkmark.circle.fill": CheckCircle,
+  "checkmark.seal": BadgeCheck,
+  // Navigation
+  "line.3.horizontal": Menu,
+  "ellipsis": MoreHorizontal,
+  // Git
+  "branch": GitBranch,
+  // System
+  "cpu": Cpu,
+  "gearshape": Settings,
+  "gearshape.fill": Settings,
+  "magnifyingglass": Search,
+  "trash": Trash2,
+  "folder": Folder,
+  "doc.text": FileText,
+  "rectangle.on.rectangle": Copy,
+  "exclamationmark.triangle": AlertTriangle,
+  "exclamationmark.triangle.fill": AlertTriangle,
+  // Chat/messaging
+  "bubble.left.and.bubble.right": MessageSquare,
 };
 
 type SymbolImageProps = {

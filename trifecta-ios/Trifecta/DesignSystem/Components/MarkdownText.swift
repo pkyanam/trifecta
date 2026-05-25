@@ -21,14 +21,10 @@ struct MarkdownText: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: T3Spacing.sm) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+            ForEach(Array(MarkdownBlockParser.parse(source).enumerated()), id: \.offset) { _, block in
                 blockView(block)
             }
         }
-    }
-
-    private var blocks: [Block] {
-        MarkdownBlockParser.parse(source)
     }
 
     @ViewBuilder
@@ -113,10 +109,33 @@ struct MarkdownText: View {
 
 // MARK: - Inline rendering
 
+private final class CachedAttributedString {
+    let value: AttributedString
+    init(_ value: AttributedString) { self.value = value }
+}
+
 private enum InlineMarkdown {
+    private static let cache: NSCache<NSString, CachedAttributedString> = {
+        let c = NSCache<NSString, CachedAttributedString>()
+        c.countLimit = 512
+        return c
+    }()
+
     static func attributed(_ source: String,
                            inlineCodeBackground: Color,
                            boldAll: Bool = false) -> AttributedString {
+        let key = (boldAll ? "b:" : "n:") + source
+        if let cached = cache.object(forKey: key as NSString) {
+            return cached.value
+        }
+        let result = build(source: source, inlineCodeBackground: inlineCodeBackground, boldAll: boldAll)
+        cache.setObject(CachedAttributedString(result), forKey: key as NSString)
+        return result
+    }
+
+    private static func build(source: String,
+                              inlineCodeBackground: Color,
+                              boldAll: Bool) -> AttributedString {
         let mdOptions = AttributedString.MarkdownParsingOptions(
             interpretedSyntax: .inlineOnlyPreservingWhitespace,
             failurePolicy: .returnPartiallyParsedIfPossible
@@ -201,8 +220,28 @@ private struct QuoteBlockView: View {
 
 // MARK: - Block parser
 
+private final class CachedBlocks {
+    let blocks: [MarkdownText.Block]
+    init(_ blocks: [MarkdownText.Block]) { self.blocks = blocks }
+}
+
 private enum MarkdownBlockParser {
+    private static let cache: NSCache<NSString, CachedBlocks> = {
+        let c = NSCache<NSString, CachedBlocks>()
+        c.countLimit = 256
+        return c
+    }()
+
     static func parse(_ source: String) -> [MarkdownText.Block] {
+        if let cached = cache.object(forKey: source as NSString) {
+            return cached.blocks
+        }
+        let result = parseUncached(source)
+        cache.setObject(CachedBlocks(result), forKey: source as NSString)
+        return result
+    }
+
+    private static func parseUncached(_ source: String) -> [MarkdownText.Block] {
         let segments = ThinkingSegmentParser.segments(from: source)
         if segments.count > 1 || segments.contains(where: { $0.isThinking }) {
             return segments.flatMap { segment in
@@ -504,9 +543,12 @@ private enum ThinkingSegmentParser {
         let isThinking: Bool
     }
 
+    private static let regex: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"(?is)<(think|thinking|reasoning)\b[^>]*>(.*?)</\1>"#
+    )
+
     static func segments(from source: String) -> [Segment] {
-        let pattern = #"(?is)<(think|thinking|reasoning)\b[^>]*>(.*?)</\1>"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+        guard let regex else {
             return [Segment(text: source, isThinking: false)]
         }
 

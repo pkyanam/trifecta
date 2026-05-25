@@ -213,6 +213,7 @@ class WsRpcClient {
         instanceId: (p.instanceId as string) ?? "",
         driver: (p.driver as string) ?? "",
         displayName: p.displayName as string | undefined,
+        label: p.label as string | undefined,
         enabled: (p.enabled as boolean) ?? false,
         installed: (p.installed as boolean) ?? false,
         status: p.status as string | undefined,
@@ -222,6 +223,16 @@ class WsRpcClient {
           shortName: m.shortName as string | undefined,
           subProvider: m.subProvider as string | undefined,
           eligible: m.eligible as boolean | undefined,
+        })),
+        slashCommands: ((p.slashCommands as Array<Record<string, unknown>>) ?? []).map((sc) => ({
+          name: (sc.name as string) ?? "",
+          description: sc.description as string | undefined,
+          input: sc.input as { hint?: string } | undefined,
+        })),
+        skills: ((p.skills as Array<Record<string, unknown>>) ?? []).map((s) => ({
+          name: (s.name as string) ?? "",
+          description: s.description as string | undefined,
+          shortDescription: s.shortDescription as string | undefined,
         })),
       }));
       this.onConfig({

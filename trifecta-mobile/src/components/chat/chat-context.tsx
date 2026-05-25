@@ -10,6 +10,8 @@ export type ChatContextValue = {
   onSend: () => void;
   streamingStore: StreamingStore;
   error?: Error | null;
+  cursorPosition: number;
+  setCursorPosition: (position: number) => void;
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);

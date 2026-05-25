@@ -1,10 +1,8 @@
 import { MainHeader } from "@/components/main-header";
-import { SafeAreaView } from "@/components/tw";
 import { useConnection } from "@/stores/connection";
 import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
-import { Image, Text, View, useColorScheme } from "react-native";
-import { Platform } from "react-native";
+import { Image, Text, View, useColorScheme, Platform } from "react-native";
 
 export default function DefaultView() {
   const { isPaired, isLoading } = useConnection();
@@ -31,26 +29,24 @@ export default function DefaultView() {
   };
 
   return (
-    <>
-      <SafeAreaView className="flex-1" edges={["top"]}>
-        <MainHeader />
-        <View className="flex-1 items-center justify-center px-8 relative">
-          <Image
-            source={require("../../assets/images/blackArrow.png")}
-            style={arrowStyle}
-            resizeMode="contain"
-            tintColor={colorScheme === "dark" ? "#FFFFFF" : "#000000"}
-          />
-          <View className="items-center gap-4">
-            <Text className="text-2xl font-bold text-foreground text-center">
-              Welcome to Trifecta
-            </Text>
-            <Text className="text-base text-muted-foreground text-center">
-              Open the sidebar to start a new thread
-            </Text>
-          </View>
+    <View className="flex-1">
+      <MainHeader />
+      <View className="flex-1 items-center justify-center px-8 relative">
+        <Image
+          source={require("../../assets/images/blackArrow.png")}
+          style={arrowStyle}
+          resizeMode="contain"
+          tintColor={colorScheme === "dark" ? "#FFFFFF" : "#000000"}
+        />
+        <View className="items-center gap-4">
+          <Text className="text-2xl font-bold text-foreground text-center">
+            Welcome to Trifecta
+          </Text>
+          <Text className="text-base text-muted-foreground text-center">
+            Open the sidebar to start a new thread
+          </Text>
         </View>
-      </SafeAreaView>
-    </>
+      </View>
+    </View>
   );
 }

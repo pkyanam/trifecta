@@ -14,6 +14,11 @@ struct ComposerTrigger: Equatable, Sendable {
 }
 
 enum ComposerLogic {
+    private static let slashCommandRegex = try? NSRegularExpression(pattern: #"^\/(\S*)$"#)
+    private static let planSlashRegex = try? NSRegularExpression(pattern: #"^/plan\s*$"#, options: .caseInsensitive)
+    private static let defaultSlashRegex = try? NSRegularExpression(pattern: #"^/default\s*$"#, options: .caseInsensitive)
+    private static let modelSlashRegex = try? NSRegularExpression(pattern: #"^/model\s*$"#, options: .caseInsensitive)
+
     private static func clampCursor(lengthUTF16: Int, _ cursor: Int) -> Int {
         max(0, min(lengthUTF16, cursor))
     }
@@ -54,8 +59,7 @@ enum ComposerLogic {
         if lineLen >= 0, lineStart + lineLen <= len {
             let linePrefix = ns.substring(with: NSRange(location: lineStart, length: lineLen))
             if linePrefix.hasPrefix("/"),
-               let regex = try? NSRegularExpression(pattern: #"^\/(\S*)$"#, options: []),
-               let match = regex.firstMatch(in: linePrefix, range: NSRange(location: 0, length: (linePrefix as NSString).length)),
+               let match = Self.slashCommandRegex?.firstMatch(in: linePrefix, range: NSRange(location: 0, length: (linePrefix as NSString).length)),
                match.numberOfRanges >= 2 {
                 let r = match.range(at: 1)
                 if r.location != NSNotFound {
@@ -108,17 +112,16 @@ enum ComposerLogic {
 
     static func parseStandaloneModeSlash(_ trimmed: String) -> ProviderInteractionMode? {
         let t = trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
-        if t.range(of: #"^/plan\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil {
-            return .plan
-        }
-        if t.range(of: #"^/default\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil {
-            return .default
-        }
+        let nsT = t as NSString
+        let range = NSRange(location: 0, length: nsT.length)
+        if planSlashRegex?.firstMatch(in: t, range: range) != nil { return .plan }
+        if defaultSlashRegex?.firstMatch(in: t, range: range) != nil { return .default }
         return nil
     }
 
     static func isStandaloneModelSlash(_ trimmed: String) -> Bool {
         let t = trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.range(of: #"^/model\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil
+        let range = NSRange(location: 0, length: (t as NSString).length)
+        return modelSlashRegex?.firstMatch(in: t, range: range) != nil
     }
 }

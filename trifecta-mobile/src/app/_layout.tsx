@@ -135,6 +135,18 @@ function StackLayout() {
           title: "Chat",
           animation: "none",
           gestureEnabled: false,
+          // On Android, SmartHeader provides its own header — hide the native one
+          headerShown: IS_ANDROID ? false : undefined,
+        }}
+      />
+
+      <Stack.Screen
+        name="default-view"
+        options={{
+          animation: "none",
+          gestureEnabled: false,
+          // On Android, SmartHeader provides its own header — hide the native one
+          headerShown: IS_ANDROID ? false : undefined,
         }}
       />
 

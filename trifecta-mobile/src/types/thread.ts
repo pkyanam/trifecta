@@ -105,16 +105,33 @@ export interface ServerProviderModel {
   eligible?: boolean;
 }
 
+export interface ServerProviderSlashCommand {
+  name: string;
+  description?: string;
+  input?: {
+    hint?: string;
+  };
+}
+
+export interface ServerProviderSkill {
+  name: string;
+  description?: string;
+  shortDescription?: string;
+}
+
 export interface ServerProvider {
   /** Unique instance ID across all configured providers */
   instanceId: string;
   /** Driver name, e.g. "claudeAgent", "opencode", "openaiChat" */
   driver: string;
   displayName?: string;
+  label?: string; // Alternative display name
   enabled: boolean;
   installed: boolean;
   status?: string;
   models: ServerProviderModel[];
+  slashCommands?: ServerProviderSlashCommand[];
+  skills?: ServerProviderSkill[];
 }
 
 export interface ServerConfig {

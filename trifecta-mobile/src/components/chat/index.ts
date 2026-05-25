@@ -22,6 +22,10 @@ export {
   PromptInputTextarea,
 } from "./prompt-input";
 
+// Suggestion Menu
+export { SuggestionMenu } from "./suggestion-menu";
+export type { SuggestionItem } from "./suggestion-menu";
+
 // Streaming
 export { StreamingMessage } from "./streaming-message";
 export { createStreamingStore } from "./streaming-store";

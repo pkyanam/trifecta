@@ -18,6 +18,7 @@ struct SidebarRootView: View {
             ZStack(alignment: .leading) {
                 mainContent
                     .frame(width: geometry.size.width, height: geometry.size.height)
+                    .allowsHitTesting(openFraction < 0.05)
 
                 if openFraction > 0.01 {
                     Color.black
@@ -73,27 +74,15 @@ struct SidebarRootView: View {
         .environment(\.t3NavigateHome, navigateHome)
     }
 
-    @ViewBuilder
     private var mainContent: some View {
-        ZStack {
-            T3Color.surfaceGrouped.ignoresSafeArea()
-
-            if let selectedThread {
-                ThreadView(threadShell: selectedThread)
-                    .id(selectedThread.id)
-                    .environment(env)
-                    .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
-                                            removal: .opacity))
-            } else {
-                SidebarHomeView(onOpenSidebar: openSidebar,
-                                onNewThread: { showNewThread = true },
-                                onOpenSettings: { showSettings = true },
-                                onOpenSSH: { showSSH = true })
-                    .environment(env)
-                    .transition(.opacity)
-            }
-        }
-        .animation(.spring(response: 0.34, dampingFraction: 0.9), value: selectedThread?.id)
+        SidebarMainContent(
+            selectedThread: selectedThread,
+            onOpenSidebar: openSidebar,
+            onNewThread: { showNewThread = true },
+            onOpenSettings: { showSettings = true },
+            onOpenSSH: { showSSH = true }
+        )
+        .environment(env)
     }
 
     private var openFraction: CGFloat {
@@ -151,6 +140,37 @@ struct SidebarRootView: View {
                     dragOffset = 0
                 }
             }
+    }
+}
+
+private struct SidebarMainContent: View {
+    @Environment(AppEnvironment.self) private var env
+    let selectedThread: ThreadShell?
+    let onOpenSidebar: () -> Void
+    let onNewThread: () -> Void
+    let onOpenSettings: () -> Void
+    let onOpenSSH: () -> Void
+
+    var body: some View {
+        ZStack {
+            T3Color.surfaceGrouped.ignoresSafeArea()
+
+            if let selectedThread {
+                ThreadView(threadShell: selectedThread)
+                    .id(selectedThread.id)
+                    .environment(env)
+                    .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                            removal: .opacity))
+            } else {
+                SidebarHomeView(onOpenSidebar: onOpenSidebar,
+                                onNewThread: onNewThread,
+                                onOpenSettings: onOpenSettings,
+                                onOpenSSH: onOpenSSH)
+                    .environment(env)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.spring(response: 0.34, dampingFraction: 0.9), value: selectedThread?.id)
     }
 }
 

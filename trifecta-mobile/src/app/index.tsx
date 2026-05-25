@@ -32,6 +32,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { View } from "react-native";
 
 const STREAMING_THROTTLE_MS = 32;
 const STREAMING_HAPTIC_THROTTLE_MS = 180;
@@ -96,6 +97,7 @@ function useRealChat() {
   }, [hapticsEnabled, thread.messages, streamingStore]);
 
   const [input, setInput] = useState("");
+  const [cursorPosition, setCursorPosition] = useState(0);
 
   const onSend = useCallback(async () => {
     const text = input.trim();
@@ -104,6 +106,7 @@ function useRealChat() {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     setInput("");
+    setCursorPosition(0);
     if (activeThreadId) {
       await thread.sendMessage(text, selectedModelSelection);
     } else {
@@ -117,7 +120,7 @@ function useRealChat() {
     }
   }, [input, thread, activeThreadId, newChatProjectId, projects, selectedModelSelection, createThread, router, hapticsEnabled]);
 
-  return { messages, input, setInput, isGenerating: thread.isTurnRunning, onSend, streamingStore, thread };
+  return { messages, input, setInput, isGenerating: thread.isTurnRunning, onSend, streamingStore, thread, cursorPosition, setCursorPosition };
 }
 
 export default function ChatScreen() {
@@ -157,7 +160,8 @@ export default function ChatScreen() {
   const emptyDescription = "Open the sidebar to start a new thread";
 
   return (
-    <>
+    <View className="flex-1">
+      <MainHeader />
       <ChatProvider value={chat}>
         <Conversation
           renderMessage={renderMessage}
@@ -182,7 +186,6 @@ export default function ChatScreen() {
           </PromptInput>
         </Conversation>
       </ChatProvider>
-      <MainHeader />
-    </>
+    </View>
   );
 }

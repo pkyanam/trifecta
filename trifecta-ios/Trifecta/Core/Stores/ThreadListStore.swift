@@ -8,6 +8,7 @@ final class ThreadListStore {
     var lastError: String?
     private(set) var activeThreads: [ThreadShell] = []
     private(set) var archivedThreads: [ThreadShell] = []
+    private(set) var mutationCount: Int = 0
 
     private var subscription: StreamSubscription?
     private weak var client: T3Client?
@@ -90,6 +91,7 @@ final class ThreadListStore {
             threads.removeAll { $0.id == id }
             rebuildThreadIndexes()
         }
+        mutationCount &+= 1
     }
 
     func threads(in projectId: ProjectID) -> [ThreadShell] {
