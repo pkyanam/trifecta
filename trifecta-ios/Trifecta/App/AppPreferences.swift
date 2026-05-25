@@ -24,18 +24,25 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 }
 
 enum AppAccent: String, CaseIterable, Identifiable {
-    case blue, violet, green, orange, rose, teal
+    case blue, violet, green, orange, rose, teal, indigo, lavender, mint, amber, crimson, plum, slate
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .blue:   "Blue"
-        case .violet: "Violet"
-        case .green:  "Green"
-        case .orange: "Orange"
-        case .rose:   "Rose"
-        case .teal:   "Teal"
+        case .blue:     "Blue"
+        case .violet:   "Violet"
+        case .green:    "Green"
+        case .orange:   "Orange"
+        case .rose:     "Rose"
+        case .teal:     "Teal"
+        case .indigo:   "Indigo"
+        case .lavender: "Lavender"
+        case .mint:     "Mint"
+        case .amber:    "Amber"
+        case .crimson:  "Crimson"
+        case .plum:     "Plum"
+        case .slate:    "Slate"
         }
     }
 
@@ -59,6 +66,27 @@ enum AppAccent: String, CaseIterable, Identifiable {
         case .teal:
             Color(light: Color(red: 0.050, green: 0.520, blue: 0.560),
                   dark:  Color(red: 0.150, green: 0.720, blue: 0.760))
+        case .indigo:
+            Color(light: Color(red: 0.345, green: 0.337, blue: 0.839),
+                  dark:  Color(red: 0.384, green: 0.369, blue: 0.937))
+        case .lavender:
+            Color(light: Color(red: 0.560, green: 0.450, blue: 0.850),
+                  dark:  Color(red: 0.680, green: 0.580, blue: 0.950))
+        case .mint:
+            Color(light: Color(red: 0.000, green: 0.560, blue: 0.480),
+                  dark:  Color(red: 0.220, green: 0.820, blue: 0.700))
+        case .amber:
+            Color(light: Color(red: 0.780, green: 0.520, blue: 0.080),
+                  dark:  Color(red: 0.950, green: 0.690, blue: 0.180))
+        case .crimson:
+            Color(light: Color(red: 0.750, green: 0.080, blue: 0.160),
+                  dark:  Color(red: 0.920, green: 0.260, blue: 0.340))
+        case .plum:
+            Color(light: Color(red: 0.560, green: 0.180, blue: 0.520),
+                  dark:  Color(red: 0.780, green: 0.380, blue: 0.740))
+        case .slate:
+            Color(light: Color(red: 0.250, green: 0.280, blue: 0.320),
+                  dark:  Color(red: 0.550, green: 0.600, blue: 0.650))
         }
     }
 

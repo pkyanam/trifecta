@@ -9,6 +9,10 @@ struct SidebarPanel: View {
     let onClose: () -> Void
 
     @State private var searchText = ""
+    @State private var debouncedSearchText = ""
+    @State private var searchDebounceTask: Task<Void, Never>?
+    @State private var cachedGroups: [(project: ProjectShell, threads: [ThreadShell])] = []
+    @State private var cachedPinnedIDs: Set<String> = []
     @State private var collapsedProjects: Set<ProjectID> = []
     @State private var pendingTopAction: SidebarTopAction?
     @State private var renameTarget: ThreadShell?
@@ -20,13 +24,69 @@ struct SidebarPanel: View {
     @AppStorage("sidebarPinnedThreadIDs") private var pinnedThreadIDsRaw = ""
 
     var body: some View {
+        sidebarContent
+            .alert("Rename Chat",
+                   isPresented: Binding(get: { renameTarget != nil },
+                                        set: { if !$0 { renameTarget = nil } })) {
+                TextField("Name", text: $renameDraft)
+                Button("Cancel", role: .cancel) { renameTarget = nil }
+                Button("Rename") { renameThread() }
+                    .disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .confirmationDialog("Remove this chat?",
+                                isPresented: Binding(get: { pendingDeleteThread != nil },
+                                                     set: { if !$0 { pendingDeleteThread = nil } }),
+                                titleVisibility: .visible,
+                                presenting: pendingDeleteThread) { thread in
+                Button("Delete", role: .destructive) { delete(thread) }
+                Button("Cancel", role: .cancel) { pendingDeleteThread = nil }
+            } message: { _ in
+                Text("This removes the chat from the Trifecta server.")
+            }
+            .confirmationDialog("Archive project?",
+                                isPresented: Binding(get: { pendingArchiveProject != nil },
+                                                     set: { if !$0 { pendingArchiveProject = nil } }),
+                                titleVisibility: .visible,
+                                presenting: pendingArchiveProject) { group in
+                Button("Archive Project") { archiveProject(group) }
+                Button("Cancel", role: .cancel) { pendingArchiveProject = nil }
+            } message: { group in
+                Text("All active chats in \(group.project.title) will be archived.")
+            }
+            .alert("Action failed",
+                   isPresented: Binding(get: { actionError != nil },
+                                        set: { if !$0 { actionError = nil } })) {
+                Button("OK", role: .cancel) { actionError = nil }
+            } message: {
+                Text(actionError ?? "Please try again.")
+            }
+            .onAppear { refreshCachedGroups() }
+            .onChange(of: env.threadList.mutationCount) { _, _ in refreshCachedGroups() }
+            .onChange(of: debouncedSearchText) { _, _ in refreshCachedGroups() }
+            .onChange(of: pinnedThreadIDsRaw) { _, _ in refreshCachedGroups() }
+    }
+
+    @ViewBuilder
+    private var sidebarContent: some View {
         VStack(spacing: 0) {
             SidebarHeader(onClose: onClose)
             SidebarSearchField(text: $searchText)
                 .padding(.horizontal, T3Spacing.md)
                 .padding(.top, T3Spacing.xs)
                 .padding(.bottom, T3Spacing.sm)
-
+                .onChange(of: searchText) { _, new in
+                    searchDebounceTask?.cancel()
+                    if new.isEmpty {
+                        debouncedSearchText = ""
+                    } else {
+                        searchDebounceTask = Task {
+                            try? await Task.sleep(nanoseconds: 200_000_000)
+                            if !Task.isCancelled {
+                                debouncedSearchText = new
+                            }
+                        }
+                    }
+                }
             SidebarTopActionsRow(pendingAction: pendingTopAction,
                                  isEnabled: env.connectionStatus == .connected,
                                  onNewChat: performNewChat,
@@ -34,26 +94,7 @@ struct SidebarPanel: View {
                                  onNewProject: performNewProject)
                 .padding(.horizontal, T3Spacing.md)
                 .padding(.bottom, T3Spacing.md)
-
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(groupedThreads, id: \.project.id) { group in
-                        projectSection(project: group.project, threads: group.threads)
-                    }
-
-                    if !archivedThreads.isEmpty {
-                        archivedSection
-                    }
-
-                    if groupedThreads.isEmpty {
-                        emptySearchState
-                    }
-                }
-                .padding(.horizontal, T3Spacing.md)
-                .padding(.bottom, T3Spacing.xl)
-            }
-            .scrollIndicators(.hidden)
-
+            scrollContent
             footer
         }
         .safeAreaPadding(.top, 34)
@@ -62,11 +103,9 @@ struct SidebarPanel: View {
         .background {
             Group {
                 if #available(iOS 26.0, *) {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
+                    Rectangle().fill(.ultraThinMaterial)
                 } else {
-                    Rectangle()
-                        .fill(T3Color.surface.opacity(0.96))
+                    Rectangle().fill(T3Color.surface.opacity(0.96))
                 }
             }
             .ignoresSafeArea()
@@ -77,48 +116,36 @@ struct SidebarPanel: View {
                 .frame(width: 0.5)
                 .ignoresSafeArea()
         }
-        .alert("Rename Chat",
-               isPresented: Binding(get: { renameTarget != nil },
-                                    set: { if !$0 { renameTarget = nil } })) {
-            TextField("Name", text: $renameDraft)
-            Button("Cancel", role: .cancel) { renameTarget = nil }
-            Button("Rename") { renameThread() }
-                .disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-        .confirmationDialog("Remove this chat?",
-                            isPresented: Binding(get: { pendingDeleteThread != nil },
-                                                 set: { if !$0 { pendingDeleteThread = nil } }),
-                            titleVisibility: .visible,
-                            presenting: pendingDeleteThread) { thread in
-            Button("Delete", role: .destructive) {
-                delete(thread)
-            }
-            Button("Cancel", role: .cancel) { pendingDeleteThread = nil }
-        } message: { _ in
-            Text("This removes the chat from the Trifecta server.")
-        }
-        .confirmationDialog("Archive project?",
-                            isPresented: Binding(get: { pendingArchiveProject != nil },
-                                                 set: { if !$0 { pendingArchiveProject = nil } }),
-                            titleVisibility: .visible,
-                            presenting: pendingArchiveProject) { group in
-            Button("Archive Project") {
-                archiveProject(group)
-            }
-            Button("Cancel", role: .cancel) { pendingArchiveProject = nil }
-        } message: { group in
-            Text("All active chats in \(group.project.title) will be archived.")
-        }
-        .alert("Action failed",
-               isPresented: Binding(get: { actionError != nil },
-                                    set: { if !$0 { actionError = nil } })) {
-            Button("OK", role: .cancel) { actionError = nil }
-        } message: {
-            Text(actionError ?? "Please try again.")
-        }
     }
 
-    private func projectSection(project: ProjectShell, threads: [ThreadShell]) -> some View {
+    @ViewBuilder
+    private var scrollContent: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(cachedGroups, id: \.project.id) { group in
+                    projectSection(project: group.project, threads: group.threads, pinnedIDs: cachedPinnedIDs)
+                }
+                if !archivedThreads.isEmpty {
+                    archivedSection
+                }
+                if cachedGroups.isEmpty {
+                    emptySearchState
+                }
+            }
+            .padding(.horizontal, T3Spacing.md)
+            .padding(.bottom, T3Spacing.xl)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private func refreshCachedGroups() {
+        cachedGroups = groupedThreads
+        cachedPinnedIDs = pinnedThreadIDs
+    }
+
+    private func projectSection(project: ProjectShell,
+                                threads: [ThreadShell],
+                                pinnedIDs: Set<String>) -> some View {
         let collapsed = collapsedProjects.contains(project.id)
         return VStack(alignment: .leading, spacing: T3Spacing.xs) {
             HStack(spacing: T3Spacing.sm) {
@@ -175,7 +202,7 @@ struct SidebarPanel: View {
                         SidebarThreadRow(thread: thread,
                                          project: project,
                                          isSelected: selectedThread?.id == thread.id,
-                                         isPinned: pinnedThreadIDs.contains(thread.id.rawValue),
+                                         isPinned: pinnedIDs.contains(thread.id.rawValue),
                                          timingLabel: SidebarRelativeTimeFormatter.compactLabel(for: thread),
                                          onRename: { beginRename(thread) },
                                          onPinToggle: { togglePin(thread) },
@@ -254,26 +281,35 @@ struct SidebarPanel: View {
     }
 
     private var groupedThreads: [(project: ProjectShell, threads: [ThreadShell])] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = debouncedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let pinned = pinnedThreadIDs
         let liveGroups: [(project: ProjectShell, threads: [ThreadShell])] = env.threadList.projects.compactMap { project in
+            let lowerProject = project.title.lowercased()
             let threads = env.threadList.threads(in: project.id)
                 .filter { thread in
                     query.isEmpty
                     || thread.title.lowercased().contains(query)
-                    || project.title.lowercased().contains(query)
+                    || lowerProject.contains(query)
                     || (thread.branch?.lowercased().contains(query) ?? false)
                 }
             guard !threads.isEmpty else { return nil }
             return (project: project, threads: threads)
         }
-        let pinned = pinnedThreadIDs
+        // Precompute sort keys once outside the comparator to avoid O(n²) map calls.
+        struct SortKey {
+            let hasPinned: Bool
+            let latestDate: Date
+        }
+        let keys: [ProjectID: SortKey] = Dictionary(uniqueKeysWithValues: liveGroups.map { group in
+            let hasPinned = group.threads.contains { pinned.contains($0.id.rawValue) }
+            let latestDate = group.threads.lazy.map { $0.latestUserMessageAt ?? $0.updatedAt }.max() ?? .distantPast
+            return (group.project.id, SortKey(hasPinned: hasPinned, latestDate: latestDate))
+        })
         return liveGroups.sorted { lhs, rhs in
-            let lPinned = lhs.threads.contains { pinned.contains($0.id.rawValue) }
-            let rPinned = rhs.threads.contains { pinned.contains($0.id.rawValue) }
-            if lPinned != rPinned { return lPinned }
-            let lDate = lhs.threads.map { $0.latestUserMessageAt ?? $0.updatedAt }.max() ?? .distantPast
-            let rDate = rhs.threads.map { $0.latestUserMessageAt ?? $0.updatedAt }.max() ?? .distantPast
-            return lDate > rDate
+            let lKey = keys[lhs.project.id]!
+            let rKey = keys[rhs.project.id]!
+            if lKey.hasPinned != rKey.hasPinned { return lKey.hasPinned }
+            return lKey.latestDate > rKey.latestDate
         }
     }
 
