@@ -243,7 +243,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
   const isAhead = status?.aheadCount && status.aheadCount > 0;
   const canPull = status?.behindCount && status.behindCount > 0;
   const canCommit = hasChanges;
-  const canPush = isAhead && !hasChanges;
+  const canPush = isAhead && !hasChanges && !status?.isProtectedRef; // disabled on protected refs
   const canCreatePR = isAhead && !hasChanges && status?.hasUpstream;
 
   const GlassComponent = View;

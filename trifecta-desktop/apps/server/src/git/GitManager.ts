@@ -764,12 +764,26 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
           )
         : null;
 
+    // Best-effort branch protection lookup. Failures (no remote, unauth'd CLI,
+    // non-GitHub provider, network errors) silently default to `false` — we
+    // never block the status response on this.
+    const isProtectedRef =
+      details.branch !== null && details.hasOriginRemote
+        ? yield* sourceControlProvider(cwd).pipe(
+            Effect.flatMap((provider) =>
+              provider.isBranchProtected({ cwd, branch: details.branch as string }),
+            ),
+            Effect.catch(() => Effect.succeed(false)),
+          )
+        : false;
+
     return {
       hasUpstream: details.hasUpstream,
       aheadCount: details.aheadCount,
       behindCount: details.behindCount,
       aheadOfDefaultCount: details.aheadOfDefaultCount,
       pr,
+      isProtectedRef,
     } satisfies VcsStatusRemoteResult;
   });
   const remoteStatusResultCache = yield* Cache.makeWith(readRemoteStatus, {

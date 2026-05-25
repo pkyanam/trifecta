@@ -85,6 +85,11 @@ export interface GitHubCliShape {
     readonly cwd: string;
   }) => Effect.Effect<string | null, GitHubCliError>;
 
+  readonly isBranchProtected: (input: {
+    readonly cwd: string;
+    readonly branch: string;
+  }) => Effect.Effect<boolean, GitHubCliError>;
+
   readonly checkoutPullRequest: (input: {
     readonly cwd: string;
     readonly reference: string;
@@ -363,6 +368,18 @@ export const make = Effect.fn("makeGitHubCli")(function* () {
           const trimmed = value.stdout.trim();
           return trimmed.length > 0 ? trimmed : null;
         }),
+      ),
+    isBranchProtected: (input) =>
+      execute({
+        cwd: input.cwd,
+        args: [
+          "api",
+          `repos/{owner}/{repo}/branches/${input.branch}`,
+          "--jq",
+          ".protected",
+        ],
+      }).pipe(
+        Effect.map((value) => value.stdout.trim().toLowerCase() === "true"),
       ),
     checkoutPullRequest: (input) =>
       execute({

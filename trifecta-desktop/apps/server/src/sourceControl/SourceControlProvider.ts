@@ -88,6 +88,11 @@ export interface SourceControlProviderShape {
     readonly cwd: string;
     readonly context?: SourceControlProviderContext;
   }) => Effect.Effect<string | null, SourceControlProviderError>;
+  readonly isBranchProtected: (input: {
+    readonly cwd: string;
+    readonly context?: SourceControlProviderContext;
+    readonly branch: string;
+  }) => Effect.Effect<boolean, SourceControlProviderError>;
   readonly checkoutChangeRequest: (input: {
     readonly cwd: string;
     readonly context?: SourceControlProviderContext;

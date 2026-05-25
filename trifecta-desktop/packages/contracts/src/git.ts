@@ -222,6 +222,10 @@ const VcsStatusRemoteShape = {
   behindCount: NonNegativeInt,
   aheadOfDefaultCount: Schema.optional(NonNegativeInt),
   pr: Schema.NullOr(VcsStatusChangeRequest),
+  // True when the current ref is protected on the remote (e.g. GitHub
+  // branch protection / required pull request). Drives client UIs to
+  // route push actions through the PR flow instead of direct push.
+  isProtectedRef: Schema.optional(Schema.Boolean),
 };
 
 export const VcsStatusLocalResult = Schema.Struct(VcsStatusLocalShape);

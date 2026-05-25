@@ -191,14 +191,15 @@ export function GitActions({ visible, onClose, cwd }: GitActionsProps) {
   const isAhead = status?.aheadCount && status.aheadCount > 0;
   const canPull = status?.behindCount && status.behindCount > 0;
   const canCommit = hasChanges;
-  const canPush = isAhead && !hasChanges; // disabled while uncommitted changes exist
+  const canPush = isAhead && !hasChanges && !status?.isProtectedRef; // disabled while uncommitted changes exist or on protected refs
   const isDefaultRef = status?.isDefaultRef ?? false;
   const hasOpenPr = status?.pr?.state === "open";
   const hasDefaultBranchDelta = (status?.aheadOfDefaultCount ?? status?.aheadCount ?? 0) > 0;
-  
+  const isProtectedRef = status?.isProtectedRef ?? false;
+
   // Determine if we should show PR options instead of push
-  const shouldShowPrOptions = !isDefaultRef && !hasOpenPr && hasDefaultBranchDelta && !hasChanges && isAhead;
-  const shouldShowCommitPushPr = !isDefaultRef && !hasOpenPr && hasChanges;
+  const shouldShowPrOptions = (!isDefaultRef && !hasOpenPr && hasDefaultBranchDelta && !hasChanges && isAhead) || isProtectedRef;
+  const shouldShowCommitPushPr = (!isDefaultRef && !hasOpenPr && hasChanges) || (hasChanges && isProtectedRef);
 
   const GlassComponent = isLiquidGlassAvailable() ? GlassView : GlassContainer;
 

@@ -52,6 +52,10 @@ export interface VcsStatusRemoteResult {
     headRef: string;
     state: "open" | "closed" | "merged";
   };
+  // True when the current ref is protected on the remote (e.g. GitHub
+  // branch protection / required pull request). Drives the UI to route
+  // push actions through the PR flow instead of direct push.
+  isProtectedRef?: boolean;
 }
 
 export interface VcsStatusResult extends VcsStatusLocalResult, VcsStatusRemoteResult {}

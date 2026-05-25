@@ -37,6 +37,7 @@ function makeProvider(
     createRepository: () => Effect.succeed(CLONE_URLS),
     getDefaultBranch: () => Effect.succeed(null),
     checkoutChangeRequest: () => unsupported("checkoutChangeRequest"),
+    isBranchProtected: () => Effect.succeed(false),
     ...overrides,
   };
 }

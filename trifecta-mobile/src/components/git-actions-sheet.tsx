@@ -198,15 +198,16 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   };
 
   const canPull = status?.isRepo && status?.hasUpstream && status?.behindCount > 0;
-  const canPush = status?.isRepo && status?.hasUpstream && status?.aheadCount > 0 && !status?.hasWorkingTreeChanges;
+  const canPush = status?.isRepo && status?.hasUpstream && status?.aheadCount > 0 && !status?.hasWorkingTreeChanges && !status?.isProtectedRef;
   const canCommit = status?.hasWorkingTreeChanges;
   const isDefaultRef = status?.isDefaultRef ?? false;
   const hasOpenPr = status?.pr?.state === "open";
   const hasDefaultBranchDelta = (status?.aheadOfDefaultCount ?? status?.aheadCount ?? 0) > 0;
-  
+  const isProtectedRef = status?.isProtectedRef ?? false;
+
   // Determine if we should show PR options instead of push
-  const shouldShowPrOptions = !isDefaultRef && !hasOpenPr && hasDefaultBranchDelta && !status?.hasWorkingTreeChanges && canPush;
-  const shouldShowCommitPushPr = !isDefaultRef && !hasOpenPr && status?.hasWorkingTreeChanges;
+  const shouldShowPrOptions = (!isDefaultRef && !hasOpenPr && hasDefaultBranchDelta && !status?.hasWorkingTreeChanges && canPush) || isProtectedRef;
+  const shouldShowCommitPushPr = (!isDefaultRef && !hasOpenPr && status?.hasWorkingTreeChanges) || (status?.hasWorkingTreeChanges && isProtectedRef);
 
   const summaryLine = () => {
     if (!status?.isRepo) return "Not a git repository";

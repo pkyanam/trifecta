@@ -131,6 +131,7 @@ export const make = Effect.fn("makeAzureDevOpsSourceControlProvider")(function* 
       azure
         .getDefaultBranch({ cwd: input.cwd })
         .pipe(Effect.mapError((error) => providerError("getDefaultBranch", error))),
+    isBranchProtected: () => Effect.succeed(false),
     checkoutChangeRequest: (input) =>
       azure
         .checkoutPullRequest({

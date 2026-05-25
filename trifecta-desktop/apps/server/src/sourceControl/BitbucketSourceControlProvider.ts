@@ -100,6 +100,7 @@ export const make = Effect.fn("makeBitbucketSourceControlProvider")(function* ()
           ...(input.context ? { context: input.context } : {}),
         })
         .pipe(Effect.mapError((error) => providerError("getDefaultBranch", error))),
+    isBranchProtected: () => Effect.succeed(false),
     checkoutChangeRequest: (input) =>
       bitbucket
         .checkoutPullRequest({
