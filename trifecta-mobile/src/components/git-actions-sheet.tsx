@@ -71,7 +71,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   // git.runStackedAction is a STREAMING RPC; calling it as a single-response
   // request hangs forever. Subscribe to the progress stream and resolve when
   // we see action_finished or action_failed.
-  const runAction = (action: GitStackedAction): Promise<void> => {
+  const runAction = (action: GitStackedAction, options?: { featureBranch?: boolean }): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       const actionId = `${action}-${Date.now()}`;
       let unsubscribe: (() => void) | null = null;
@@ -165,7 +165,9 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handleCommitPushPr = async () => {
     setActionInProgress(true);
     try {
-      await runAction("commit_push_pr");
+      // Auto-enable feature branch when on protected ref
+      const options = isProtectedRef ? { featureBranch: true } : undefined;
+      await runAction("commit_push_pr", options);
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Commit, push & PR successful", true);
@@ -180,7 +182,9 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handlePushPr = async () => {
     setActionInProgress(true);
     try {
-      await runAction("create_pr");
+      // Auto-enable feature branch when on protected ref
+      const options = isProtectedRef ? { featureBranch: true } : undefined;
+      await runAction("create_pr", options);
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Push & create PR successful", true);
