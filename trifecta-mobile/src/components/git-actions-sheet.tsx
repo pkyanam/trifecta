@@ -198,7 +198,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   };
 
   const canPull = status?.isRepo && status?.hasUpstream && status?.behindCount > 0;
-  const canPush = status?.isRepo && status?.hasUpstream && status?.aheadCount > 0;
+  const canPush = status?.isRepo && status?.hasUpstream && status?.aheadCount > 0 && !status?.hasWorkingTreeChanges;
   const canCommit = status?.hasWorkingTreeChanges;
   const isDefaultRef = status?.isDefaultRef ?? false;
   const hasOpenPr = status?.pr?.state === "open";
@@ -438,7 +438,11 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                           <View className="flex-1">
                             <Text className="text-sm font-semibold text-white">Push</Text>
                             <Text className="text-xs text-white/80">
-                              {(status?.aheadCount ?? 0) > 0 ? `Ahead by ${status?.aheadCount} commits` : "Nothing to push"}
+                              {status?.hasWorkingTreeChanges
+                                ? "Commit changes first"
+                                : (status?.aheadCount ?? 0) > 0
+                                  ? `Ahead by ${status?.aheadCount} commits`
+                                  : "Nothing to push"}
                             </Text>
                           </View>
                         </Pressable>

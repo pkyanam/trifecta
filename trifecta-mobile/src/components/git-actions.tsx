@@ -191,7 +191,7 @@ export function GitActions({ visible, onClose, cwd }: GitActionsProps) {
   const isAhead = status?.aheadCount && status.aheadCount > 0;
   const canPull = status?.behindCount && status.behindCount > 0;
   const canCommit = hasChanges;
-  const canPush = isAhead && !hasChanges;
+  const canPush = isAhead && !hasChanges; // disabled while uncommitted changes exist
   const isDefaultRef = status?.isDefaultRef ?? false;
   const hasOpenPr = status?.pr?.state === "open";
   const hasDefaultBranchDelta = (status?.aheadOfDefaultCount ?? status?.aheadCount ?? 0) > 0;
