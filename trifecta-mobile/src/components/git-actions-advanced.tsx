@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { SymbolImage } from "@/components/symbol-image";
 import { cn } from "@/utils/tailwind";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useGitService, GitStackedAction, type VcsStatusResult, type VcsRef } from "@/services/git";
@@ -10,14 +11,12 @@ interface GitActionsProps {
   visible: boolean;
   onClose: () => void;
   cwd: string;
-  status: VcsStatusResult | null;
 }
 
-export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActionsProps) {
+export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
   const git = useGitService();
+  const [status, setStatus] = useState<VcsStatusResult | null>(null);
   const [actionInProgress, setActionInProgress] = useState<GitStackedAction | null>(null);
-  const [commitMessage, setCommitMessage] = useState("");
-  const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [showBranchDialog, setShowBranchDialog] = useState(false);
   const [showPRDialog, setShowPRDialog] = useState(false);
   const [showWorktreeManager, setShowWorktreeManager] = useState(false);
@@ -26,15 +25,48 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
   const [activeTab, setActiveTab] = useState<"basic" | "branches" | "pr" | "worktrees">("basic");
   const [branches, setBranches] = useState<VcsRef[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
+  const [toast, setToast] = useState<{ title: string; detail?: string; success: boolean } | null>(null);
 
-  // Load branches when switching to branches tab
   useEffect(() => {
-    if (visible && activeTab === "branches") {
-      loadBranches();
-    }
-  }, [visible, activeTab]);
+    if (!visible || !cwd) return;
 
-  const loadBranches = async () => {
+    // Initial load
+    const loadStatus = async () => {
+      try {
+        const result = await git.refreshStatus(cwd);
+        setStatus(result);
+      } catch (error) {
+        console.error("Failed to load git status:", error);
+      }
+    };
+
+    loadStatus();
+
+    // Subscribe to status updates
+    const unsubscribe = git.subscribeVcsStatus(cwd, (event) => {
+      if (event._tag === "snapshot" || event._tag === "localUpdated") {
+        setStatus((prev) => ({
+          ...prev,
+          ...event.local,
+          ...(event._tag === "snapshot" && event.remote ? event.remote : {}),
+        }) as VcsStatusResult);
+      } else if (event._tag === "remoteUpdated") {
+        setStatus((prev) => ({
+          ...prev,
+          ...event.remote,
+        }) as VcsStatusResult);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [visible, cwd, git]);
+
+  const showToast = (title: string, success: boolean, detail?: string) => {
+    setToast({ title, detail, success });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const loadBranches = useCallback(async () => {
     setLoadingBranches(true);
     try {
       const result = await git.listRefs(cwd);
@@ -44,33 +76,75 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
     } finally {
       setLoadingBranches(false);
     }
-  };
+  }, [git, cwd]);
+
+  // Load branches when switching to branches tab
+  useEffect(() => {
+    if (visible && activeTab === "branches") {
+      loadBranches();
+    }
+  }, [visible, activeTab, loadBranches]);
 
   const handlePull = async () => {
     if (!status?.refName) return;
     setActionInProgress("pull");
     try {
       await git.pull(cwd);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Pull successful", true);
     } catch (error) {
       console.error("Pull failed:", error);
+      showToast("Pull failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
   };
 
+  // git.runStackedAction is a STREAMING RPC; calling it as a single-response
+  // request hangs forever. Subscribe to the progress stream and resolve when
+  // we see action_finished or action_failed.
+  const runAction = (
+    action: GitStackedAction,
+    options?: { commitMessage?: string; featureBranch?: boolean; filePaths?: string[] },
+  ): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const actionId = `${action}-${Date.now()}`;
+      let unsubscribe: (() => void) | null = null;
+      const cleanup = () => {
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = null;
+        }
+      };
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, 30000);
+      unsubscribe = git.subscribeGitActionProgress(actionId, cwd, action, (event) => {
+        if (event.kind === "action_finished") {
+          clearTimeout(timeout);
+          cleanup();
+          resolve();
+        } else if (event.kind === "action_failed") {
+          clearTimeout(timeout);
+          cleanup();
+          reject(new Error(event.message ?? `${action} failed`));
+        }
+      }, options);
+    });
+  };
+
   const handleCommit = async () => {
-    if (!commitMessage.trim()) return;
     setActionInProgress("commit");
-    setShowCommitDialog(false);
-    
-    const actionId = `commit-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "commit", {
-        commitMessage: commitMessage.trim(),
-      });
-      setCommitMessage("");
+      await runAction("commit");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Commit successful", true);
     } catch (error) {
       console.error("Commit failed:", error);
+      showToast("Commit failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -79,29 +153,30 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
   const handlePush = async () => {
     if (!status?.refName) return;
     setActionInProgress("push");
-    const actionId = `push-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "push");
+      await runAction("push");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Push successful", true);
     } catch (error) {
       console.error("Push failed:", error);
+      showToast("Push failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
   };
 
   const handleCommitPush = async () => {
-    if (!commitMessage.trim() || !status?.refName) return;
+    if (!status?.refName) return;
     setActionInProgress("commit_push");
-    setShowCommitDialog(false);
-    
-    const actionId = `commit-push-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "commit_push", {
-        commitMessage: commitMessage.trim(),
-      });
-      setCommitMessage("");
+      await runAction("commit_push");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Commit & push successful", true);
     } catch (error) {
       console.error("Commit & push failed:", error);
+      showToast("Commit & push failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -115,9 +190,13 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
     try {
       await git.createRef(cwd, branchName.trim(), true);
       setBranchName("");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
       loadBranches(); // Reload branches
+      showToast("Branch created successfully", true);
     } catch (error) {
       console.error("Branch creation failed:", error);
+      showToast("Branch creation failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -127,9 +206,13 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
     setActionInProgress("commit"); // Reuse for loading state
     try {
       await git.switchRef(cwd, refName);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
       loadBranches(); // Reload branches
+      showToast("Branch switched successfully", true);
     } catch (error) {
       console.error("Branch switch failed:", error);
+      showToast("Branch switch failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -139,16 +222,18 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
     if (!prTitle.trim() || !status?.refName) return;
     setActionInProgress("create_pr");
     setShowPRDialog(false);
-    
-    const actionId = `pr-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "commit_push_pr", {
+      await runAction("commit_push_pr", {
         commitMessage: prTitle.trim(),
         featureBranch: true,
       });
       setPrTitle("");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Pull request created successfully", true);
     } catch (error) {
       console.error("PR creation failed:", error);
+      showToast("Pull request creation failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -158,7 +243,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
   const isAhead = status?.aheadCount && status.aheadCount > 0;
   const canPull = status?.behindCount && status.behindCount > 0;
   const canCommit = hasChanges;
-  const canPush = isAhead && !hasChanges;
+  const canPush = isAhead && !hasChanges && !status?.isProtectedRef; // disabled on protected refs
   const canCreatePR = isAhead && !hasChanges && status?.hasUpstream;
 
   const GlassComponent = View;
@@ -170,8 +255,8 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
         onPress={onClose}
       >
         <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
+          entering={FadeIn}
+          exiting={FadeOut}
           className="w-full max-w-sm mx-4 max-h-[85vh]"
         >
           <Pressable className="w-full" onPress={(e) => e.stopPropagation()}>
@@ -234,7 +319,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
                       label="Commit"
                       subtitle={hasChanges ? `${status?.workingTree.insertions} insertions, ${status?.workingTree.deletions} deletions` : "No changes"}
                       disabled={!canCommit || actionInProgress !== null}
-                      onPress={() => setShowCommitDialog(true)}
+                      onPress={handleCommit}
                       loading={actionInProgress === "commit"}
                     />
                     <GitActionButton
@@ -242,7 +327,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
                       label="Commit & Push"
                       subtitle="Commit changes and push to remote"
                       disabled={!canCommit || actionInProgress !== null}
-                      onPress={() => setShowCommitDialog(true)}
+                      onPress={handleCommitPush}
                       loading={actionInProgress === "commit_push"}
                     />
                   </View>
@@ -266,7 +351,7 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
                         <BranchItem
                           key={branch.name}
                           branch={branch}
-                          currentBranch={status?.refName}
+                          currentBranch={status?.refName ?? null}
                           onSwitch={() => handleSwitchBranch(branch.name)}
                           disabled={actionInProgress !== null}
                         />
@@ -353,6 +438,28 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
                 )}
               </ScrollView>
 
+              {/* Toast */}
+              {toast && (
+                <View className={cn(
+                  "mx-2 mb-2 p-3 rounded-xl border",
+                  toast.success
+                    ? "border-success/30 bg-success/10"
+                    : "border-destructive/30 bg-destructive/10"
+                )}>
+                  <View className="flex-row items-start gap-2">
+                    <SymbolImage
+                      name={toast.success ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"}
+                      size={14}
+                      className={toast.success ? "text-success" : "text-destructive"}
+                    />
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-foreground">{toast.title}</Text>
+                      {toast.detail && <Text className="text-sm text-muted-foreground">{toast.detail}</Text>}
+                    </View>
+                  </View>
+                </View>
+              )}
+
               {/* Close button */}
               <View className="px-4 py-3 border-t border-border/50">
                 <Pressable
@@ -366,17 +473,6 @@ export function GitActionsAdvanced({ visible, onClose, cwd, status }: GitActions
           </Pressable>
         </Animated.View>
       </Pressable>
-
-      {/* Commit Dialog */}
-      <CommitDialog
-        visible={showCommitDialog}
-        onClose={() => setShowCommitDialog(false)}
-        commitMessage={commitMessage}
-        setCommitMessage={setCommitMessage}
-        onCommit={handleCommit}
-        onCommitPush={handleCommitPush}
-        loading={actionInProgress === "commit" || actionInProgress === "commit_push"}
-      />
 
       {/* Branch Dialog */}
       <BranchDialog
@@ -516,68 +612,6 @@ function BranchItem({ branch, currentBranch, onSwitch, disabled }: BranchItemPro
   );
 }
 
-interface CommitDialogProps {
-  visible: boolean;
-  onClose: () => void;
-  commitMessage: string;
-  setCommitMessage: (value: string) => void;
-  onCommit: () => void;
-  onCommitPush: () => void;
-  loading: boolean;
-}
-
-function CommitDialog({ visible, onClose, commitMessage, setCommitMessage, onCommit, onCommitPush, loading }: CommitDialogProps) {
-  const GlassComponent = View;
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1 bg-black/50 items-center justify-center" onPress={onClose}>
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} className="w-full max-w-sm mx-4">
-          <Pressable className="w-full" onPress={(e) => e.stopPropagation()}>
-            <GlassComponent
-              className="bg-background/90 backdrop-blur-xl border border-border/50 rounded-2xl overflow-hidden p-4"
-              style={{ borderRadius: 16 }}
-            >
-              <Text className="text-lg font-semibold text-foreground mb-3">Commit Changes</Text>
-              <TextInput
-                className="bg-muted/50 rounded-lg px-4 py-3 text-foreground mb-4 min-h-24"
-                placeholder="Enter commit message..."
-                placeholderTextColor="#9ca3af"
-                multiline
-                value={commitMessage}
-                onChangeText={setCommitMessage}
-                autoFocus
-              />
-              <View className="flex-row gap-2">
-                <Pressable
-                  onPress={onClose}
-                  className="flex-1 bg-muted/50 active:bg-muted rounded-lg px-4 py-2.5"
-                >
-                  <Text className="text-center text-sm font-medium text-foreground">Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={onCommit}
-                  disabled={!commitMessage.trim() || loading}
-                  className="flex-1 bg-foreground active:bg-muted-foreground rounded-lg px-4 py-2.5"
-                >
-                  <Text className="text-center text-sm font-medium text-background">Commit</Text>
-                </Pressable>
-                <Pressable
-                  onPress={onCommitPush}
-                  disabled={!commitMessage.trim() || loading}
-                  className="flex-1 bg-blue-500 active:bg-blue-600 rounded-lg px-4 py-2.5"
-                >
-                  <Text className="text-center text-sm font-medium text-white">Commit & Push</Text>
-                </Pressable>
-              </View>
-            </GlassComponent>
-          </Pressable>
-        </Animated.View>
-      </Pressable>
-    </Modal>
-  );
-}
-
 interface BranchDialogProps {
   visible: boolean;
   onClose: () => void;
@@ -593,7 +627,7 @@ function BranchDialog({ visible, onClose, branchName, setBranchName, onCreate, l
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable className="flex-1 bg-black/50 items-center justify-center" onPress={onClose}>
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} className="w-full max-w-sm mx-4">
+        <Animated.View entering={FadeIn} exiting={FadeOut} className="w-full max-w-sm mx-4">
           <Pressable className="w-full" onPress={(e) => e.stopPropagation()}>
             <GlassComponent
               className="bg-background/90 backdrop-blur-xl border border-border/50 rounded-2xl overflow-hidden p-4"
@@ -646,7 +680,7 @@ function PRDialog({ visible, onClose, prTitle, setPrTitle, onCreate, loading }: 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable className="flex-1 bg-black/50 items-center justify-center" onPress={onClose}>
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} className="w-full max-w-sm mx-4">
+        <Animated.View entering={FadeIn} exiting={FadeOut} className="w-full max-w-sm mx-4">
           <Pressable className="w-full" onPress={(e) => e.stopPropagation()}>
             <GlassComponent
               className="bg-background/90 backdrop-blur-xl border border-border/50 rounded-2xl overflow-hidden p-4"

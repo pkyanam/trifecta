@@ -14,6 +14,7 @@ import { useKeyboardHandler } from "react-native-keyboard-controller";
 import Animated, {
   runOnJS,
   useAnimatedProps,
+  useAnimatedRef,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -68,12 +69,11 @@ export function Conversation({
   children?: ReactNode;
 }) {
   const { messages } = useChatContext();
-  const listRef = useRef<LegendListRef>(null);
+  const listRef = useAnimatedRef<LegendListRef>();
   const insets = useSafeAreaInsets();
 
   // -- Keyboard tracking --------------------------------------------------
 
-  const scrollToBottomRef = useRef<() => void>(() => {});
   const keyboardHeight = useSharedValue(0);
   // Separate value for contentInset that freezes during interactive dismiss
   // to prevent the scroll view from snapping when the user is overscrolled.
@@ -81,6 +81,18 @@ export function Conversation({
   // Tracks whether the current keyboard transition originated from an
   // interactive dismiss gesture (vs a programmatic tap-to-open).
   const wasInteractive = useSharedValue(false);
+  
+  // Create a worklet-safe scroll function
+  const scrollToBottomWorklet = useCallback(() => {
+    "worklet";
+    // With useAnimatedRef, we can access the ref directly in worklets
+    if (listRef.current) {
+      listRef.current.scrollToEnd({
+        animated: true,
+        viewOffset: -bottomInset.value,
+      });
+    }
+  }, []);
   useKeyboardHandler(
     {
       onStart: (e) => {
@@ -110,7 +122,7 @@ export function Conversation({
         keyboardHeightForInset.value = withTiming(e.height, { duration: 250 });
         wasInteractive.value = false;
         if (shouldScroll) {
-          runOnJS(scrollToBottomRef.current)();
+          scrollToBottomWorklet();
         }
       },
     },
@@ -123,7 +135,6 @@ export function Conversation({
   const composerHeight = useSharedValue(68);
   const scrollViewHeight = useSharedValue(0);
   const totalContentHeight = useSharedValue(0);
-  const currentFooterHeight = useSharedValue(0);
   const messagesOnlyHeight = useSharedValue(0);
 
   // -- Auto-scroll ---------------------------------------------------------
@@ -170,10 +181,13 @@ export function Conversation({
 
     totalContentHeight.value = height;
     lastContentHeight.value = height;
-    // Derive message-only height by subtracting the last known footer height.
-    // This is stable: when the footer resizes, totalContent changes but
-    // messagesOnly stays the same, breaking the feedback loop.
-    messagesOnlyHeight.value = height - currentFooterHeight.value;
+    // Update messagesOnlyHeight here - this is safe as it's not in a worklet
+    const scrollHeight = scrollViewHeight.value;
+    const keyboard = Math.abs(keyboardHeight.value);
+    const bottom = composerHeight.value + Math.max(insets.bottom, keyboard);
+    const blankSpace = scrollHeight - messagesOnlyHeight.value - bottom;
+    const footerHeight = Math.max(0, blankSpace - topPadding);
+    messagesOnlyHeight.value = height - footerHeight;
 
     if (wasAtBottom && heightIncreased && listRef.current) {
       requestAnimationFrame(() => {
@@ -191,7 +205,6 @@ export function Conversation({
       viewOffset: -bottomInset.value,
     });
   }, []);
-  scrollToBottomRef.current = scrollToBottom;
 
   // -- Animated styles -----------------------------------------------------
   // Account for safe area + iOS navigation header (~44px) + breathing room.
@@ -204,10 +217,10 @@ export function Conversation({
 
     const keyboard = Math.abs(keyboardHeight.value);
     const bottom = composerHeight.value + Math.max(insets.bottom, keyboard);
+    // Use messagesOnlyHeight directly in calculation
     const blankSpace = scrollHeight - messagesOnlyHeight.value - bottom;
     const footerHeight = Math.max(0, blankSpace - topPadding);
 
-    currentFooterHeight.value = footerHeight;
     return { height: footerHeight };
   });
 

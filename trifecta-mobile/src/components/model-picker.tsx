@@ -8,13 +8,12 @@ import {
   Text,
   TextInput,
   View,
-  Platform,
 } from "react-native";
-import Animated, { FadeIn, FadeOut, SlideInDown } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useWsClient } from "@/stores/ws-client";
 import { useModel } from "@/components/model-context";
 import { useRouter } from "expo-router";
-import type { ServerConfig, ServerProvider, ServerProviderModel } from "@/types/thread";
+import type { ServerProvider, ServerProviderModel } from "@/types/thread";
 
 interface ModelPickerProps {
   visible: boolean;
@@ -38,10 +37,10 @@ export function ModelPicker({ visible, onClose }: ModelPickerProps) {
       filteredProviders = allProviders.filter(p => p.instanceId === selectedProviderId);
     }
 
-    const filteredModels: Array<{
+    const filteredModels: {
       model: ServerProviderModel;
       provider: ServerProvider;
-    }> = [];
+    }[] = [];
 
     for (const provider of filteredProviders) {
       for (const model of provider.models) {
@@ -77,8 +76,8 @@ export function ModelPicker({ visible, onClose }: ModelPickerProps) {
         onPress={onClose}
       >
         <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
+          entering={FadeIn}
+          exiting={FadeOut}
           className="w-full max-w-lg mx-4 max-h-[80vh]"
         >
           <Pressable className="w-full h-full" onPress={(e) => e.stopPropagation()}>

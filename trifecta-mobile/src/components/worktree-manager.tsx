@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { SymbolImage } from "@/components/symbol-image";
 import { cn } from "@/utils/tailwind";
 import { useState, useEffect } from "react";
@@ -20,12 +21,6 @@ export function WorktreeManager({ visible, onClose, cwd }: WorktreeManagerProps)
   const [newWorktreeBranch, setNewWorktreeBranch] = useState("");
   const [actionInProgress, setActionInProgress] = useState<"create" | "remove" | null>(null);
 
-  useEffect(() => {
-    if (visible) {
-      loadWorktrees();
-    }
-  }, [visible]);
-
   const loadWorktrees = async () => {
     setLoading(true);
     try {
@@ -38,6 +33,13 @@ export function WorktreeManager({ visible, onClose, cwd }: WorktreeManagerProps)
     }
   };
 
+  useEffect(() => {
+    if (visible) {
+      loadWorktrees();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
   const handleCreateWorktree = async () => {
     if (!newWorktreePath.trim()) return;
     setActionInProgress("create");
@@ -47,7 +49,7 @@ export function WorktreeManager({ visible, onClose, cwd }: WorktreeManagerProps)
       await git.createWorktree(
         cwd,
         newWorktreePath.trim(),
-        newWorktreeBranch.trim() || null
+        newWorktreeBranch.trim() || undefined
       );
       setNewWorktreePath("");
       setNewWorktreeBranch("");
@@ -80,8 +82,8 @@ export function WorktreeManager({ visible, onClose, cwd }: WorktreeManagerProps)
         onPress={onClose}
       >
         <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
+          entering={FadeIn}
+          exiting={FadeOut}
           className="w-full max-w-sm mx-4 max-h-[85vh]"
         >
           <Pressable className="w-full" onPress={(e) => e.stopPropagation()}>
@@ -249,7 +251,7 @@ function CreateWorktreeDialog({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable className="flex-1 bg-black/50 items-center justify-center" onPress={onClose}>
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} className="w-full max-w-sm mx-4">
+        <Animated.View entering={FadeIn} exiting={FadeOut} className="w-full max-w-sm mx-4">
           <Pressable className="w-full" onPress={(e) => e.stopPropagation()}>
             <GlassComponent
               className="bg-background/90 backdrop-blur-xl border border-border/50 rounded-2xl overflow-hidden p-4"

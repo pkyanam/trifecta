@@ -1,4 +1,4 @@
-import { issueWebSocketToken, makeWebSocketURL } from "@/services/pairing";
+import { issueWebSocketToken, makeWebSocketURL, getServerURLForPlatform } from "@/services/pairing";
 import type { ServerConfig } from "@/types/thread";
 import React, {
   createContext,
@@ -82,9 +82,11 @@ class WsRpcClient {
     if (!this.alive) return;
     this.onStatus("connecting");
     try {
-      const wsToken = await issueWebSocketToken(this.serverURL, this.bearerToken);
+      // Use platform-specific URL for WebSocket connection
+      const platformURL = getServerURLForPlatform(this.serverURL);
+      const wsToken = await issueWebSocketToken(platformURL, this.bearerToken);
       if (!this.alive) return;
-      const url = makeWebSocketURL(this.serverURL, wsToken);
+      const url = makeWebSocketURL(platformURL, wsToken);
       const ws = new WebSocket(url);
       this.ws = ws;
 

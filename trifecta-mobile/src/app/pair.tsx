@@ -1,5 +1,5 @@
 import { Icon } from "@/components/icon";
-import { exchangeToken, fetchEnvironment, parsePairingURL } from "@/services/pairing";
+import { exchangeToken, fetchEnvironment, parsePairingURL, getServerURLForPlatform } from "@/services/pairing";
 import { useConnection } from "@/stores/connection";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
@@ -88,8 +88,11 @@ export default function PairScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
-      await fetchEnvironment(url);
-      const result = await exchangeToken(url, tok);
+      // Use platform-specific URL for connection
+      const platformURL = getServerURLForPlatform(url);
+      await fetchEnvironment(platformURL);
+      const result = await exchangeToken(platformURL, tok);
+      // Store the original URL (not the Android alias) for consistency
       await pair(url, result.bearerToken);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace("/");
@@ -195,7 +198,7 @@ export default function PairScreen() {
                   setServerURL(v);
                   setError(null);
                 }}
-                placeholder="http://localhost:8080"
+                placeholder={Platform.OS === "android" ? "http://10.0.2.2:8080" : "http://localhost:8080"}
                 placeholderTextColor={appMutedFg}
                 autoCapitalize="none"
                 autoCorrect={false}

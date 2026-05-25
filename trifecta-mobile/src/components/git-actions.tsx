@@ -5,8 +5,8 @@ import {
   GlassView,
   isLiquidGlassAvailable,
 } from "expo-glass-effect";
-import { useState } from "react";
-import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from "react-native";
+import { useState, useEffect } from "react";
+import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useGitService, GitStackedAction, type VcsStatusResult } from "@/services/git";
 
@@ -14,40 +14,110 @@ interface GitActionsProps {
   visible: boolean;
   onClose: () => void;
   cwd: string;
-  status: VcsStatusResult | null;
 }
 
-export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
+export function GitActions({ visible, onClose, cwd }: GitActionsProps) {
   const git = useGitService();
+  const [status, setStatus] = useState<VcsStatusResult | null>(null);
   const [actionInProgress, setActionInProgress] = useState<GitStackedAction | null>(null);
-  const [commitMessage, setCommitMessage] = useState("");
-  const [showCommitDialog, setShowCommitDialog] = useState(false);
+  const [toast, setToast] = useState<{ title: string; detail?: string; success: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!visible || !cwd) return;
+
+    // Initial load
+    const loadStatus = async () => {
+      try {
+        const result = await git.refreshStatus(cwd);
+        setStatus(result);
+      } catch (error) {
+        console.error("Failed to load git status:", error);
+      }
+    };
+
+    loadStatus();
+
+    // Subscribe to status updates
+    const unsubscribe = git.subscribeVcsStatus(cwd, (event) => {
+      if (event._tag === "snapshot" || event._tag === "localUpdated") {
+        setStatus((prev) => ({
+          ...prev,
+          ...event.local,
+          ...(event._tag === "snapshot" && event.remote ? event.remote : {}),
+        }) as VcsStatusResult);
+      } else if (event._tag === "remoteUpdated") {
+        setStatus((prev) => ({
+          ...prev,
+          ...event.remote,
+        }) as VcsStatusResult);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [visible, cwd, git]);
+
+  const showToast = (title: string, success: boolean, detail?: string) => {
+    setToast({ title, detail, success });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // git.runStackedAction is a STREAMING RPC; calling it as a single-response
+  // request hangs forever. Subscribe to the progress stream and resolve when
+  // we see action_finished or action_failed.
+  const runAction = (action: GitStackedAction, options?: { featureBranch?: boolean }): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const actionId = `${action}-${Date.now()}`;
+      let unsubscribe: (() => void) | null = null;
+      const cleanup = () => {
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = null;
+        }
+      };
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, 30000);
+      unsubscribe = git.subscribeGitActionProgress(actionId, cwd, action, (event) => {
+        if (event.kind === "action_finished") {
+          clearTimeout(timeout);
+          cleanup();
+          resolve();
+        } else if (event.kind === "action_failed") {
+          clearTimeout(timeout);
+          cleanup();
+          reject(new Error(event.message ?? `${action} failed`));
+        }
+      });
+    });
+  };
 
   const handlePull = async () => {
     if (!status?.refName) return;
     setActionInProgress("pull");
     try {
       await git.pull(cwd);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Pull successful", true);
     } catch (error) {
       console.error("Pull failed:", error);
+      showToast("Pull failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
   };
 
   const handleCommit = async () => {
-    if (!commitMessage.trim()) return;
     setActionInProgress("commit");
-    setShowCommitDialog(false);
-    
-    const actionId = `commit-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "commit", {
-        commitMessage: commitMessage.trim(),
-      });
-      setCommitMessage("");
+      await runAction("commit");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Commit successful", true);
     } catch (error) {
       console.error("Commit failed:", error);
+      showToast("Commit failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -56,29 +126,66 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
   const handlePush = async () => {
     if (!status?.refName) return;
     setActionInProgress("push");
-    const actionId = `push-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "push");
+      await runAction("push");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Push successful", true);
     } catch (error) {
       console.error("Push failed:", error);
+      showToast("Push failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
   };
 
   const handleCommitPush = async () => {
-    if (!commitMessage.trim() || !status?.refName) return;
+    if (!status?.refName) return;
     setActionInProgress("commit_push");
-    setShowCommitDialog(false);
-    
-    const actionId = `commit-push-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "commit_push", {
-        commitMessage: commitMessage.trim(),
-      });
-      setCommitMessage("");
+      await runAction("commit_push");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Commit & push successful", true);
     } catch (error) {
       console.error("Commit & push failed:", error);
+      showToast("Commit & push failed", false, error instanceof Error ? error.message : undefined);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleCommitPushPr = async () => {
+    if (!status?.refName) return;
+    setActionInProgress("commit_push_pr");
+    try {
+      // Auto-enable feature branch when on protected ref
+      const options = isProtectedRef ? { featureBranch: true } : undefined;
+      await runAction("commit_push_pr", options);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Commit, push & PR successful", true);
+    } catch (error) {
+      console.error("Commit, push & PR failed:", error);
+      showToast("Commit, push & PR failed", false, error instanceof Error ? error.message : undefined);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handlePushPr = async () => {
+    if (!status?.refName) return;
+    setActionInProgress("create_pr");
+    try {
+      // Auto-enable feature branch when on protected ref
+      const options = isProtectedRef ? { featureBranch: true } : undefined;
+      await runAction("create_pr", options);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Push & create PR successful", true);
+    } catch (error) {
+      console.error("Push & create PR failed:", error);
+      showToast("Push & create PR failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -88,7 +195,15 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
   const isAhead = status?.aheadCount && status.aheadCount > 0;
   const canPull = status?.behindCount && status.behindCount > 0;
   const canCommit = hasChanges;
-  const canPush = isAhead && !hasChanges;
+  const canPush = isAhead && !hasChanges && !status?.isProtectedRef; // disabled while uncommitted changes exist or on protected refs
+  const isDefaultRef = status?.isDefaultRef ?? false;
+  const hasOpenPr = status?.pr?.state === "open";
+  const hasDefaultBranchDelta = (status?.aheadOfDefaultCount ?? status?.aheadCount ?? 0) > 0;
+  const isProtectedRef = status?.isProtectedRef ?? false;
+
+  // Determine if we should show PR options instead of push
+  const shouldShowPrOptions = (!isDefaultRef && !hasOpenPr && hasDefaultBranchDelta && !hasChanges && isAhead) || isProtectedRef;
+  const shouldShowCommitPushPr = (!isDefaultRef && !hasOpenPr && hasChanges) || (hasChanges && isProtectedRef);
 
   const GlassComponent = isLiquidGlassAvailable() ? GlassView : GlassContainer;
 
@@ -99,8 +214,8 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
         onPress={onClose}
       >
         <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
+          entering={FadeIn}
+          exiting={FadeOut}
           className="w-full max-w-sm mx-4"
         >
           <Pressable className="w-full" onPress={(e) => e.stopPropagation()}>
@@ -136,30 +251,74 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
                   label="Commit"
                   subtitle={hasChanges ? `${status?.workingTree.insertions} insertions, ${status?.workingTree.deletions} deletions` : "No changes"}
                   disabled={!canCommit || actionInProgress !== null}
-                  onPress={() => setShowCommitDialog(true)}
+                  onPress={handleCommit}
                   loading={actionInProgress === "commit"}
                 />
 
-                {/* Push */}
-                <GitActionButton
-                  icon="arrow.up.circle"
-                  label="Push"
-                  subtitle={isAhead ? `Ahead by ${status?.aheadCount} commits` : "Nothing to push"}
-                  disabled={!canPush || actionInProgress !== null}
-                  onPress={handlePush}
-                  loading={actionInProgress === "push"}
-                />
+                {/* Push or Push & Create PR */}
+                {shouldShowPrOptions ? (
+                  <GitActionButton
+                    icon="arrow.triangle.2.circlepath"
+                    label="Push & Create PR"
+                    subtitle="Push commits and create pull request"
+                    disabled={!canPush || actionInProgress !== null}
+                    onPress={handlePushPr}
+                    loading={actionInProgress === "create_pr"}
+                  />
+                ) : (
+                  <GitActionButton
+                    icon="arrow.up.circle"
+                    label="Push"
+                    subtitle={isAhead ? `Ahead by ${status?.aheadCount} commits` : "Nothing to push"}
+                    disabled={!canPush || actionInProgress !== null}
+                    onPress={handlePush}
+                    loading={actionInProgress === "push"}
+                  />
+                )}
 
-                {/* Commit & Push */}
-                <GitActionButton
-                  icon="arrow.up.arrow.down.circle"
-                  label="Commit & Push"
-                  subtitle="Commit changes and push to remote"
-                  disabled={!canCommit || actionInProgress !== null}
-                  onPress={() => setShowCommitDialog(true)}
-                  loading={actionInProgress === "commit_push"}
-                />
+                {/* Commit & Push or Commit, Push & PR */}
+                {shouldShowCommitPushPr ? (
+                  <GitActionButton
+                    icon="arrow.triangle.2.circlepath"
+                    label="Commit, Push & PR"
+                    subtitle="Commit changes, push, and create pull request"
+                    disabled={!canCommit || actionInProgress !== null}
+                    onPress={handleCommitPushPr}
+                    loading={actionInProgress === "commit_push_pr"}
+                  />
+                ) : (
+                  <GitActionButton
+                    icon="arrow.up.arrow.down.circle"
+                    label="Commit & Push"
+                    subtitle="Commit changes and push to remote"
+                    disabled={!canCommit || actionInProgress !== null}
+                    onPress={handleCommitPush}
+                    loading={actionInProgress === "commit_push"}
+                  />
+                )}
               </View>
+
+              {/* Toast */}
+              {toast && (
+                <View className={cn(
+                  "mx-2 mb-2 p-3 rounded-xl border",
+                  toast.success
+                    ? "border-success/30 bg-success/10"
+                    : "border-destructive/30 bg-destructive/10"
+                )}>
+                  <View className="flex-row items-start gap-2">
+                    <SymbolImage
+                      name={toast.success ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"}
+                      size={14}
+                      className={toast.success ? "text-success" : "text-destructive"}
+                    />
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-foreground">{toast.title}</Text>
+                      {toast.detail && <Text className="text-sm text-muted-foreground">{toast.detail}</Text>}
+                    </View>
+                  </View>
+                </View>
+              )}
 
               {/* Close button */}
               <View className="px-4 py-3 border-t border-border/50">
@@ -174,63 +333,6 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
           </Pressable>
         </Animated.View>
       </Pressable>
-
-      {/* Commit Dialog */}
-      <Modal visible={showCommitDialog} transparent animationType="fade" onRequestClose={() => setShowCommitDialog(false)}>
-        <Pressable
-          className="flex-1 bg-black/50 items-center justify-center"
-          onPress={() => setShowCommitDialog(false)}
-        >
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-            className="w-full max-w-sm mx-4"
-          >
-            <Pressable className="w-full" onPress={(e) => e.stopPropagation()}>
-              <GlassComponent
-                isInteractive={!isLiquidGlassAvailable()}
-                glassEffectStyle="regular"
-                className="border-continuous rounded-2xl overflow-hidden p-4"
-                style={{
-                  ...(isLiquidGlassAvailable() ? {} : { borderRadius: 16 }),
-                }}
-              >
-                <Text className="text-lg font-semibold text-foreground mb-2">Commit Message</Text>
-                <TextInput
-                  className="bg-muted/50 rounded-lg px-3 py-2 text-foreground mb-4 min-h-20"
-                  placeholder="Enter commit message..."
-                  placeholderTextColor="#9ca3af"
-                  multiline
-                  value={commitMessage}
-                  onChangeText={setCommitMessage}
-                />
-                <View className="flex-row gap-2">
-                  <Pressable
-                    onPress={() => setShowCommitDialog(false)}
-                    className="flex-1 bg-muted/50 active:bg-muted rounded-lg px-4 py-2"
-                  >
-                    <Text className="text-center text-sm font-medium text-foreground">Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={handleCommit}
-                    disabled={!commitMessage.trim()}
-                    className="flex-1 bg-foreground active:bg-muted-foreground rounded-lg px-4 py-2"
-                  >
-                    <Text className="text-center text-sm font-medium text-background">Commit</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={handleCommitPush}
-                    disabled={!commitMessage.trim()}
-                    className="flex-1 bg-blue-500 active:bg-blue-600 rounded-lg px-4 py-2"
-                  >
-                    <Text className="text-center text-sm font-medium text-white">Commit & Push</Text>
-                  </Pressable>
-                </View>
-              </GlassComponent>
-            </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Modal>
     </Modal>
   );
 }

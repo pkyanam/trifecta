@@ -764,12 +764,26 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
           )
         : null;
 
+    // Best-effort branch protection lookup. Failures (no remote, unauth'd CLI,
+    // non-GitHub provider, network errors) silently default to `false` — we
+    // never block the status response on this.
+    const isProtectedRef =
+      details.branch !== null && details.hasOriginRemote
+        ? yield* sourceControlProvider(cwd).pipe(
+            Effect.flatMap((provider) =>
+              provider.isBranchProtected({ cwd, branch: details.branch as string }),
+            ),
+            Effect.catch(() => Effect.succeed(false)),
+          )
+        : false;
+
     return {
       hasUpstream: details.hasUpstream,
       aheadCount: details.aheadCount,
       behindCount: details.behindCount,
       aheadOfDefaultCount: details.aheadOfDefaultCount,
       pr,
+      isProtectedRef,
     } satisfies VcsStatusRemoteResult;
   });
   const remoteStatusResultCache = yield* Cache.makeWith(readRemoteStatus, {
@@ -1608,7 +1622,17 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
             (!initialStatus.hasUpstream || initialStatus.aheadCount > 0));
         const wantsPr = input.action === "create_pr" || input.action === "commit_push_pr";
 
-        if (input.featureBranch && !wantsCommit) {
+        // Check if current ref is protected — if so, automatically enable feature branch
+        // for PR actions to avoid pushing directly to protected refs
+        const currentRemoteStatus = yield* remoteStatus({ cwd: input.cwd });
+        const isProtectedRef = currentRemoteStatus?.isProtectedRef === true;
+        const shouldAutoFeatureBranch = wantsPr && isProtectedRef && !input.featureBranch;
+
+        const effectiveInput = shouldAutoFeatureBranch
+          ? { ...input, featureBranch: true }
+          : input;
+
+        if (effectiveInput.featureBranch && !wantsCommit) {
           return yield* gitManagerError(
             "runStackedAction",
             "Feature-branch checkout is only supported for commit actions.",
@@ -1622,7 +1646,7 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
         }
 
         const phases: GitActionProgressPhase[] = [
-          ...(input.featureBranch ? (["branch"] as const) : []),
+          ...(effectiveInput.featureBranch ? (["branch"] as const) : []),
           ...(wantsCommit ? (["commit"] as const) : []),
           ...(wantsPush ? (["push"] as const) : []),
           ...(wantsPr ? (["pr"] as const) : []),
@@ -1633,10 +1657,10 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
           phases,
         });
 
-        if (!input.featureBranch && wantsPush && !initialStatus.branch) {
+        if (!effectiveInput.featureBranch && wantsPush && !initialStatus.branch) {
           return yield* gitManagerError("runStackedAction", "Cannot push from detached HEAD.");
         }
-        if (!input.featureBranch && wantsPr && !initialStatus.branch) {
+        if (!effectiveInput.featureBranch && wantsPr && !initialStatus.branch) {
           return yield* gitManagerError(
             "runStackedAction",
             "Cannot create a pull request from detached HEAD.",
@@ -1644,7 +1668,7 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
         }
 
         let branchStep: { status: "created" | "skipped_not_requested"; name?: string };
-        let commitMessageForStep = input.commitMessage;
+        let commitMessageForStep = effectiveInput.commitMessage;
         let preResolvedCommitSuggestion: CommitAndBranchSuggestion | undefined = undefined;
 
         const modelSelection = yield* serverSettingsService.getSettings.pipe(
@@ -1654,7 +1678,7 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
           ),
         );
 
-        if (input.featureBranch) {
+        if (effectiveInput.featureBranch) {
           yield* Ref.set(currentPhase, Option.some("branch"));
           yield* progress.emit({
             kind: "phase_started",
@@ -1665,8 +1689,8 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
             modelSelection,
             input.cwd,
             initialStatus.branch,
-            input.commitMessage,
-            input.filePaths,
+            effectiveInput.commitMessage,
+            effectiveInput.filePaths,
           );
           branchStep = result.branchStep;
           commitMessageForStep = result.resolvedCommitMessage;
@@ -1676,7 +1700,7 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
         }
 
         const currentBranch = branchStep.name ?? initialStatus.branch;
-        const commitAction = isCommitAction(input.action) ? input.action : null;
+        const commitAction = isCommitAction(effectiveInput.action) ? effectiveInput.action : null;
         const changeRequestTerms = wantsPr
           ? yield* sourceControlProvider(input.cwd).pipe(
               Effect.map((provider) => getChangeRequestTerminologyForKind(provider.kind)),
@@ -1694,7 +1718,7 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
                   currentBranch,
                   commitMessageForStep,
                   preResolvedCommitSuggestion,
-                  input.filePaths,
+                  effectiveInput.filePaths,
                   options?.progressReporter,
                   progress.actionId,
                 ),

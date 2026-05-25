@@ -610,6 +610,16 @@ function createGitHubCliWithFakeGh(scenario: FakeGhScenario = {}): {
           cwd: input.cwd,
           args: ["pr", "checkout", input.reference, ...(input.force ? ["--force"] : [])],
         }).pipe(Effect.asVoid),
+      isBranchProtected: (input) =>
+        execute({
+          cwd: input.cwd,
+          args: ["api", "repos/{owner}/{repo}/branches/{branch}", "--jq", ".protected"],
+        }).pipe(
+          Effect.map((result) => {
+            const value = result.stdout.trim();
+            return value === "true";
+          }),
+        ),
     },
     ghCalls,
   };

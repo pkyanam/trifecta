@@ -103,22 +103,27 @@ export function buildMenuItems(
   const hasChanges = gitStatus.hasWorkingTreeChanges;
   const hasOpenPr = gitStatus.pr?.state === "open";
   const isBehind = gitStatus.behindCount > 0;
+  const isProtectedRef = gitStatus.isProtectedRef === true;
   const hasDefaultBranchDelta = (gitStatus.aheadOfDefaultCount ?? gitStatus.aheadCount) > 0;
   const canPushWithoutUpstream = hasPrimaryRemote && !gitStatus.hasUpstream;
   const canCommit = !isBusy && hasChanges;
+  // Direct push is forbidden on protected refs — must go through a PR instead.
   const canPush =
     !isBusy &&
     hasBranch &&
     !isBehind &&
+    !isProtectedRef &&
     gitStatus.aheadCount > 0 &&
     (gitStatus.hasUpstream || canPushWithoutUpstream);
+  // Allow "create PR" on a protected branch with local commits — the action
+  // handler will fork a feature branch from the current commits.
   const canCreatePr =
     !isBusy &&
     hasBranch &&
     !hasChanges &&
     !hasOpenPr &&
-    hasDefaultBranchDelta &&
     !isBehind &&
+    (hasDefaultBranchDelta || (isProtectedRef && gitStatus.aheadCount > 0)) &&
     (gitStatus.hasUpstream || canPushWithoutUpstream);
   const canOpenPr = !isBusy && hasOpenPr;
 
@@ -190,6 +195,7 @@ export function resolveQuickAction(
   const hasDefaultBranchDelta = (gitStatus.aheadOfDefaultCount ?? gitStatus.aheadCount) > 0;
   const isBehind = gitStatus.behindCount > 0;
   const isDiverged = isAhead && isBehind;
+  const isProtectedRef = gitStatus.isProtectedRef === true;
   const terminology = resolveChangeRequestTerminology(gitStatus);
 
   if (!hasBranch) {
@@ -204,6 +210,15 @@ export function resolveQuickAction(
   if (hasChanges) {
     if (!gitStatus.hasUpstream && !hasPrimaryRemote) {
       return { label: "Commit", disabled: false, kind: "run_action", action: "commit" };
+    }
+    // Protected refs cannot be pushed to directly — always go via PR.
+    if (isProtectedRef) {
+      return {
+        label: `Commit, push & ${terminology.shortLabel}`,
+        disabled: false,
+        kind: "run_action",
+        action: "commit_push_pr",
+      };
     }
     if (hasOpenPr || isDefaultRef) {
       return { label: "Commit & push", disabled: false, kind: "run_action", action: "commit_push" };
@@ -236,6 +251,14 @@ export function resolveQuickAction(
         disabled: true,
         kind: "show_hint",
         hint: "No local commits to push.",
+      };
+    }
+    if (isProtectedRef) {
+      return {
+        label: `Push & create ${terminology.shortLabel}`,
+        disabled: false,
+        kind: "run_action",
+        action: "create_pr",
       };
     }
     if (hasOpenPr || isDefaultRef) {
@@ -272,6 +295,15 @@ export function resolveQuickAction(
   }
 
   if (isAhead) {
+    // Protected refs cannot be pushed to directly — always go via PR.
+    if (isProtectedRef) {
+      return {
+        label: `Push & create ${terminology.shortLabel}`,
+        disabled: false,
+        kind: "run_action",
+        action: "create_pr",
+      };
+    }
     if (hasOpenPr || isDefaultRef) {
       return {
         label: "Push",

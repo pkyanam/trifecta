@@ -5,7 +5,7 @@ import type {
   ThreadDetail,
   ThreadId,
 } from "@/types/thread";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useActiveThread } from "@/stores/active-thread";
 import { useWsClient } from "@/stores/ws-client";
 
@@ -41,21 +41,17 @@ export function useThread(threadId: ThreadId | null): UseThreadResult {
   const [session, setSession] = useState<OrchestrationSession | null>(null);
   const [isSending, setIsSending] = useState(false);
 
-  const messagesRef = useRef<Message[]>([]);
-
   useEffect(() => {
     if (!threadId) {
       setDetail(null);
       setMessages([]);
       setSession(null);
-      messagesRef.current = [];
       return;
     }
 
     setDetail(null);
     setMessages([]);
     setSession(null);
-    messagesRef.current = [];
 
     const unsubscribe = subscribe(
       "orchestration.subscribeThread",
@@ -71,7 +67,6 @@ export function useThread(threadId: ThreadId | null): UseThreadResult {
           const sorted = [...rawMessages].sort(
             (a, b) => (a.createdAt > b.createdAt ? 1 : -1),
           );
-          messagesRef.current = sorted;
           setMessages(sorted);
           setSession((thread.session as OrchestrationSession) ?? null);
           setDetail(thread as unknown as ThreadDetail);
@@ -130,7 +125,6 @@ export function useThread(threadId: ThreadId | null): UseThreadResult {
           streaming,
           updatedAt,
         };
-        messagesRef.current = updated;
         return updated;
       } else {
         const msg: Message = {
@@ -145,7 +139,6 @@ export function useThread(threadId: ThreadId | null): UseThreadResult {
         const next = [...prev, msg].sort(
           (a, b) => (a.createdAt > b.createdAt ? 1 : -1),
         );
-        messagesRef.current = next;
         return next;
       }
     });

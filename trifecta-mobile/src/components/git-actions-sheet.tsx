@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/purity */
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -6,15 +7,11 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
-  TextInput,
 } from "react-native";
 import { SymbolImage } from "@/components/symbol-image";
-import { useWsClient } from "@/stores/ws-client";
+import { useGitService, type VcsStatusResult, type GitStackedAction } from "@/services/git";
 import { cn } from "@/utils/tailwind";
-import Animated, { FadeIn, FadeOut, SlideInUp, SlideOutDown } from "react-native-reanimated";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
-
-const GLASS = isLiquidGlassAvailable();
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 interface GitActionsSheetProps {
   visible: boolean;
@@ -22,88 +19,114 @@ interface GitActionsSheetProps {
   cwd: string;
 }
 
-interface GitFile {
-  path: string;
-  insertions: number;
-  deletions: number;
-}
-
-interface GitStatus {
-  isRepo: boolean;
-  refName: string | null;
-  hasWorkingTreeChanges: boolean;
-  hasUpstream: boolean;
-  aheadCount: number;
-  behindCount: number;
-  workingTree: {
-    files: GitFile[];
-    insertions: number;
-    deletions: number;
-  };
-}
-
 export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps) {
-  const { request } = useWsClient();
-  const [status, setStatus] = useState<GitStatus | null>(null);
+  const git = useGitService();
+  const [status, setStatus] = useState<VcsStatusResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [commitMessage, setCommitMessage] = useState("");
-  const [showCommitEditor, setShowCommitEditor] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [toast, setToast] = useState<{ title: string; detail?: string; success: boolean } | null>(null);
   const [filesExpanded, setFilesExpanded] = useState(false);
 
   useEffect(() => {
-    if (visible && cwd) {
-      fetchGitStatus();
-    }
-  }, [visible, cwd]);
+    if (!visible || !cwd) return;
 
-  const fetchGitStatus = async () => {
     setLoading(true);
     setError(null);
-    try {
-      const response = await request("vcs.refreshStatus", { cwd }) as any;
-      setStatus(response);
-    } catch (err) {
-      setError("Failed to fetch git status");
-      console.error("Git status error:", err);
-    } finally {
-      setLoading(false);
-    }
+
+    // Initial load
+    const loadStatus = async () => {
+      try {
+        const result = await git.refreshStatus(cwd);
+        setStatus(result);
+      } catch (err) {
+        setError("Failed to fetch git status");
+        console.error("Git status error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStatus();
+
+    // Subscribe to status updates
+    const unsubscribe = git.subscribeVcsStatus(cwd, (event) => {
+      if (event._tag === "snapshot" || event._tag === "localUpdated") {
+        setStatus((prev) => ({
+          ...prev,
+          ...event.local,
+          ...(event._tag === "snapshot" && event.remote ? event.remote : {}),
+        }) as VcsStatusResult);
+      } else if (event._tag === "remoteUpdated") {
+        setStatus((prev) => ({
+          ...prev,
+          ...event.remote,
+        }) as VcsStatusResult);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [visible, cwd, git]);
+
+  // git.runStackedAction is a STREAMING RPC; calling it as a single-response
+  // request hangs forever. Subscribe to the progress stream and resolve when
+  // we see action_finished or action_failed.
+  const runAction = (action: GitStackedAction, options?: { featureBranch?: boolean }): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const actionId = `${action}-${Date.now()}`;
+      let unsubscribe: (() => void) | null = null;
+      const cleanup = () => {
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = null;
+        }
+      };
+      // Safety timeout in case the stream never sends a terminal event
+      const timeout = setTimeout(() => {
+        console.warn("[GitActionsSheet] Action timed out:", action);
+        cleanup();
+        resolve();
+      }, 30000);
+      unsubscribe = git.subscribeGitActionProgress(actionId, cwd, action, (event) => {
+        console.log("[GitActionsSheet] Progress event:", event.kind, event.phase ?? "");
+        if (event.kind === "action_finished") {
+          clearTimeout(timeout);
+          cleanup();
+          resolve();
+        } else if (event.kind === "action_failed") {
+          clearTimeout(timeout);
+          cleanup();
+          reject(new Error(event.message ?? `${action} failed`));
+        }
+      });
+    });
   };
 
   const handlePull = async () => {
     setActionInProgress(true);
     try {
-      await request("vcs.pull", { cwd });
-      await fetchGitStatus();
-      showToast("Pull successful", undefined, true);
+      await git.pull(cwd);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Pull successful", true);
     } catch (err) {
       setError("Pull failed");
-      showToast("Pull failed", err instanceof Error ? err.message : undefined, false);
+      showToast("Pull failed", false, err instanceof Error ? err.message : undefined);
     } finally {
       setActionInProgress(false);
     }
   };
 
   const handleCommit = async () => {
-    if (!commitMessage.trim()) return;
     setActionInProgress(true);
     try {
-      await request("git.runStackedAction", {
-        actionId: Date.now().toString(),
-        cwd,
-        action: "commit",
-        commitMessage: commitMessage.trim(),
-      });
-      setCommitMessage("");
-      setShowCommitEditor(false);
-      await fetchGitStatus();
-      showToast("Commit successful", undefined, true);
+      await runAction("commit");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Commit successful", true);
     } catch (err) {
       setError("Commit failed");
-      showToast("Commit failed", err instanceof Error ? err.message : undefined, false);
+      showToast("Commit failed", false, err instanceof Error ? err.message : undefined);
     } finally {
       setActionInProgress(false);
     }
@@ -112,29 +135,83 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handlePush = async () => {
     setActionInProgress(true);
     try {
-      await request("git.runStackedAction", {
-        actionId: Date.now().toString(),
-        cwd,
-        action: "push",
-      });
-      await fetchGitStatus();
-      showToast("Push successful", undefined, true);
+      await runAction("push");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Push successful", true);
     } catch (err) {
       setError("Push failed");
-      showToast("Push failed", err instanceof Error ? err.message : undefined, false);
+      showToast("Push failed", false, err instanceof Error ? err.message : undefined);
     } finally {
       setActionInProgress(false);
     }
   };
 
-  const showToast = (title: string, detail?: string, success: boolean) => {
+  const handleCommitPush = async () => {
+    setActionInProgress(true);
+    try {
+      await runAction("commit_push");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Commit & push successful", true);
+    } catch (err) {
+      setError("Commit & push failed");
+      showToast("Commit & push failed", false, err instanceof Error ? err.message : undefined);
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  const handleCommitPushPr = async () => {
+    setActionInProgress(true);
+    try {
+      // Auto-enable feature branch when on protected ref
+      const options = isProtectedRef ? { featureBranch: true } : undefined;
+      await runAction("commit_push_pr", options);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Commit, push & PR successful", true);
+    } catch (err) {
+      setError("Commit, push & PR failed");
+      showToast("Commit, push & PR failed", false, err instanceof Error ? err.message : undefined);
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  const handlePushPr = async () => {
+    setActionInProgress(true);
+    try {
+      // Auto-enable feature branch when on protected ref
+      const options = isProtectedRef ? { featureBranch: true } : undefined;
+      await runAction("create_pr", options);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      showToast("Push & create PR successful", true);
+    } catch (err) {
+      setError("Push & create PR failed");
+      showToast("Push & create PR failed", false, err instanceof Error ? err.message : undefined);
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  const showToast = (title: string, success: boolean, detail?: string) => {
     setToast({ title, detail, success });
     setTimeout(() => setToast(null), 3000);
   };
 
   const canPull = status?.isRepo && status?.hasUpstream && status?.behindCount > 0;
-  const canPush = status?.isRepo && status?.hasUpstream && status?.aheadCount > 0;
+  const canPush = status?.isRepo && status?.hasUpstream && status?.aheadCount > 0 && !status?.hasWorkingTreeChanges && !status?.isProtectedRef;
   const canCommit = status?.hasWorkingTreeChanges;
+  const isDefaultRef = status?.isDefaultRef ?? false;
+  const hasOpenPr = status?.pr?.state === "open";
+  const hasDefaultBranchDelta = (status?.aheadOfDefaultCount ?? status?.aheadCount ?? 0) > 0;
+  const isProtectedRef = status?.isProtectedRef ?? false;
+
+  // Determine if we should show PR options instead of push
+  const shouldShowPrOptions = (!isDefaultRef && !hasOpenPr && hasDefaultBranchDelta && !status?.hasWorkingTreeChanges && canPush) || isProtectedRef;
+  const shouldShowCommitPushPr = (!isDefaultRef && !hasOpenPr && status?.hasWorkingTreeChanges) || (status?.hasWorkingTreeChanges && isProtectedRef);
 
   const summaryLine = () => {
     if (!status?.isRepo) return "Not a git repository";
@@ -151,8 +228,6 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     return parts.join(" • ");
   };
 
-  const GlassComponent = View;
-
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 justify-end">
@@ -161,8 +236,8 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
 
         {/* Bottom sheet card */}
         <Animated.View
-          entering={FadeIn.duration(150)}
-          exiting={FadeOut.duration(150)}
+          entering={FadeIn}
+          exiting={FadeOut}
           className="w-full"
           style={{ maxHeight: "85%" }}
         >
@@ -300,80 +375,137 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                     )}
 
                     {/* Actions */}
-                    {showCommitEditor ? (
-                      <View className="p-4 bg-muted/30 rounded-xl border border-border/50 space-y-3">
-                        <Text className="text-xs text-muted-foreground font-semibold tracking-wider">COMMIT MESSAGE</Text>
-                        <TextInput
-                          className="min-h-20 p-3 bg-background rounded-lg border border-border text-foreground"
-                          placeholder="Describe these changes…"
-                          placeholderTextColor="#9ca3af"
-                          value={commitMessage}
-                          onChangeText={setCommitMessage}
-                          multiline
-                          textAlignVertical="top"
-                        />
-                        <View className="flex-row gap-2">
-                          <Pressable
-                            onPress={() => { setShowCommitEditor(false); setCommitMessage(""); }}
-                            className="flex-1 py-2.5 rounded-lg border border-border items-center justify-center active:bg-muted/30"
-                          >
-                            <Text className="text-sm font-semibold text-foreground">Cancel</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={handleCommit}
-                            disabled={!commitMessage.trim() || actionInProgress}
-                            className={cn(
-                              "flex-1 py-2.5 rounded-lg bg-accent items-center justify-center",
-                              (!commitMessage.trim() || actionInProgress) && "opacity-50"
-                            )}
-                          >
-                            <Text className="text-sm font-semibold text-background">Commit</Text>
-                          </Pressable>
+                    <View className="space-y-2">
+                      {/* Pull */}
+                      <Pressable
+                        onPress={handlePull}
+                        disabled={!canPull || actionInProgress}
+                        className={cn(
+                          "flex-row items-center gap-3 px-4 py-3 rounded-lg border border-border active:bg-muted/30",
+                          (!canPull || actionInProgress) && "opacity-50"
+                        )}
+                      >
+                        <SymbolImage name="arrow.down" size={16} className="text-foreground" />
+                        <View className="flex-1">
+                          <Text className="text-sm font-semibold text-foreground">Pull</Text>
+                          <Text className="text-xs text-muted-foreground">
+                            {canPull ? `Behind by ${status?.behindCount} commits` : "Up to date"}
+                          </Text>
                         </View>
-                      </View>
-                    ) : (
-                      <View className="flex-row gap-2">
+                      </Pressable>
+
+                      {/* Commit */}
+                      <Pressable
+                        onPress={handleCommit}
+                        disabled={!canCommit || actionInProgress}
+                        className={cn(
+                          "flex-row items-center gap-3 px-4 py-3 rounded-lg border border-border active:bg-muted/30",
+                          (!canCommit || actionInProgress) && "opacity-50"
+                        )}
+                      >
+                        {actionInProgress ? (
+                          <ActivityIndicator size="small" />
+                        ) : (
+                          <SymbolImage name="checkmark.circle" size={16} className="text-foreground" />
+                        )}
+                        <View className="flex-1">
+                          <Text className="text-sm font-semibold text-foreground">Commit</Text>
+                          <Text className="text-xs text-muted-foreground">
+                            {status?.hasWorkingTreeChanges
+                              ? `${status.workingTree.insertions} insertions, ${status.workingTree.deletions} deletions`
+                              : "No changes"}
+                          </Text>
+                        </View>
+                      </Pressable>
+
+                      {/* Push or Push & Create PR */}
+                      {shouldShowPrOptions ? (
                         <Pressable
-                          onPress={handlePull}
-                          disabled={!canPull || actionInProgress}
+                          onPress={handlePushPr}
+                          disabled={!canPush || actionInProgress}
                           className={cn(
-                            "flex-1 py-3 rounded-lg border border-border items-center justify-center active:bg-muted/30",
-                            (!canPull || actionInProgress) && "opacity-50"
+                            "flex-row items-center gap-3 px-4 py-3 rounded-lg bg-blue-500 active:bg-blue-600",
+                            (!canPush || actionInProgress) && "opacity-50"
                           )}
                         >
-                          <View className="flex-row items-center gap-2">
-                            <SymbolImage name="arrow.down" size={16} className="text-foreground" />
-                            <Text className="text-sm font-semibold text-foreground">Pull</Text>
-                          </View>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => setShowCommitEditor(true)}
-                          disabled={!canCommit || actionInProgress}
-                          className={cn(
-                            "flex-1 py-3 rounded-lg border border-border items-center justify-center active:bg-muted/30",
-                            (!canCommit || actionInProgress) && "opacity-50"
+                          {actionInProgress ? (
+                            <ActivityIndicator size="small" color="white" />
+                          ) : (
+                            <SymbolImage name="arrow.triangle.2.circlepath" size={16} className="text-white" />
                           )}
-                        >
-                          <View className="flex-row items-center gap-2">
-                            <SymbolImage name="checkmark.seal" size={16} className="text-foreground" />
-                            <Text className="text-sm font-semibold text-foreground">Commit</Text>
+                          <View className="flex-1">
+                            <Text className="text-sm font-semibold text-white">Push & Create PR</Text>
+                            <Text className="text-xs text-white/80">Push commits and create pull request</Text>
                           </View>
                         </Pressable>
+                      ) : (
                         <Pressable
                           onPress={handlePush}
                           disabled={!canPush || actionInProgress}
                           className={cn(
-                            "flex-1 py-3 rounded-lg bg-accent items-center justify-center",
+                            "flex-row items-center gap-3 px-4 py-3 rounded-lg bg-blue-500 active:bg-blue-600",
                             (!canPush || actionInProgress) && "opacity-50"
                           )}
                         >
-                          <View className="flex-row items-center gap-2">
-                            <SymbolImage name="arrow.up" size={16} className="text-background" />
-                            <Text className="text-sm font-semibold text-background">Push</Text>
+                          {actionInProgress ? (
+                            <ActivityIndicator size="small" color="white" />
+                          ) : (
+                            <SymbolImage name="arrow.up.circle" size={16} className="text-white" />
+                          )}
+                          <View className="flex-1">
+                            <Text className="text-sm font-semibold text-white">Push</Text>
+                            <Text className="text-xs text-white/80">
+                              {status?.hasWorkingTreeChanges
+                                ? "Commit changes first"
+                                : (status?.aheadCount ?? 0) > 0
+                                  ? `Ahead by ${status?.aheadCount} commits`
+                                  : "Nothing to push"}
+                            </Text>
                           </View>
                         </Pressable>
-                      </View>
-                    )}
+                      )}
+
+                      {/* Commit & Push or Commit, Push & PR */}
+                      {shouldShowCommitPushPr ? (
+                        <Pressable
+                          onPress={handleCommitPushPr}
+                          disabled={!canCommit || actionInProgress}
+                          className={cn(
+                            "flex-row items-center gap-3 px-4 py-3 rounded-lg border border-border active:bg-muted/30",
+                            (!canCommit || actionInProgress) && "opacity-50"
+                          )}
+                        >
+                          {actionInProgress ? (
+                            <ActivityIndicator size="small" />
+                          ) : (
+                            <SymbolImage name="arrow.triangle.2.circlepath" size={16} className="text-foreground" />
+                          )}
+                          <View className="flex-1">
+                            <Text className="text-sm font-semibold text-foreground">Commit, Push & PR</Text>
+                            <Text className="text-xs text-muted-foreground">Commit changes, push, and create pull request</Text>
+                          </View>
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          onPress={handleCommitPush}
+                          disabled={!canCommit || actionInProgress}
+                          className={cn(
+                            "flex-row items-center gap-3 px-4 py-3 rounded-lg border border-border active:bg-muted/30",
+                            (!canCommit || actionInProgress) && "opacity-50"
+                          )}
+                        >
+                          {actionInProgress ? (
+                            <ActivityIndicator size="small" />
+                          ) : (
+                            <SymbolImage name="arrow.up.arrow.down.circle" size={16} className="text-foreground" />
+                          )}
+                          <View className="flex-1">
+                            <Text className="text-sm font-semibold text-foreground">Commit & Push</Text>
+                            <Text className="text-xs text-muted-foreground">Commit changes and push to remote</Text>
+                          </View>
+                        </Pressable>
+                      )}
+                    </View>
 
                     {/* Toast */}
                     {toast && (

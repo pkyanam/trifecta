@@ -1,8 +1,8 @@
 import { SymbolImage } from "@/components/symbol-image";
 import { cn } from "@/utils/tailwind";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text } from "react-native";
 import { useEffect, useState } from "react";
-import Animated, { FadeIn, FadeOut, Layout } from "react-native-reanimated";
+import Animated, { Layout } from "react-native-reanimated";
 import { useGitService, type VcsStatusResult } from "@/services/git";
 import { GitActionsAdvanced } from "./git-actions-advanced";
 
@@ -32,12 +32,12 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
     loadStatus();
 
     // Subscribe to status updates
-    const unsubscribe = git.subscribeVcsStatus((event) => {
+    const unsubscribe = git.subscribeVcsStatus(cwd, (event) => {
       if (event._tag === "snapshot" || event._tag === "localUpdated") {
         setStatus((prev) => ({
           ...prev,
           ...event.local,
-          ...(event.remote ? event.remote : {}),
+          ...(event._tag === "snapshot" && event.remote ? event.remote : {}),
         }) as VcsStatusResult);
       } else if (event._tag === "remoteUpdated") {
         setStatus((prev) => ({
@@ -68,9 +68,9 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
               "w-2 h-2 rounded-full",
               loading && "bg-gray-400",
               !loading && status?.hasWorkingTreeChanges && "bg-orange-500",
-              !loading && !status?.hasWorkingTreeChanges && status?.aheadCount > 0 && "bg-blue-500",
-              !loading && !status?.hasWorkingTreeChanges && status?.behindCount > 0 && "bg-yellow-500",
-              !loading && !status?.hasWorkingTreeChanges && status?.aheadCount === 0 && status?.behindCount === 0 && "bg-green-500",
+              !loading && !status?.hasWorkingTreeChanges && (status?.aheadCount ?? 0) > 0 && "bg-blue-500",
+              !loading && !status?.hasWorkingTreeChanges && (status?.behindCount ?? 0) > 0 && "bg-yellow-500",
+              !loading && !status?.hasWorkingTreeChanges && (status?.aheadCount ?? 0) === 0 && (status?.behindCount ?? 0) === 0 && "bg-green-500",
               !loading && !status && "bg-gray-400"
             )}
           />
@@ -93,12 +93,12 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
           )}
 
           {/* Sync status */}
-          {(status?.aheadCount > 0 || status?.behindCount > 0) && (
+          {((status?.aheadCount ?? 0) > 0 || (status?.behindCount ?? 0) > 0) && (
             <Animated.View layout={Layout.springify()} className="flex-row items-center gap-1">
-              {status.aheadCount > 0 && (
+              {(status?.aheadCount ?? 0) > 0 && (
                 <SymbolImage name="arrow.up" size={10} className="text-blue-500" />
               )}
-              {status.behindCount > 0 && (
+              {(status?.behindCount ?? 0) > 0 && (
                 <SymbolImage name="arrow.down" size={10} className="text-yellow-500" />
               )}
             </Animated.View>
@@ -117,7 +117,6 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
         visible={showActions}
         onClose={() => setShowActions(false)}
         cwd={cwd}
-        status={status}
       />
     </>
   );

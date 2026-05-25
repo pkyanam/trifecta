@@ -191,6 +191,10 @@ export const make = Effect.fn("makeGitHubSourceControlProvider")(function* () {
       github
         .getDefaultBranch(input)
         .pipe(Effect.mapError((error) => providerError("getDefaultBranch", error))),
+    isBranchProtected: (input) =>
+      github
+        .isBranchProtected({ cwd: input.cwd, branch: input.branch })
+        .pipe(Effect.mapError((error) => providerError("isBranchProtected", error))),
     checkoutChangeRequest: (input) =>
       github
         .checkoutPullRequest(input)

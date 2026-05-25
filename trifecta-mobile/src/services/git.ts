@@ -7,7 +7,7 @@ import { useWsClient } from "@/stores/ws-client";
 
 // Types matching desktop contracts
 
-export type GitStackedAction = "commit" | "push" | "create_pr" | "commit_push" | "commit_push_pr";
+export type GitStackedAction = "commit" | "push" | "pull" | "create_pr" | "commit_push" | "commit_push_pr";
 
 export interface VcsRef {
   name: string;
@@ -29,11 +29,11 @@ export interface VcsStatusLocalResult {
   refName: string | null;
   hasWorkingTreeChanges: boolean;
   workingTree: {
-    files: Array<{
+    files: {
       path: string;
       insertions: number;
       deletions: number;
-    }>;
+    }[];
     insertions: number;
     deletions: number;
   };
@@ -52,6 +52,10 @@ export interface VcsStatusRemoteResult {
     headRef: string;
     state: "open" | "closed" | "merged";
   };
+  // True when the current ref is protected on the remote (e.g. GitHub
+  // branch protection / required pull request). Drives the UI to route
+  // push actions through the PR flow instead of direct push.
+  isProtectedRef?: boolean;
 }
 
 export interface VcsStatusResult extends VcsStatusLocalResult, VcsStatusRemoteResult {}
@@ -281,7 +285,9 @@ export function useGitService() {
   };
 
   const subscribeVcsStatus = (cwd: string, onEvent: (event: VcsStatusStreamEvent) => void): (() => void) => {
-    return subscribe("subscribeVcsStatus", { cwd }, onEvent);
+    return subscribe("subscribeVcsStatus", { cwd }, (value: unknown) => {
+      onEvent(value as VcsStatusStreamEvent);
+    });
   };
 
   const subscribeGitActionProgress = (
@@ -289,12 +295,22 @@ export function useGitService() {
     cwd: string,
     action: GitStackedAction,
     onEvent: (event: GitActionProgressEvent) => void,
+    options?: {
+      commitMessage?: string;
+      featureBranch?: boolean;
+      filePaths?: string[];
+    },
   ): (() => void) => {
     return subscribe("git.runStackedAction", {
       actionId,
       cwd,
       action,
-    }, onEvent);
+      commitMessage: options?.commitMessage,
+      featureBranch: options?.featureBranch,
+      filePaths: options?.filePaths,
+    }, (value: unknown) => {
+      onEvent(value as GitActionProgressEvent);
+    });
   };
 
   return {
