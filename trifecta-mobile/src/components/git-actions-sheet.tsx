@@ -403,12 +403,16 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                           (!canCommit || actionInProgress) && "opacity-50"
                         )}
                       >
-                        <SymbolImage name="checkmark.circle" size={16} className="text-foreground" />
+                        {actionInProgress ? (
+                          <ActivityIndicator size="small" />
+                        ) : (
+                          <SymbolImage name="checkmark.circle" size={16} className="text-foreground" />
+                        )}
                         <View className="flex-1">
                           <Text className="text-sm font-semibold text-foreground">Commit</Text>
                           <Text className="text-xs text-muted-foreground">
-                            {status?.hasWorkingTreeChanges 
-                              ? `${status.workingTree.insertions} insertions, ${status.workingTree.deletions} deletions` 
+                            {status?.hasWorkingTreeChanges
+                              ? `${status.workingTree.insertions} insertions, ${status.workingTree.deletions} deletions`
                               : "No changes"}
                           </Text>
                         </View>
@@ -424,7 +428,11 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                             (!canPush || actionInProgress) && "opacity-50"
                           )}
                         >
-                          <SymbolImage name="arrow.triangle.2.circlepath" size={16} className="text-white" />
+                          {actionInProgress ? (
+                            <ActivityIndicator size="small" color="white" />
+                          ) : (
+                            <SymbolImage name="arrow.triangle.2.circlepath" size={16} className="text-white" />
+                          )}
                           <View className="flex-1">
                             <Text className="text-sm font-semibold text-white">Push & Create PR</Text>
                             <Text className="text-xs text-white/80">Push commits and create pull request</Text>
@@ -439,7 +447,11 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                             (!canPush || actionInProgress) && "opacity-50"
                           )}
                         >
-                          <SymbolImage name="arrow.up.circle" size={16} className="text-white" />
+                          {actionInProgress ? (
+                            <ActivityIndicator size="small" color="white" />
+                          ) : (
+                            <SymbolImage name="arrow.up.circle" size={16} className="text-white" />
+                          )}
                           <View className="flex-1">
                             <Text className="text-sm font-semibold text-white">Push</Text>
                             <Text className="text-xs text-white/80">
@@ -463,7 +475,11 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                             (!canCommit || actionInProgress) && "opacity-50"
                           )}
                         >
-                          <SymbolImage name="arrow.triangle.2.circlepath" size={16} className="text-foreground" />
+                          {actionInProgress ? (
+                            <ActivityIndicator size="small" />
+                          ) : (
+                            <SymbolImage name="arrow.triangle.2.circlepath" size={16} className="text-foreground" />
+                          )}
                           <View className="flex-1">
                             <Text className="text-sm font-semibold text-foreground">Commit, Push & PR</Text>
                             <Text className="text-xs text-muted-foreground">Commit changes, push, and create pull request</Text>
@@ -478,7 +494,11 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                             (!canCommit || actionInProgress) && "opacity-50"
                           )}
                         >
-                          <SymbolImage name="arrow.up.arrow.down.circle" size={16} className="text-foreground" />
+                          {actionInProgress ? (
+                            <ActivityIndicator size="small" />
+                          ) : (
+                            <SymbolImage name="arrow.up.arrow.down.circle" size={16} className="text-foreground" />
+                          )}
                           <View className="flex-1">
                             <Text className="text-sm font-semibold text-foreground">Commit & Push</Text>
                             <Text className="text-xs text-muted-foreground">Commit changes and push to remote</Text>
