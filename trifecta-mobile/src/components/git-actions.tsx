@@ -20,14 +20,23 @@ interface GitActionsProps {
 export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
   const git = useGitService();
   const [actionInProgress, setActionInProgress] = useState<GitStackedAction | null>(null);
+  const [toast, setToast] = useState<{ title: string; detail?: string; success: boolean } | null>(null);
+
+  const showToast = (title: string, success: boolean, detail?: string) => {
+    setToast({ title, detail, success });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const handlePull = async () => {
     if (!status?.refName) return;
     setActionInProgress("pull");
     try {
       await git.pull(cwd);
+      await git.refreshStatus(cwd);
+      showToast("Pull successful", true);
     } catch (error) {
       console.error("Pull failed:", error);
+      showToast("Pull failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -39,8 +48,11 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     const actionId = `commit-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit");
+      await git.refreshStatus(cwd);
+      showToast("Commit successful", true);
     } catch (error) {
       console.error("Commit failed:", error);
+      showToast("Commit failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -52,8 +64,11 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     const actionId = `push-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "push");
+      await git.refreshStatus(cwd);
+      showToast("Push successful", true);
     } catch (error) {
       console.error("Push failed:", error);
+      showToast("Push failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -66,8 +81,11 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     const actionId = `commit-push-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit_push");
+      await git.refreshStatus(cwd);
+      showToast("Commit & push successful", true);
     } catch (error) {
       console.error("Commit & push failed:", error);
+      showToast("Commit & push failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -80,8 +98,11 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     const actionId = `commit-push-pr-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "commit_push_pr");
+      await git.refreshStatus(cwd);
+      showToast("Commit, push & PR successful", true);
     } catch (error) {
       console.error("Commit, push & PR failed:", error);
+      showToast("Commit, push & PR failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -93,8 +114,11 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
     const actionId = `push-pr-${Date.now()}`;
     try {
       await git.runStackedAction(actionId, cwd, "create_pr");
+      await git.refreshStatus(cwd);
+      showToast("Push & create PR successful", true);
     } catch (error) {
       console.error("Push & create PR failed:", error);
+      showToast("Push & create PR failed", false, error instanceof Error ? error.message : undefined);
     } finally {
       setActionInProgress(null);
     }
@@ -205,6 +229,28 @@ export function GitActions({ visible, onClose, cwd, status }: GitActionsProps) {
                   />
                 )}
               </View>
+
+              {/* Toast */}
+              {toast && (
+                <View className={cn(
+                  "mx-2 mb-2 p-3 rounded-xl border",
+                  toast.success
+                    ? "border-success/30 bg-success/10"
+                    : "border-destructive/30 bg-destructive/10"
+                )}>
+                  <View className="flex-row items-start gap-2">
+                    <SymbolImage
+                      name={toast.success ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"}
+                      size={14}
+                      className={toast.success ? "text-success" : "text-destructive"}
+                    />
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-foreground">{toast.title}</Text>
+                      {toast.detail && <Text className="text-sm text-muted-foreground">{toast.detail}</Text>}
+                    </View>
+                  </View>
+                </View>
+              )}
 
               {/* Close button */}
               <View className="px-4 py-3 border-t border-border/50">
