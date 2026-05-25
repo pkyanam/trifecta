@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { SymbolImage } from "@/components/symbol-image";
 import { GitActionsSheet } from "@/components/git-actions-sheet";
 import { cn } from "@/utils/tailwind";
@@ -26,16 +27,17 @@ export function SmartHeader({ onMenuPress }: SmartHeaderProps) {
   const [branchName, setBranchName] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
   const { selectedModelLabel } = useModel();
-  const { activeThreadId } = useActiveThread();
+  const { activeThreadId, newChatProjectId } = useActiveThread();
   const { getThread, getProject } = useThreadList();
   const router = useRouter();
 
   // Get the actual thread data using the thread ID
   const activeThread = activeThreadId ? getThread(activeThreadId) : null;
   const project = activeThread?.projectId ? getProject(activeThread.projectId) : null;
+  const newChatProject = newChatProjectId ? getProject(newChatProjectId) : null;
 
-  // Get the correct CWD: thread worktreePath > project workspaceRoot > server cwd
-  const cwd = activeThread?.worktreePath || project?.workspaceRoot || serverConfig?.cwd || "";
+  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project > server cwd
+  const cwd = activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
 
   // Fetch git status whenever cwd changes (mirrors iOS header behavior)
   useEffect(() => {
@@ -64,8 +66,8 @@ export function SmartHeader({ onMenuPress }: SmartHeaderProps) {
 
   return (
     <SafeAreaView className="bg-background" edges={["top"]}>
-      <StatusBar barStyle="auto" />
-      <Animated.View entering={FadeIn.duration(300)}>
+      <StatusBar barStyle="default" />
+      <Animated.View entering={FadeIn}>
         <View className="flex-row items-center px-2 py-1 min-h-[52px]">
           {/* Left – Menu button */}
           <Pressable

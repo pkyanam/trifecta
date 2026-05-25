@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/purity */
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -6,15 +7,11 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
-  TextInput,
 } from "react-native";
 import { SymbolImage } from "@/components/symbol-image";
 import { useWsClient } from "@/stores/ws-client";
 import { cn } from "@/utils/tailwind";
-import Animated, { FadeIn, FadeOut, SlideInUp, SlideOutDown } from "react-native-reanimated";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
-
-const GLASS = isLiquidGlassAvailable();
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 interface GitActionsSheetProps {
   visible: boolean;
@@ -47,17 +44,9 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [commitMessage, setCommitMessage] = useState("");
-  const [showCommitEditor, setShowCommitEditor] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [toast, setToast] = useState<{ title: string; detail?: string; success: boolean } | null>(null);
   const [filesExpanded, setFilesExpanded] = useState(false);
-
-  useEffect(() => {
-    if (visible && cwd) {
-      fetchGitStatus();
-    }
-  }, [visible, cwd]);
 
   const fetchGitStatus = async () => {
     setLoading(true);
@@ -73,37 +62,40 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     }
   };
 
+  useEffect(() => {
+    if (visible && cwd) {
+      fetchGitStatus();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, cwd]);
+
   const handlePull = async () => {
     setActionInProgress(true);
     try {
       await request("vcs.pull", { cwd });
       await fetchGitStatus();
-      showToast("Pull successful", undefined, true);
+      showToast("Pull successful", true);
     } catch (err) {
       setError("Pull failed");
-      showToast("Pull failed", err instanceof Error ? err.message : undefined, false);
+      showToast("Pull failed", false, err instanceof Error ? err.message : undefined);
     } finally {
       setActionInProgress(false);
     }
   };
 
   const handleCommit = async () => {
-    if (!commitMessage.trim()) return;
     setActionInProgress(true);
     try {
       await request("git.runStackedAction", {
         actionId: Date.now().toString(),
         cwd,
         action: "commit",
-        commitMessage: commitMessage.trim(),
       });
-      setCommitMessage("");
-      setShowCommitEditor(false);
       await fetchGitStatus();
-      showToast("Commit successful", undefined, true);
+      showToast("Commit successful", true);
     } catch (err) {
       setError("Commit failed");
-      showToast("Commit failed", err instanceof Error ? err.message : undefined, false);
+      showToast("Commit failed", false, err instanceof Error ? err.message : undefined);
     } finally {
       setActionInProgress(false);
     }
@@ -118,16 +110,16 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
         action: "push",
       });
       await fetchGitStatus();
-      showToast("Push successful", undefined, true);
+      showToast("Push successful", true);
     } catch (err) {
       setError("Push failed");
-      showToast("Push failed", err instanceof Error ? err.message : undefined, false);
+      showToast("Push failed", false, err instanceof Error ? err.message : undefined);
     } finally {
       setActionInProgress(false);
     }
   };
 
-  const showToast = (title: string, detail?: string, success: boolean) => {
+  const showToast = (title: string, success: boolean, detail?: string) => {
     setToast({ title, detail, success });
     setTimeout(() => setToast(null), 3000);
   };
@@ -151,8 +143,6 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     return parts.join(" • ");
   };
 
-  const GlassComponent = View;
-
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 justify-end">
@@ -161,8 +151,8 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
 
         {/* Bottom sheet card */}
         <Animated.View
-          entering={FadeIn.duration(150)}
-          exiting={FadeOut.duration(150)}
+          entering={FadeIn}
+          exiting={FadeOut}
           className="w-full"
           style={{ maxHeight: "85%" }}
         >
@@ -300,80 +290,47 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                     )}
 
                     {/* Actions */}
-                    {showCommitEditor ? (
-                      <View className="p-4 bg-muted/30 rounded-xl border border-border/50 space-y-3">
-                        <Text className="text-xs text-muted-foreground font-semibold tracking-wider">COMMIT MESSAGE</Text>
-                        <TextInput
-                          className="min-h-20 p-3 bg-background rounded-lg border border-border text-foreground"
-                          placeholder="Describe these changes…"
-                          placeholderTextColor="#9ca3af"
-                          value={commitMessage}
-                          onChangeText={setCommitMessage}
-                          multiline
-                          textAlignVertical="top"
-                        />
-                        <View className="flex-row gap-2">
-                          <Pressable
-                            onPress={() => { setShowCommitEditor(false); setCommitMessage(""); }}
-                            className="flex-1 py-2.5 rounded-lg border border-border items-center justify-center active:bg-muted/30"
-                          >
-                            <Text className="text-sm font-semibold text-foreground">Cancel</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={handleCommit}
-                            disabled={!commitMessage.trim() || actionInProgress}
-                            className={cn(
-                              "flex-1 py-2.5 rounded-lg bg-accent items-center justify-center",
-                              (!commitMessage.trim() || actionInProgress) && "opacity-50"
-                            )}
-                          >
-                            <Text className="text-sm font-semibold text-background">Commit</Text>
-                          </Pressable>
+                    <View className="flex-row gap-2">
+                      <Pressable
+                        onPress={handlePull}
+                        disabled={!canPull || actionInProgress}
+                        className={cn(
+                          "flex-1 py-3 rounded-lg border border-border items-center justify-center active:bg-muted/30",
+                          (!canPull || actionInProgress) && "opacity-50"
+                        )}
+                      >
+                        <View className="flex-row items-center gap-2">
+                          <SymbolImage name="arrow.down" size={16} className="text-foreground" />
+                          <Text className="text-sm font-semibold text-foreground">Pull</Text>
                         </View>
-                      </View>
-                    ) : (
-                      <View className="flex-row gap-2">
-                        <Pressable
-                          onPress={handlePull}
-                          disabled={!canPull || actionInProgress}
-                          className={cn(
-                            "flex-1 py-3 rounded-lg border border-border items-center justify-center active:bg-muted/30",
-                            (!canPull || actionInProgress) && "opacity-50"
-                          )}
-                        >
-                          <View className="flex-row items-center gap-2">
-                            <SymbolImage name="arrow.down" size={16} className="text-foreground" />
-                            <Text className="text-sm font-semibold text-foreground">Pull</Text>
-                          </View>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => setShowCommitEditor(true)}
-                          disabled={!canCommit || actionInProgress}
-                          className={cn(
-                            "flex-1 py-3 rounded-lg border border-border items-center justify-center active:bg-muted/30",
-                            (!canCommit || actionInProgress) && "opacity-50"
-                          )}
-                        >
-                          <View className="flex-row items-center gap-2">
-                            <SymbolImage name="checkmark.seal" size={16} className="text-foreground" />
-                            <Text className="text-sm font-semibold text-foreground">Commit</Text>
-                          </View>
-                        </Pressable>
-                        <Pressable
-                          onPress={handlePush}
-                          disabled={!canPush || actionInProgress}
-                          className={cn(
-                            "flex-1 py-3 rounded-lg bg-accent items-center justify-center",
-                            (!canPush || actionInProgress) && "opacity-50"
-                          )}
-                        >
-                          <View className="flex-row items-center gap-2">
-                            <SymbolImage name="arrow.up" size={16} className="text-background" />
-                            <Text className="text-sm font-semibold text-background">Push</Text>
-                          </View>
-                        </Pressable>
-                      </View>
-                    )}
+                      </Pressable>
+                      <Pressable
+                        onPress={handleCommit}
+                        disabled={!canCommit || actionInProgress}
+                        className={cn(
+                          "flex-1 py-3 rounded-lg border border-border items-center justify-center active:bg-muted/30",
+                          (!canCommit || actionInProgress) && "opacity-50"
+                        )}
+                      >
+                        <View className="flex-row items-center gap-2">
+                          <SymbolImage name="checkmark.seal" size={16} className="text-foreground" />
+                          <Text className="text-sm font-semibold text-foreground">Commit</Text>
+                        </View>
+                      </Pressable>
+                      <Pressable
+                        onPress={handlePush}
+                        disabled={!canPush || actionInProgress}
+                        className={cn(
+                          "flex-1 py-3 rounded-lg bg-accent items-center justify-center",
+                          (!canPush || actionInProgress) && "opacity-50"
+                        )}
+                      >
+                        <View className="flex-row items-center gap-2">
+                          <SymbolImage name="arrow.up" size={16} className="text-background" />
+                          <Text className="text-sm font-semibold text-background">Push</Text>
+                        </View>
+                      </Pressable>
+                    </View>
 
                     {/* Toast */}
                     {toast && (

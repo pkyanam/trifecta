@@ -3,7 +3,6 @@ import React, {
   createContext,
   use,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import { useWsClient } from "./ws-client";
@@ -30,8 +29,6 @@ export function ThreadListProvider({ children }: { children: React.ReactNode }) 
   const { subscribe, status } = useWsClient();
   const [projects, setProjects] = useState<ProjectShell[]>([]);
   const [threads, setThreads] = useState<ThreadShell[]>([]);
-  const threadsRef = useRef<ThreadShell[]>([]);
-  const projectsRef = useRef<ProjectShell[]>([]);
 
   useEffect(() => {
     if (status !== "connected") return;
@@ -50,54 +47,41 @@ export function ThreadListProvider({ children }: { children: React.ReactNode }) 
             const newThreads = sortByRecency(
               (snap.threads as ThreadShell[]) ?? [],
             );
-            projectsRef.current = newProjects;
-            threadsRef.current = newThreads;
             setProjects(newProjects);
             setThreads(newThreads);
             break;
           }
           case "thread-upserted": {
             const thread = item.thread as ThreadShell;
-            const cur = threadsRef.current;
-            const idx = cur.findIndex((t) => t.id === thread.id);
-            const next =
-              idx >= 0
-                ? cur.map((t) => (t.id === thread.id ? thread : t))
-                : [thread, ...cur];
-            const sorted = sortByRecency(next);
-            threadsRef.current = sorted;
-            setThreads(sorted);
+            setThreads((cur) => {
+              const idx = cur.findIndex((t) => t.id === thread.id);
+              const next =
+                idx >= 0
+                  ? cur.map((t) => (t.id === thread.id ? thread : t))
+                  : [thread, ...cur];
+              return sortByRecency(next);
+            });
             break;
           }
           case "thread-removed": {
             const threadId = item.threadId as string;
-            const next = threadsRef.current.filter((t) => t.id !== threadId);
-            threadsRef.current = next;
-            setThreads(next);
+            setThreads((cur) => cur.filter((t) => t.id !== threadId));
             break;
           }
           case "project-upserted": {
             const project = item.project as ProjectShell;
-            const cur = projectsRef.current;
-            const idx = cur.findIndex((p) => p.id === project.id);
-            const next =
-              idx >= 0
+            setProjects((cur) => {
+              const idx = cur.findIndex((p) => p.id === project.id);
+              return idx >= 0
                 ? cur.map((p) => (p.id === project.id ? project : p))
                 : [...cur, project];
-            projectsRef.current = next;
-            setProjects(next);
+            });
             break;
           }
           case "project-removed": {
             const projectId = item.projectId as string;
-            const nextP = projectsRef.current.filter((p) => p.id !== projectId);
-            const nextT = threadsRef.current.filter(
-              (t) => t.projectId !== projectId,
-            );
-            projectsRef.current = nextP;
-            threadsRef.current = nextT;
-            setProjects(nextP);
-            setThreads(nextT);
+            setProjects((cur) => cur.filter((p) => p.id !== projectId));
+            setThreads((cur) => cur.filter((t) => t.projectId !== projectId));
             break;
           }
         }

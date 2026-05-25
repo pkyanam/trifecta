@@ -6,7 +6,6 @@
 import * as Haptics from "expo-haptics";
 import * as React from "react";
 import {
-  InteractionManager,
   Keyboard,
   Pressable,
   useWindowDimensions,
@@ -85,19 +84,6 @@ export function DrawerLayout({
   const callOnOpen = React.useCallback(() => onOpenRef.current(), []);
   const callOnClose = React.useCallback(() => onCloseRef.current(), []);
 
-  const interactionHandleRef = React.useRef<number | null>(null);
-
-  const startInteraction = React.useCallback(() => {
-    interactionHandleRef.current = InteractionManager.createInteractionHandle();
-  }, []);
-
-  const endInteraction = React.useCallback(() => {
-    if (interactionHandleRef.current != null) {
-      InteractionManager.clearInteractionHandle(interactionHandleRef.current);
-      interactionHandleRef.current = null;
-    }
-  }, []);
-
   const touchStartX = useSharedValue(0);
   const touchX = useSharedValue(0);
   const translationX = useSharedValue(open ? 0 : -drawerWidth);
@@ -142,19 +128,17 @@ export function DrawerLayout({
   }, [open, toggleDrawer, openValue]);
 
   const onGestureBegin = React.useCallback(() => {
-    startInteraction();
     Keyboard.dismiss();
-  }, [startInteraction]);
+  }, []);
 
   const onGestureFinish = React.useCallback(
     (nextOpen: boolean) => {
-      endInteraction();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (nextOpen) {
         Keyboard.dismiss();
       }
     },
-    [endInteraction],
+    [],
   );
 
   const pan = React.useMemo(() => {

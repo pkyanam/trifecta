@@ -7,7 +7,7 @@ import { useWsClient } from "@/stores/ws-client";
 
 // Types matching desktop contracts
 
-export type GitStackedAction = "commit" | "push" | "create_pr" | "commit_push" | "commit_push_pr";
+export type GitStackedAction = "commit" | "push" | "pull" | "create_pr" | "commit_push" | "commit_push_pr";
 
 export interface VcsRef {
   name: string;
@@ -29,11 +29,11 @@ export interface VcsStatusLocalResult {
   refName: string | null;
   hasWorkingTreeChanges: boolean;
   workingTree: {
-    files: Array<{
+    files: {
       path: string;
       insertions: number;
       deletions: number;
-    }>;
+    }[];
     insertions: number;
     deletions: number;
   };
@@ -281,7 +281,9 @@ export function useGitService() {
   };
 
   const subscribeVcsStatus = (cwd: string, onEvent: (event: VcsStatusStreamEvent) => void): (() => void) => {
-    return subscribe("subscribeVcsStatus", { cwd }, onEvent);
+    return subscribe("subscribeVcsStatus", { cwd }, (value: unknown) => {
+      onEvent(value as VcsStatusStreamEvent);
+    });
   };
 
   const subscribeGitActionProgress = (
@@ -294,7 +296,9 @@ export function useGitService() {
       actionId,
       cwd,
       action,
-    }, onEvent);
+    }, (value: unknown) => {
+      onEvent(value as GitActionProgressEvent);
+    });
   };
 
   return {

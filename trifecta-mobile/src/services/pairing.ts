@@ -1,4 +1,17 @@
+import { Platform } from "react-native";
+
 export type PairingResult = { bearerToken: string };
+
+// Android emulator uses 10.0.2.2 to access host machine's localhost
+const ANDROID_LOCALHOST_ALIAS = "10.0.2.2";
+
+// Convert localhost to Android emulator alias for network requests
+export function getServerURLForPlatform(url: string): string {
+  if (Platform.OS === "android") {
+    return url.replace(/localhost|127\.0\.0\.1/g, ANDROID_LOCALHOST_ALIAS);
+  }
+  return url;
+}
 
 export function parsePairingURL(raw: string): { serverURL: string; token: string } | null {
   try {
@@ -43,7 +56,8 @@ export function normalizeServerURL(url: URL): string {
 }
 
 export async function fetchEnvironment(serverURL: string): Promise<void> {
-  const res = await fetch(`${serverURL}/.well-known/belweave/environment`);
+  const platformURL = getServerURLForPlatform(serverURL);
+  const res = await fetch(`${platformURL}/.well-known/belweave/environment`);
   if (!res.ok) throw new Error(`Server unreachable (HTTP ${res.status})`);
 }
 
@@ -51,7 +65,8 @@ export async function exchangeToken(
   serverURL: string,
   credential: string,
 ): Promise<PairingResult> {
-  const res = await fetch(`${serverURL}/api/auth/bootstrap/bearer`, {
+  const platformURL = getServerURLForPlatform(serverURL);
+  const res = await fetch(`${platformURL}/api/auth/bootstrap/bearer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ credential }),
@@ -78,7 +93,8 @@ export async function issueWebSocketToken(
   serverURL: string,
   bearerToken: string,
 ): Promise<string> {
-  const res = await fetch(`${serverURL}/api/auth/ws-token`, {
+  const platformURL = getServerURLForPlatform(serverURL);
+  const res = await fetch(`${platformURL}/api/auth/ws-token`, {
     method: "POST",
     headers: { Authorization: `Bearer ${bearerToken}` },
   });

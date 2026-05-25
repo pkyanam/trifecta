@@ -3,6 +3,7 @@ import { useActiveThread } from "@/stores/active-thread";
 import { useThreadList } from "@/stores/thread-list";
 import { useWsClient } from "@/stores/ws-client";
 import { GitActionsSheet } from "./git-actions-sheet";
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from "react";
 import {
   Button,
@@ -19,7 +20,7 @@ import {
   foregroundStyle,
 } from "@expo/ui/swift-ui/modifiers";
 import { Stack, useRouter } from "expo-router";
-import { Alert, useColorScheme, Pressable, Text, View } from "react-native";
+import { Alert, useColorScheme, Pressable, Text } from "react-native";
 import { useDrawer } from "./drawer-content";
 import { SymbolImage } from "@/components/symbol-image";
 
@@ -100,7 +101,6 @@ function HeaderTitleMenu() {
                   foregroundStyle(headerFg),
                   font({ weight: "semibold", size: 17 }),
                 ]}
-                numberOfLines={2}
               >
                 {selectedModelLabel}
               </SUIText>
@@ -138,7 +138,7 @@ function HeaderTitleMenu() {
 export function MainHeader() {
   const { openDrawer } = useDrawer();
   const { serverConfig, request } = useWsClient();
-  const { activeThreadId } = useActiveThread();
+  const { activeThreadId, newChatProjectId } = useActiveThread();
   const { getThread, getProject } = useThreadList();
   const [showGitActions, setShowGitActions] = useState(false);
   const [branchName, setBranchName] = useState("");
@@ -147,9 +147,10 @@ export function MainHeader() {
   // Get the actual thread data using the thread ID
   const activeThread = activeThreadId ? getThread(activeThreadId) : null;
   const project = activeThread?.projectId ? getProject(activeThread.projectId) : null;
+  const newChatProject = newChatProjectId ? getProject(newChatProjectId) : null;
 
-  // Get the correct CWD: thread worktreePath > project workspaceRoot > server cwd
-  const cwd = activeThread?.worktreePath || project?.workspaceRoot || serverConfig?.cwd || "";
+  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project > server cwd
+  const cwd = activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
 
   // Fetch git status whenever the thread changes
   useEffect(() => {

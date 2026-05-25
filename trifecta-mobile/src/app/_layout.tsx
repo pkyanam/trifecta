@@ -17,6 +17,8 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import { BackHandler, Platform } from "react-native";
+import { useEffect } from "react";
 
 import { ModelProvider } from "@/components/model-context";
 import {
@@ -113,6 +115,19 @@ function RootDrawer() {
 function StackLayout() {
   const appForeground = useCSSVariable("--app-foreground") as string;
   const appBackground = useCSSVariable("--app-background") as string;
+
+  // Handle Android back button when there's no screen to go back to
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+      // Always return true to prevent the warning when there's nowhere to go back
+      // The navigation system will handle actual back navigation when possible
+      return true;
+    });
+
+    return () => backHandler.remove();
+  }, []);
 
   return (
     <Stack

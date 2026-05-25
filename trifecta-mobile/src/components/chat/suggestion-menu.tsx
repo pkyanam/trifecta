@@ -43,8 +43,8 @@ export function SuggestionMenu({ items, visible, onSelectItem, loading = false, 
 
   return (
     <Animated.View
-      entering={FadeIn.spring().mass(1).damping(20).stiffness(300)}
-      exiting={FadeOut.duration(150)}
+      entering={FadeIn}
+      exiting={FadeOut}
       className="absolute bottom-full left-0 right-0 mb-2 mx-2"
       style={{ zIndex: 100 }}
     >

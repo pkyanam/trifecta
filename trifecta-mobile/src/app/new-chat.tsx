@@ -1,11 +1,12 @@
 import { AndroidGrabber } from "@/components/grabber";
+import { useDrawer } from "@/components/drawer-content";
 import { useActiveThread } from "@/stores/active-thread";
 import { useThreadList } from "@/stores/thread-list";
 import type { ProjectShell } from "@/types/thread";
 import { projectDisplayName, projectDisplayPath } from "@/utils/projects";
 import { useRouter } from "expo-router";
 import { FolderOpen } from "lucide-react-native";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 
 function ProjectRow({
   project,
@@ -43,13 +44,18 @@ export default function NewChatSheet() {
   const { projects } = useThreadList();
   const { startNewChat } = useActiveThread();
   const router = useRouter();
+  const { closeDrawer } = useDrawer();
 
   function handleSelectProject(project: ProjectShell) {
     startNewChat(project.id);
     // Close the sheet first
     router.back();
-    // Then navigate to main page to close sidebar and show chat interface
-    router.replace("/");
+    
+    // On iOS, close the drawer and navigate to main screen
+    if (Platform.OS === "ios") {
+      closeDrawer();
+      router.replace("/");
+    }
   }
 
   return (

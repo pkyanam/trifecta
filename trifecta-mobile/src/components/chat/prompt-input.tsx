@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { SymbolImage } from "@/components/symbol-image";
 import { TouchableGlass } from "@/components/touchable-glass";
 import {
@@ -5,7 +6,7 @@ import {
   GlassView,
   isLiquidGlassAvailable,
 } from "expo-glass-effect";
-import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
@@ -17,7 +18,8 @@ import { SuggestionMenu, type SuggestionItem, type SuggestionType } from "./sugg
 import { detectTrigger, replaceRange, ComposerTriggerKind } from "@/utils/composer-triggers";
 import { useProjectSearch } from "@/services/project-search";
 import { useWsClient } from "@/stores/ws-client";
-import { useRouter } from "expo-router";
+import { useActiveThread } from "@/stores/active-thread";
+import { useThreadList } from "@/stores/thread-list";
 import { ModelPicker } from "@/components/model-picker";
 
 const AnimatedGlassContainer = Animated.createAnimatedComponent(GlassContainer);
@@ -32,7 +34,16 @@ export function PromptInput({ children }: { children: ReactNode }) {
   const { error, input, cursorPosition, setInput, setCursorPosition } = useChatContext();
   const { serverConfig } = useWsClient();
   const { search: searchProjectEntries } = useProjectSearch();
-  const router = useRouter();
+  const { activeThreadId, newChatProjectId } = useActiveThread();
+  const { getThread, getProject } = useThreadList();
+
+  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project > server cwd
+  const cwd = useMemo(() => {
+    const activeThread = activeThreadId ? getThread(activeThreadId) : null;
+    const project = activeThread?.projectId ? getProject(activeThread.projectId) : null;
+    const newChatProject = newChatProjectId ? getProject(newChatProjectId) : null;
+    return activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
+  }, [activeThreadId, newChatProjectId, getThread, getProject, serverConfig?.cwd]);
   
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -41,7 +52,7 @@ export function PromptInput({ children }: { children: ReactNode }) {
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-  const [suggestionType, setSuggestionType] = useState<SuggestionType | null>(null);
+  const [suggestionType, setSuggestionType] = useState<SuggestionType | undefined>(undefined);
 
   // Debounced project search for @ mentions
   useEffect(() => {
@@ -54,14 +65,14 @@ export function PromptInput({ children }: { children: ReactNode }) {
     }
 
     searchTimeoutRef.current = setTimeout(async () => {
-      if (!serverConfig?.cwd) return;
+      if (!cwd) return;
       
       setLoadingSuggestions(true);
       setSuggestionType("mention");
       
       try {
         const result = await searchProjectEntries({
-          cwd: serverConfig.cwd,
+          cwd: cwd,
           query: searchQuery,
           limit: 50,
         });
@@ -87,7 +98,15 @@ export function PromptInput({ children }: { children: ReactNode }) {
         setShowSuggestions(items.length > 0);
       } catch (error) {
         console.error("Project search failed:", error);
-        setShowSuggestions(false);
+        // Show error state in suggestions
+        setSuggestions([{
+          id: "error",
+          title: "Connection Error",
+          subtitle: "Unable to search files. Check your connection.",
+          icon: "exclamationmark.triangle",
+          type: "file",
+        }]);
+        setShowSuggestions(true);
       } finally {
         setLoadingSuggestions(false);
       }
@@ -98,7 +117,7 @@ export function PromptInput({ children }: { children: ReactNode }) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchQuery, serverConfig?.cwd, input, cursorPosition, searchProjectEntries]);
+  }, [searchQuery, cwd, input, cursorPosition, searchProjectEntries, activeThreadId, getThread, getProject]);
 
   // Detect triggers and update suggestions
   useEffect(() => {
@@ -174,7 +193,7 @@ export function PromptInput({ children }: { children: ReactNode }) {
       const allCommands = [...builtInCommands, ...providerCommands];
       const filtered = allCommands.filter(cmd => 
         cmd.title.toLowerCase().includes(query) || 
-        cmd.subtitle.toLowerCase().includes(query)
+        (cmd.subtitle && cmd.subtitle.toLowerCase().includes(query))
       );
       
       setSuggestions(filtered);
@@ -218,7 +237,7 @@ export function PromptInput({ children }: { children: ReactNode }) {
       setShowSuggestions(skills.length > 0);
       setSearchQuery(null);
     }
-  }, [input, cursorPosition]);
+  }, [input, cursorPosition, serverConfig?.providers]);
 
   const handleSelectSuggestion = useCallback((item: SuggestionItem) => {
     if (!currentTrigger) return;
@@ -306,7 +325,7 @@ export function PromptInput({ children }: { children: ReactNode }) {
 
 function PromptInputError({ message }: { message?: string }) {
   return (
-    <Animated.View entering={FadeIn.duration(200)} className="px-3 pb-2">
+    <Animated.View entering={FadeIn} className="px-3 pb-2">
       <View
         className="flex-row items-center gap-2 rounded-xl bg-card px-3 py-2.5 border-continuous"
       >
@@ -418,10 +437,13 @@ export function PromptInputTextarea({
     <TextInput
       ref={inputRef}
       nativeID="composer"
-      cursorColorClassName="tint-foreground"
-      selectionColorClassName="tint-foreground"
-      style={{ fontSize: 16 }}
-      className="flex-1 pl-4 pr-2 py-3 text-foreground max-h-25"
+      style={{
+        fontSize: 16,
+        color: 'var(--app-foreground)'
+      }}
+      cursorColor="#3b82f6"
+      selectionColor="rgba(59, 130, 246, 0.3)"
+      className="flex-1 pl-4 pr-2 py-3 max-h-25"
       value={input}
       onChangeText={setInput}
       onSelectionChange={handleSelectionChange}
@@ -458,7 +480,7 @@ export function PromptInputSubmit() {
     >
       {isGenerating ? (
         <Animated.View entering={FadeIn} exiting={FadeOut}>
-          <ActivityIndicator size="small" colorClassName="tint-foreground" className="text-foreground" />
+          <ActivityIndicator size="small" colorClassName="text-foreground" className="text-foreground" />
         </Animated.View>
       ) : (
           <SymbolImage

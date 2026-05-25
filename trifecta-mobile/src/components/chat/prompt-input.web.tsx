@@ -126,7 +126,7 @@ export function PromptInputTextarea({
       value={input}
       onChangeText={setInput}
       placeholder={placeholder}
-      placeholderTextColorClassName="tint-muted-foreground"
+      placeholderTextColorClassName="text-muted-foreground"
       multiline
       maxLength={maxLength}
       onKeyPress={(e) => {
