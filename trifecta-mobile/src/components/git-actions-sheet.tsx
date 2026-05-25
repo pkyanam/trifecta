@@ -71,7 +71,10 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handlePull = async () => {
     setActionInProgress(true);
     try {
-      await git.pull(cwd);
+      git.pull(cwd).catch(err => {
+        console.error("[GitActionsSheet] Pull error (non-blocking):", err);
+      });
+      await new Promise(resolve => setTimeout(resolve, 2000));
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Pull successful", true);
@@ -88,8 +91,14 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     setActionInProgress(true);
     try {
       console.log("[GitActionsSheet] Running stacked action");
-      await git.runStackedAction(Date.now().toString(), cwd, "commit");
-      console.log("[GitActionsSheet] Stacked action completed, refreshing status");
+      // Fire the action but don't wait for it - the WebSocket subscription will update status
+      git.runStackedAction(Date.now().toString(), cwd, "commit").catch(err => {
+        console.error("[GitActionsSheet] Action error (non-blocking):", err);
+      });
+      
+      // Wait a bit for the action to complete, then refresh status
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log("[GitActionsSheet] Refreshing status after delay");
       const newStatus = await git.refreshStatus(cwd);
       console.log("[GitActionsSheet] After commit - status:", newStatus);
       console.log("[GitActionsSheet] canPush check:", {
@@ -114,7 +123,10 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handlePush = async () => {
     setActionInProgress(true);
     try {
-      await git.runStackedAction(Date.now().toString(), cwd, "push");
+      git.runStackedAction(Date.now().toString(), cwd, "push").catch(err => {
+        console.error("[GitActionsSheet] Push error (non-blocking):", err);
+      });
+      await new Promise(resolve => setTimeout(resolve, 2000));
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Push successful", true);
@@ -129,7 +141,10 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handleCommitPush = async () => {
     setActionInProgress(true);
     try {
-      await git.runStackedAction(Date.now().toString(), cwd, "commit_push");
+      git.runStackedAction(Date.now().toString(), cwd, "commit_push").catch(err => {
+        console.error("[GitActionsSheet] CommitPush error (non-blocking):", err);
+      });
+      await new Promise(resolve => setTimeout(resolve, 3000));
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Commit & push successful", true);
@@ -144,7 +159,10 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handleCommitPushPr = async () => {
     setActionInProgress(true);
     try {
-      await git.runStackedAction(Date.now().toString(), cwd, "commit_push_pr");
+      git.runStackedAction(Date.now().toString(), cwd, "commit_push_pr").catch(err => {
+        console.error("[GitActionsSheet] CommitPushPr error (non-blocking):", err);
+      });
+      await new Promise(resolve => setTimeout(resolve, 3000));
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Commit, push & PR successful", true);
@@ -159,7 +177,10 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handlePushPr = async () => {
     setActionInProgress(true);
     try {
-      await git.runStackedAction(Date.now().toString(), cwd, "create_pr");
+      git.runStackedAction(Date.now().toString(), cwd, "create_pr").catch(err => {
+        console.error("[GitActionsSheet] PushPr error (non-blocking):", err);
+      });
+      await new Promise(resolve => setTimeout(resolve, 3000));
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Push & create PR successful", true);
