@@ -26,6 +26,8 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
+  const [switchingBranch, setSwitchingBranch] = useState(false);
+  const [switchingBranchName, setSwitchingBranchName] = useState<string | null>(null);
   const [toast, setToast] = useState<{ title: string; detail?: string; success: boolean } | null>(null);
   const [filesExpanded, setFilesExpanded] = useState(false);
   const [showBranchSelector, setShowBranchSelector] = useState(false);
@@ -61,7 +63,8 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
       return;
     }
     
-    setActionInProgress(true);
+    setSwitchingBranch(true);
+    setSwitchingBranchName(refName);
     try {
       const result = await git.switchRef(cwd, refName);
       const newStatus = await git.refreshStatus(cwd);
@@ -89,7 +92,8 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
         showToast("Branch switch failed", false, errorMessage);
       }
     } finally {
-      setActionInProgress(false);
+      setSwitchingBranch(false);
+      setSwitchingBranchName(null);
     }
   };
 
@@ -641,11 +645,11 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                           <Pressable
                             key={branch.name}
                             onPress={() => handleSwitchBranch(branch.name)}
-                            disabled={actionInProgress}
+                            disabled={switchingBranch}
                             className={cn(
                               "flex-row items-center justify-between px-4 py-3 rounded-lg border border-border active:bg-muted/30",
                               branch.current && "bg-muted/50 border-muted-foreground/30",
-                              actionInProgress && "opacity-50"
+                              switchingBranch && "opacity-50"
                             )}
                           >
                             <View className="flex-row items-center gap-3">
@@ -659,6 +663,9 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                                 <View className="px-2 py-0.5 bg-muted rounded-full">
                                   <Text className="text-xs text-muted-foreground">default</Text>
                                 </View>
+                              )}
+                              {switchingBranch && branch.name === switchingBranchName && (
+                                <ActivityIndicator size="small" className="text-foreground" />
                               )}
                             </View>
                           </Pressable>

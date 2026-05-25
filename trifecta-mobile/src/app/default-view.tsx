@@ -1,11 +1,13 @@
 import { MainHeader } from "@/components/main-header";
 import { useConnection } from "@/stores/connection";
+import { useWsClient } from "@/stores/ws-client";
 import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Text, View, useColorScheme, Platform } from "react-native";
 
 export default function DefaultView() {
   const { isPaired, isLoading } = useConnection();
+  const { status } = useWsClient();
   const [mounted, setMounted] = useState(false);
   const colorScheme = useColorScheme();
 
@@ -16,6 +18,9 @@ export default function DefaultView() {
   if (isLoading) return null;
   if (!isPaired) return <Redirect href="/pair" />;
   if (!mounted) return null;
+  
+  // Don't show welcome screen if we're just reconnecting
+  // Only redirect to pair if not paired, not if WebSocket is temporarily disconnected
 
   // Platform-specific arrow positioning
   const isAndroid = Platform.OS === "android";
