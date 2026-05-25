@@ -101,12 +101,44 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
     }
   };
 
+  // git.runStackedAction is a STREAMING RPC; calling it as a single-response
+  // request hangs forever. Subscribe to the progress stream and resolve when
+  // we see action_finished or action_failed.
+  const runAction = (
+    action: GitStackedAction,
+    options?: { commitMessage?: string; featureBranch?: boolean; filePaths?: string[] },
+  ): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const actionId = `${action}-${Date.now()}`;
+      let unsubscribe: (() => void) | null = null;
+      const cleanup = () => {
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = null;
+        }
+      };
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, 30000);
+      unsubscribe = git.subscribeGitActionProgress(actionId, cwd, action, (event) => {
+        if (event.kind === "action_finished") {
+          clearTimeout(timeout);
+          cleanup();
+          resolve();
+        } else if (event.kind === "action_failed") {
+          clearTimeout(timeout);
+          cleanup();
+          reject(new Error(event.message ?? `${action} failed`));
+        }
+      }, options);
+    });
+  };
+
   const handleCommit = async () => {
     setActionInProgress("commit");
-    
-    const actionId = `commit-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "commit");
+      await runAction("commit");
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Commit successful", true);
@@ -121,9 +153,8 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
   const handlePush = async () => {
     if (!status?.refName) return;
     setActionInProgress("push");
-    const actionId = `push-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "push");
+      await runAction("push");
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Push successful", true);
@@ -138,10 +169,8 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
   const handleCommitPush = async () => {
     if (!status?.refName) return;
     setActionInProgress("commit_push");
-    
-    const actionId = `commit-push-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "commit_push");
+      await runAction("commit_push");
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Commit & push successful", true);
@@ -193,10 +222,8 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
     if (!prTitle.trim() || !status?.refName) return;
     setActionInProgress("create_pr");
     setShowPRDialog(false);
-    
-    const actionId = `pr-${Date.now()}`;
     try {
-      await git.runStackedAction(actionId, cwd, "commit_push_pr", {
+      await runAction("commit_push_pr", {
         commitMessage: prTitle.trim(),
         featureBranch: true,
       });

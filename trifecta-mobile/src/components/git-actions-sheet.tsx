@@ -9,7 +9,7 @@ import {
   Modal,
 } from "react-native";
 import { SymbolImage } from "@/components/symbol-image";
-import { useGitService, type VcsStatusResult } from "@/services/git";
+import { useGitService, type VcsStatusResult, type GitStackedAction } from "@/services/git";
 import { cn } from "@/utils/tailwind";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
@@ -68,13 +68,44 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
     return () => unsubscribe();
   }, [visible, cwd, git]);
 
+  // git.runStackedAction is a STREAMING RPC; calling it as a single-response
+  // request hangs forever. Subscribe to the progress stream and resolve when
+  // we see action_finished or action_failed.
+  const runAction = (action: GitStackedAction): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const actionId = `${action}-${Date.now()}`;
+      let unsubscribe: (() => void) | null = null;
+      const cleanup = () => {
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = null;
+        }
+      };
+      // Safety timeout in case the stream never sends a terminal event
+      const timeout = setTimeout(() => {
+        console.warn("[GitActionsSheet] Action timed out:", action);
+        cleanup();
+        resolve();
+      }, 30000);
+      unsubscribe = git.subscribeGitActionProgress(actionId, cwd, action, (event) => {
+        console.log("[GitActionsSheet] Progress event:", event.kind, event.phase ?? "");
+        if (event.kind === "action_finished") {
+          clearTimeout(timeout);
+          cleanup();
+          resolve();
+        } else if (event.kind === "action_failed") {
+          clearTimeout(timeout);
+          cleanup();
+          reject(new Error(event.message ?? `${action} failed`));
+        }
+      });
+    });
+  };
+
   const handlePull = async () => {
     setActionInProgress(true);
     try {
-      git.pull(cwd).catch(err => {
-        console.error("[GitActionsSheet] Pull error (non-blocking):", err);
-      });
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await git.pull(cwd);
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Pull successful", true);
@@ -87,26 +118,16 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   };
 
   const handleCommit = async () => {
-    console.log("[GitActionsSheet] handleCommit called");
     setActionInProgress(true);
     try {
-      console.log("[GitActionsSheet] Running stacked action");
-      // Fire the action but don't wait for it - the WebSocket subscription will update status
-      git.runStackedAction(Date.now().toString(), cwd, "commit").catch(err => {
-        console.error("[GitActionsSheet] Action error (non-blocking):", err);
-      });
-      
-      // Wait a bit for the action to complete, then clear actionInProgress
-      // The WebSocket subscription will handle updating the status
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      console.log("[GitActionsSheet] Clearing actionInProgress after 3s");
+      await runAction("commit");
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
       showToast("Commit successful", true);
     } catch (err) {
-      console.error("[GitActionsSheet] Commit error:", err);
       setError("Commit failed");
       showToast("Commit failed", false, err instanceof Error ? err.message : undefined);
     } finally {
-      console.log("[GitActionsSheet] Setting actionInProgress to false");
       setActionInProgress(false);
     }
   };
@@ -114,10 +135,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handlePush = async () => {
     setActionInProgress(true);
     try {
-      git.runStackedAction(Date.now().toString(), cwd, "push").catch(err => {
-        console.error("[GitActionsSheet] Push error (non-blocking):", err);
-      });
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await runAction("push");
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Push successful", true);
@@ -132,10 +150,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handleCommitPush = async () => {
     setActionInProgress(true);
     try {
-      git.runStackedAction(Date.now().toString(), cwd, "commit_push").catch(err => {
-        console.error("[GitActionsSheet] CommitPush error (non-blocking):", err);
-      });
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await runAction("commit_push");
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Commit & push successful", true);
@@ -150,10 +165,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handleCommitPushPr = async () => {
     setActionInProgress(true);
     try {
-      git.runStackedAction(Date.now().toString(), cwd, "commit_push_pr").catch(err => {
-        console.error("[GitActionsSheet] CommitPushPr error (non-blocking):", err);
-      });
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await runAction("commit_push_pr");
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Commit, push & PR successful", true);
@@ -168,10 +180,7 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const handlePushPr = async () => {
     setActionInProgress(true);
     try {
-      git.runStackedAction(Date.now().toString(), cwd, "create_pr").catch(err => {
-        console.error("[GitActionsSheet] PushPr error (non-blocking):", err);
-      });
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await runAction("create_pr");
       const newStatus = await git.refreshStatus(cwd);
       setStatus(newStatus);
       showToast("Push & create PR successful", true);
@@ -194,17 +203,6 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   const isDefaultRef = status?.isDefaultRef ?? false;
   const hasOpenPr = status?.pr?.state === "open";
   const hasDefaultBranchDelta = (status?.aheadOfDefaultCount ?? status?.aheadCount ?? 0) > 0;
-  
-  // Debug logging
-  console.log("[GitActionsSheet] Button state check:", {
-    canPush,
-    canCommit,
-    canPull,
-    isDefaultRef,
-    hasOpenPr,
-    hasDefaultBranchDelta,
-    status: status
-  });
   
   // Determine if we should show PR options instead of push
   const shouldShowPrOptions = !isDefaultRef && !hasOpenPr && hasDefaultBranchDelta && !status?.hasWorkingTreeChanges && canPush;

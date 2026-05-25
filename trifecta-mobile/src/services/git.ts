@@ -291,11 +291,19 @@ export function useGitService() {
     cwd: string,
     action: GitStackedAction,
     onEvent: (event: GitActionProgressEvent) => void,
+    options?: {
+      commitMessage?: string;
+      featureBranch?: boolean;
+      filePaths?: string[];
+    },
   ): (() => void) => {
     return subscribe("git.runStackedAction", {
       actionId,
       cwd,
       action,
+      commitMessage: options?.commitMessage,
+      featureBranch: options?.featureBranch,
+      filePaths: options?.filePaths,
     }, (value: unknown) => {
       onEvent(value as GitActionProgressEvent);
     });
