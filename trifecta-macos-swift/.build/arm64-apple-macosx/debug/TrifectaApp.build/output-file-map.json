@@ -1,0 +1,68 @@
+{
+  "": {
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/master.swiftdeps"
+  },
+  "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ConnectionStatusView.swift": {
+    "dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ConnectionStatusView.d",
+    "object": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ConnectionStatusView.swift.o",
+    "swiftmodule": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ConnectionStatusView~partial.swiftmodule",
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ConnectionStatusView.swiftdeps",
+    "diagnostics": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ConnectionStatusView.dia"
+  },
+  "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ContentView.swift": {
+    "dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ContentView.d",
+    "object": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ContentView.swift.o",
+    "swiftmodule": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ContentView.swiftdeps",
+    "diagnostics": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ContentView.dia"
+  },
+  "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/EnvironmentListView.swift": {
+    "dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/EnvironmentListView.d",
+    "object": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/EnvironmentListView.swift.o",
+    "swiftmodule": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/EnvironmentListView~partial.swiftmodule",
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/EnvironmentListView.swiftdeps",
+    "diagnostics": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/EnvironmentListView.dia"
+  },
+  "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/PairingFlowView.swift": {
+    "dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/PairingFlowView.d",
+    "object": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/PairingFlowView.swift.o",
+    "swiftmodule": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/PairingFlowView~partial.swiftmodule",
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/PairingFlowView.swiftdeps",
+    "diagnostics": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/PairingFlowView.dia"
+  },
+  "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ProjectThreadSidebarView.swift": {
+    "dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ProjectThreadSidebarView.d",
+    "object": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ProjectThreadSidebarView.swift.o",
+    "swiftmodule": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ProjectThreadSidebarView~partial.swiftmodule",
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ProjectThreadSidebarView.swiftdeps",
+    "diagnostics": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ProjectThreadSidebarView.dia"
+  },
+  "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ThreadDetailView.swift": {
+    "dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ThreadDetailView.d",
+    "object": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ThreadDetailView.swift.o",
+    "swiftmodule": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ThreadDetailView~partial.swiftmodule",
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ThreadDetailView.swiftdeps",
+    "diagnostics": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ThreadDetailView.dia"
+  },
+  "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/TrifectaApp.swift": {
+    "dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/TrifectaApp.d",
+    "object": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/TrifectaApp.swift.o",
+    "swiftmodule": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/TrifectaApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/TrifectaApp.swiftdeps",
+    "diagnostics": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/TrifectaApp.dia"
+  },
+  "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/UnifiedSidebarView.swift": {
+    "dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/UnifiedSidebarView.d",
+    "object": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/UnifiedSidebarView.swift.o",
+    "swiftmodule": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/UnifiedSidebarView~partial.swiftmodule",
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/UnifiedSidebarView.swiftdeps",
+    "diagnostics": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/UnifiedSidebarView.dia"
+  },
+  "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ViewModifiers.swift": {
+    "dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ViewModifiers.d",
+    "object": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ViewModifiers.swift.o",
+    "swiftmodule": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ViewModifiers~partial.swiftmodule",
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ViewModifiers.swiftdeps",
+    "diagnostics": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ViewModifiers.dia"
+  }
+}

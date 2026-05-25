@@ -1,0 +1,1238 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.TrifectaApp-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/sources",
+      "importPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ConnectionStatusView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ContentView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/EnvironmentListView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/PairingFlowView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ProjectThreadSidebarView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ThreadDetailView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/TrifectaApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/UnifiedSidebarView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ViewModifiers.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaProtocol.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaCore.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "TrifectaApp",
+      "moduleOutputPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaApp.swiftmodule",
+      "objects" : [
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ConnectionStatusView.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ContentView.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/EnvironmentListView.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/PairingFlowView.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ProjectThreadSidebarView.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ThreadDetailView.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/TrifectaApp.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/UnifiedSidebarView.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ViewModifiers.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "TrifectaApp_main",
+        "-color-diagnostics",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "trifecta_macos_swift"
+      ],
+      "outputFileMapPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ConnectionStatusView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ContentView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/EnvironmentListView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/PairingFlowView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ProjectThreadSidebarView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ThreadDetailView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/TrifectaApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/UnifiedSidebarView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ViewModifiers.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaApp.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ConnectionStatusView.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ContentView.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/EnvironmentListView.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/PairingFlowView.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ProjectThreadSidebarView.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ThreadDetailView.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/TrifectaApp.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/UnifiedSidebarView.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ViewModifiers.swift"
+      ],
+      "tempsPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.TrifectaConformance-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/sources",
+      "importPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaConformance/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaProtocol.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "TrifectaConformance",
+      "moduleOutputPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaConformance.swiftmodule",
+      "objects" : [
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "TrifectaConformance_main",
+        "-color-diagnostics",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "trifecta_macos_swift"
+      ],
+      "outputFileMapPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaConformance.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaConformance/main.swift"
+      ],
+      "tempsPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.TrifectaCore-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/sources",
+      "importPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ConnectionStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/SavedEnvironment.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ShellStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ThreadDetailStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaProtocol.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "TrifectaCore",
+      "moduleOutputPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaCore.swiftmodule",
+      "objects" : [
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/ConnectionStore.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/SavedEnvironment.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/ShellStore.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/ThreadDetailStore.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/include/TrifectaCore-Swift.h",
+        "-color-diagnostics",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "trifecta_macos_swift"
+      ],
+      "outputFileMapPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/ConnectionStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/SavedEnvironment.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/ShellStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/ThreadDetailStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaCore.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ConnectionStore.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/SavedEnvironment.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ShellStore.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ThreadDetailStore.swift"
+      ],
+      "tempsPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.TrifectaProtocol-arm64-apple-macosx26.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/sources",
+      "importPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/Auth.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/Orchestration.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/ServerConfig.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Pairing/KeychainStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Pairing/PairingClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/JSONValue.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/RpcMessages.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/RpcTransport.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "TrifectaProtocol",
+      "moduleOutputPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaProtocol.swiftmodule",
+      "objects" : [
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/Auth.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/Orchestration.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/ServerConfig.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/KeychainStore.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/PairingClient.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/JSONValue.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/RpcMessages.swift.o",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/RpcTransport.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/include/TrifectaProtocol-Swift.h",
+        "-color-diagnostics",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "trifecta_macos_swift"
+      ],
+      "outputFileMapPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/Auth.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/Orchestration.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/ServerConfig.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/KeychainStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/PairingClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/JSONValue.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/RpcMessages.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/RpcTransport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules/TrifectaProtocol.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/Auth.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/Orchestration.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/ServerConfig.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Pairing/KeychainStore.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Pairing/PairingClient.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/JSONValue.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/RpcMessages.swift",
+        "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/RpcTransport.swift"
+      ],
+      "tempsPath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "TrifectaApp" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "TrifectaApp",
+      "-package-name",
+      "trifecta_macos_swift",
+      "-c",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ConnectionStatusView.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ContentView.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/EnvironmentListView.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/PairingFlowView.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ProjectThreadSidebarView.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ThreadDetailView.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/TrifectaApp.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/UnifiedSidebarView.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ViewModifiers.swift",
+      "-I",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "TrifectaApp_main",
+      "-color-diagnostics",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "trifecta_macos_swift",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "TrifectaConformance" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "TrifectaConformance",
+      "-package-name",
+      "trifecta_macos_swift",
+      "-c",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaConformance/main.swift",
+      "-I",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "TrifectaConformance_main",
+      "-color-diagnostics",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "trifecta_macos_swift",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "TrifectaCore" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "TrifectaCore",
+      "-package-name",
+      "trifecta_macos_swift",
+      "-c",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ConnectionStore.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/SavedEnvironment.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ShellStore.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ThreadDetailStore.swift",
+      "-I",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/include/TrifectaCore-Swift.h",
+      "-color-diagnostics",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "trifecta_macos_swift",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "TrifectaProtocol" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "TrifectaProtocol",
+      "-package-name",
+      "trifecta_macos_swift",
+      "-c",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/Auth.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/Orchestration.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/ServerConfig.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Pairing/KeychainStore.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Pairing/PairingClient.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/JSONValue.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/RpcMessages.swift",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/RpcTransport.swift",
+      "-I",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/include/TrifectaProtocol-Swift.h",
+      "-color-diagnostics",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "trifecta_macos_swift",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "TrifectaApp" : [
+      "TrifectaCore",
+      "TrifectaProtocol"
+    ],
+    "TrifectaConformance" : [
+      "TrifectaProtocol"
+    ],
+    "TrifectaCore" : [
+      "TrifectaProtocol"
+    ],
+    "TrifectaProtocol" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp-entitlement.plist"
+    },
+    "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ConnectionStatusView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ContentView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/EnvironmentListView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/PairingFlowView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ProjectThreadSidebarView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ThreadDetailView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/TrifectaApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/UnifiedSidebarView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaApp/ViewModifiers.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/sources"
+    },
+    "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ConnectionStatusView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ContentView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/EnvironmentListView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/PairingFlowView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ProjectThreadSidebarView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ThreadDetailView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/TrifectaApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/UnifiedSidebarView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.build/ViewModifiers.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/ConnectionStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/SavedEnvironment.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/ShellStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/ThreadDetailStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/Auth.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/JSONValue.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/KeychainStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/Orchestration.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/PairingClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/RpcMessages.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/RpcTransport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/ServerConfig.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaApp.product/Objects.LinkFileList"
+    },
+    "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance-entitlement.plist"
+    },
+    "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaConformance/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/sources"
+    },
+    "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/Auth.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/JSONValue.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/KeychainStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/Orchestration.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/PairingClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/RpcMessages.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/RpcTransport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/ServerConfig.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.product/Objects.LinkFileList"
+    },
+    "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ConnectionStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/SavedEnvironment.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ShellStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaCore/ThreadDetailStore.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/sources"
+    },
+    "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/Auth.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/Orchestration.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/ServerConfig.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Pairing/KeychainStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Pairing/PairingClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/JSONValue.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/RpcMessages.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/RpcTransport.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/sources"
+    },
+    "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}

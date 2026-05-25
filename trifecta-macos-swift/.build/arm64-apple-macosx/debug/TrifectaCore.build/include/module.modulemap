@@ -1,0 +1,3 @@
+module TrifectaCore {
+    header "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaCore.build/include/TrifectaCore-Swift.h"
+}

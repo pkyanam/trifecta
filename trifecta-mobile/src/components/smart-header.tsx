@@ -100,12 +100,7 @@ export function SmartHeader({ onMenuPress }: SmartHeaderProps) {
               onPress={() => setShowGitActions(true)}
               className="flex-row items-center gap-1.5 px-2 py-1 rounded-md active:bg-muted/50"
             >
-              <View
-                className={cn(
-                  "w-2 h-2 rounded-full",
-                  hasChanges ? "bg-orange-500" : "bg-foreground/40"
-                )}
-              />
+              <SymbolImage name="arrow.triangle.2.circlepath" size={16} className="text-foreground" />
               <Text className="text-sm font-medium text-foreground">Git</Text>
             </Pressable>
           ) : (

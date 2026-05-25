@@ -200,9 +200,9 @@ export function MainHeader() {
             className="flex-row items-center gap-1.5 px-2 py-1 active:opacity-60"
           >
             <SymbolImage
-              name={hasChanges ? "circle.fill" : "arrow.triangle.branch"}
-              size={10}
-              className={hasChanges ? "text-orange-500" : "text-foreground"}
+              name="arrow.triangle.2.circlepath"
+              size={16}
+              className="text-foreground"
             />
             <Text className="text-sm font-medium text-foreground">Git</Text>
           </Pressable>

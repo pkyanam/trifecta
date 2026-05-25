@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/master.swiftdeps"
+  },
+  "/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaConformance/main.swift": {
+    "dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/main.d",
+    "object": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/main.swift.o",
+    "swiftmodule": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/main.swiftdeps",
+    "diagnostics": "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaConformance.build/main.dia"
+  }
+}

@@ -164,7 +164,41 @@ class WsRpcClient {
           if (exit._tag === "Success") {
             pend.resolve(exit.value);
           } else {
-            pend.reject(new Error("RPC request failed"));
+            // Include error details in the rejection
+            let errorMessage = "RPC request failed";
+            
+            // Handle nested error structure from Effect
+            if (exit.cause && Array.isArray(exit.cause) && exit.cause.length > 0) {
+              const cause = exit.cause[0] as Record<string, unknown>;
+              if (cause.error && typeof cause.error === "object") {
+                const errorObj = cause.error as Record<string, unknown>;
+                if (typeof errorObj.detail === "string") {
+                  errorMessage = errorObj.detail;
+                } else if (typeof errorObj.message === "string") {
+                  errorMessage = errorObj.message;
+                } else {
+                  errorMessage = JSON.stringify(errorObj);
+                }
+              }
+            } else if (exit.error) {
+              if (typeof exit.error === "string") {
+                errorMessage = exit.error;
+              } else if (exit.error instanceof Error) {
+                errorMessage = exit.error.message;
+              } else if (typeof exit.error === "object" && exit.error !== null) {
+                // Try to extract message from error object
+                const errorObj = exit.error as Record<string, unknown>;
+                if (typeof errorObj.message === "string") {
+                  errorMessage = errorObj.message;
+                } else if (typeof errorObj.detail === "string") {
+                  errorMessage = errorObj.detail;
+                } else {
+                  errorMessage = JSON.stringify(errorObj);
+                }
+              }
+            }
+            
+            pend.reject(new Error(errorMessage));
           }
         }
         // streams: exit means the subscription ended (shouldn't happen for long-lived subs)

@@ -1,0 +1,8 @@
+/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/Auth.swift
+/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/Orchestration.swift
+/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Contracts/ServerConfig.swift
+/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Pairing/KeychainStore.swift
+/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/Pairing/PairingClient.swift
+/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/JSONValue.swift
+/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/RpcMessages.swift
+/Users/preetham/projects/trifecta/trifecta-macos-swift/Sources/TrifectaProtocol/RPC/RpcTransport.swift
