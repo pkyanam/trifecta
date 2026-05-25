@@ -84,9 +84,12 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
   };
 
   const handleCommit = async () => {
+    console.log("[GitActionsSheet] handleCommit called");
     setActionInProgress(true);
     try {
+      console.log("[GitActionsSheet] Running stacked action");
       await git.runStackedAction(Date.now().toString(), cwd, "commit");
+      console.log("[GitActionsSheet] Stacked action completed, refreshing status");
       const newStatus = await git.refreshStatus(cwd);
       console.log("[GitActionsSheet] After commit - status:", newStatus);
       console.log("[GitActionsSheet] canPush check:", {
@@ -99,9 +102,11 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
       setStatus(newStatus);
       showToast("Commit successful", true);
     } catch (err) {
+      console.error("[GitActionsSheet] Commit error:", err);
       setError("Commit failed");
       showToast("Commit failed", false, err instanceof Error ? err.message : undefined);
     } finally {
+      console.log("[GitActionsSheet] Setting actionInProgress to false");
       setActionInProgress(false);
     }
   };
