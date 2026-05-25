@@ -1,18 +1,19 @@
 import { MainHeader } from "@/components/main-header";
 import { useConnection } from "@/stores/connection";
-import { useWsClient } from "@/stores/ws-client";
 import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Text, View, useColorScheme, Platform } from "react-native";
 
 export default function DefaultView() {
   const { isPaired, isLoading } = useConnection();
-  const { status } = useWsClient();
   const [mounted, setMounted] = useState(false);
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   if (isLoading) return null;
