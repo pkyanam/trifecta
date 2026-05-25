@@ -70,7 +70,9 @@ export function GitActionsAdvanced({ visible, onClose, cwd }: GitActionsProps) {
     setLoadingBranches(true);
     try {
       const result = await git.listRefs(cwd);
-      setBranches(result.refs);
+      // Filter to show only local branches, not remote tracking branches
+      const localBranches = result.refs.filter(ref => !ref.isRemote);
+      setBranches(localBranches);
     } catch (error) {
       console.error("Failed to load branches:", error);
     } finally {

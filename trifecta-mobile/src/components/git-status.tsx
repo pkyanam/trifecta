@@ -1,9 +1,9 @@
 import { SymbolImage } from "@/components/symbol-image";
 import { cn } from "@/utils/tailwind";
-import { Pressable, Text } from "react-native";
+import { Pressable, Text, View, Modal, ScrollView, ActivityIndicator } from "react-native";
 import { useEffect, useState } from "react";
 import Animated, { Layout } from "react-native-reanimated";
-import { useGitService, type VcsStatusResult } from "@/services/git";
+import { useGitService, type VcsStatusResult, type VcsRef } from "@/services/git";
 import { GitActionsAdvanced } from "./git-actions-advanced";
 
 interface GitStatusProps {
@@ -16,6 +16,34 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
   const [status, setStatus] = useState<VcsStatusResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [showActions, setShowActions] = useState(false);
+  const [showBranchSelector, setShowBranchSelector] = useState(false);
+  const [branches, setBranches] = useState<VcsRef[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+
+  const loadBranches = async () => {
+    setLoadingBranches(true);
+    try {
+      const result = await git.listRefs(cwd);
+      // Filter to show only local branches, not remote tracking branches
+      const localBranches = result.refs.filter(ref => !ref.isRemote);
+      setBranches(localBranches);
+    } catch (error) {
+      console.error("Failed to load branches:", error);
+    } finally {
+      setLoadingBranches(false);
+    }
+  };
+
+  const handleSwitchBranch = async (refName: string) => {
+    try {
+      await git.switchRef(cwd, refName);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      setShowBranchSelector(false);
+    } catch (error) {
+      console.error("Branch switch failed:", error);
+    }
+  };
 
   useEffect(() => {
     const loadStatus = async () => {
@@ -76,9 +104,18 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
           />
 
           {/* Branch name or loading state */}
-          <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
-            {loading ? "Loading..." : status?.refName || "No git"}
-          </Text>
+          <Pressable
+            onPress={() => {
+              loadBranches();
+              setShowBranchSelector(true);
+            }}
+            disabled={loading}
+            className="flex-1"
+          >
+            <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
+              {loading ? "Loading..." : status?.refName || "No git"}
+            </Text>
+          </Pressable>
 
           {/* Changes count */}
           {status?.hasWorkingTreeChanges && (
@@ -118,6 +155,76 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
         onClose={() => setShowActions(false)}
         cwd={cwd}
       />
+
+      {/* Branch Selector Modal */}
+      <Modal
+        visible={showBranchSelector}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBranchSelector(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/50 items-center justify-center"
+          onPress={() => setShowBranchSelector(false)}
+        >
+          <View className="bg-background rounded-2xl w-11/12 max-h-96 overflow-hidden">
+            <View className="px-4 py-3 border-b border-border">
+              <Text className="text-lg font-semibold text-foreground">Switch Branch</Text>
+            </View>
+            <ScrollView className="flex-1">
+              {loadingBranches ? (
+                <View className="items-center justify-center py-8">
+                  <ActivityIndicator size="small" className="text-foreground" />
+                </View>
+              ) : (
+                branches.map((branch) => (
+                  <Pressable
+                    key={branch.name}
+                    onPress={() => handleSwitchBranch(branch.name)}
+                    disabled={branch.current}
+                    className={cn(
+                      "flex-row items-center gap-3 px-4 py-3 border-b border-border/50",
+                      !branch.current && "active:bg-muted/30",
+                      branch.current && "opacity-50"
+                    )}
+                  >
+                    <View className="w-8 h-8 items-center justify-center bg-muted/50 rounded-full">
+                      <SymbolImage name="branch" size={16} className="text-foreground" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-sm font-medium text-foreground">{branch.name}</Text>
+                    </View>
+                    {branch.current && (
+                      <View className="px-2 py-1 bg-green-500/10 rounded">
+                        <Text className="text-xs text-green-500">Current</Text>
+                      </View>
+                    )}
+                    {branch.isDefault && (
+                      <View className="px-2 py-1 bg-blue-500/10 rounded">
+                        <Text className="text-xs text-blue-500">Default</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                ))
+              )}
+              {branches.length === 0 && !loadingBranches && (
+                <View className="items-center justify-center py-8">
+                  <SymbolImage name="branch" size={32} className="text-muted-foreground mb-2" />
+                  <Text className="text-sm text-muted-foreground">No local branches found</Text>
+                </View>
+              )}
+            </ScrollView>
+            <View className="px-4 py-3 border-t border-border/50">
+              <Pressable
+                onPress={() => setShowBranchSelector(false)}
+                className="bg-muted/50 active:bg-muted rounded-lg px-4 py-2"
+              >
+                <Text className="text-center text-sm font-medium text-foreground">Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </>
   );
 }
