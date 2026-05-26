@@ -312,6 +312,7 @@
     "ip-address": "^10.1.1",
     "path-to-regexp": "^8.4.0",
     "picomatch": "^4.0.4",
+    "qs": "^6.15.2",
     "smol-toml": "^1.6.1",
     "uuid": "^13.0.1",
     "ws": "^8.20.1",
@@ -2107,7 +2108,7 @@
 
     "pure-rand": ["pure-rand@8.1.0", "", {}, "sha512-53B3MB8wetRdD6JZ4W/0gDKaOvKwuXrEmV1auQc0hASWge8rieKV4PCCVNVbJ+i24miiubb4c/B+dg8Ho0ikYw=="],
 
-    "qs": ["qs@6.15.1", "", { "dependencies": { "side-channel": "^1.1.0" } }, "sha512-6YHEFRL9mfgcAvql/XhwTvf5jKcOiiupt2FiJxHkiX1z4j7WL8J/jRHYLluORvc1XxB5rV20KoeK00gVJamspg=="],
+    "qs": ["qs@6.15.2", "", { "dependencies": { "side-channel": "^1.1.0" } }, "sha512-Rzq0KEyX/w/tEybncDgdkZrJgVUsUMk3xjh3t5bv3S1HTAtg+uOYt72+ZfwiQwKdysThkTBdL/rTi6HDmX9Ddw=="],
 
     "quansync": ["quansync@1.0.0", "", {}, "sha512-5xZacEEufv3HSTPQuchrvV6soaiACMFnq1H8wkVioctoH3TRha9Sz66lOxRwPK/qZj7HPiSveih9yAyh98gvqA=="],
 

@@ -71,6 +71,7 @@
     "vitest": "^4.1.7"
   },
   "overrides": {
+    "@anthropic-ai/sdk": "^0.97.1",
     "@effect/atom-react": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@effect/platform-node": "catalog:",
@@ -78,9 +79,8 @@
     "@effect/sql-sqlite-bun": "catalog:",
     "@effect/vitest": "catalog:",
     "astro": "^6.3.1",
-    "@anthropic-ai/sdk": "^0.97.1",
-    "devalue": "^5.8.1",
     "defu": "^6.1.7",
+    "devalue": "^5.8.1",
     "effect": "catalog:",
     "esbuild": "^0.25.0",
     "fast-uri": "^3.1.2",
@@ -88,6 +88,7 @@
     "ip-address": "^10.1.1",
     "path-to-regexp": "^8.4.0",
     "picomatch": "^4.0.4",
+    "qs": "^6.15.2",
     "smol-toml": "^1.6.1",
     "uuid": "^13.0.1",
     "ws": "^8.20.1",
