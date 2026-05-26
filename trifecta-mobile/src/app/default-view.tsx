@@ -10,12 +10,18 @@ export default function DefaultView() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   if (isLoading) return null;
   if (!isPaired) return <Redirect href="/pair" />;
   if (!mounted) return null;
+  
+  // Don't show welcome screen if we're just reconnecting
+  // Only redirect to pair if not paired, not if WebSocket is temporarily disconnected
 
   // Platform-specific arrow positioning
   const isAndroid = Platform.OS === "android";

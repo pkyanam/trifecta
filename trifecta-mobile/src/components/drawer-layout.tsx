@@ -2,6 +2,7 @@
  * Simplified drawer layout forked from react-native-drawer-layout.
  * Only supports "back" type (drawer behind content), left-side, LTR.
  */
+/* eslint-disable react-hooks/immutability, react-hooks/refs -- Reanimated shared values are mutable animation cells. */
 
 import * as Haptics from "expo-haptics";
 import * as React from "react";

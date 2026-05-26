@@ -1623,9 +1623,21 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
         const wantsPr = input.action === "create_pr" || input.action === "commit_push_pr";
 
         // Check if current ref is protected — if so, automatically enable feature branch
-        // for PR actions to avoid pushing directly to protected refs
-        const currentRemoteStatus = yield* remoteStatus({ cwd: input.cwd });
-        const isProtectedRef = currentRemoteStatus?.isProtectedRef === true;
+        // for PR actions to avoid pushing directly to protected refs. Probe branch
+        // protection directly (mirroring readRemoteStatus's guard) instead of the full
+        // remoteStatus lookup, which would also run an unnecessary PR search on every action.
+        const isProtectedRef =
+          wantsPr && initialStatus.branch !== null && initialStatus.hasOriginRemote
+            ? yield* sourceControlProvider(input.cwd).pipe(
+                Effect.flatMap((provider) =>
+                  provider.isBranchProtected({
+                    cwd: input.cwd,
+                    branch: initialStatus.branch as string,
+                  }),
+                ),
+                Effect.catch(() => Effect.succeed(false)),
+              )
+            : false;
         const shouldAutoFeatureBranch = wantsPr && isProtectedRef && !input.featureBranch;
 
         const effectiveInput = shouldAutoFeatureBranch

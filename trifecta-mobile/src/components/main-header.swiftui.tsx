@@ -23,6 +23,7 @@ import { Stack, useRouter } from "expo-router";
 import { Alert, useColorScheme, Pressable, Text } from "react-native";
 import { useDrawer } from "./drawer-content";
 import { SymbolImage } from "@/components/symbol-image";
+import { shouldRestoreGitActions } from "@/utils/git-actions-restore";
 
 function randomId(): string {
   let result = "";
@@ -149,8 +150,24 @@ export function MainHeader() {
   const project = activeThread?.projectId ? getProject(activeThread.projectId) : null;
   const newChatProject = newChatProjectId ? getProject(newChatProjectId) : null;
 
-  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project > server cwd
-  const cwd = activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
+  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project > server cwd.
+  // If an active thread exists but its snapshot has not rehydrated after a
+  // branch-triggered Metro reload, avoid falling back to the server home cwd.
+  const cwd = activeThreadId && !activeThread
+    ? ""
+    : activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
+
+  useEffect(() => {
+    let cancelled = false;
+    shouldRestoreGitActions(cwd).then((shouldRestore) => {
+      if (!cancelled && shouldRestore) {
+        setShowGitActions(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cwd]);
 
   // Fetch git status whenever the thread changes
   useEffect(() => {
@@ -200,9 +217,9 @@ export function MainHeader() {
             className="flex-row items-center gap-1.5 px-2 py-1 active:opacity-60"
           >
             <SymbolImage
-              name={hasChanges ? "circle.fill" : "arrow.triangle.branch"}
-              size={10}
-              className={hasChanges ? "text-orange-500" : "text-foreground"}
+              name="arrow.triangle.2.circlepath"
+              size={16}
+              className="text-foreground"
             />
             <Text className="text-sm font-medium text-foreground">Git</Text>
           </Pressable>

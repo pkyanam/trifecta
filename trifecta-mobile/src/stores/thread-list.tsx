@@ -31,6 +31,8 @@ export function ThreadListProvider({ children }: { children: React.ReactNode }) 
   const [threads, setThreads] = useState<ThreadShell[]>([]);
 
   useEffect(() => {
+    // Only subscribe when connected, but don't clear data on disconnect
+    // This preserves thread list during temporary connection drops
     if (status !== "connected") return;
 
     const unsubscribe = subscribe(

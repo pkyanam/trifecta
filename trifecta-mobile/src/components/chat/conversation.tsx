@@ -1,10 +1,10 @@
 import { SymbolImage } from "@/components/symbol-image";
 import { LegendList, LegendListRef } from "@legendapp/list";
+/* eslint-disable react-hooks/immutability -- Reanimated shared values are mutable animation cells. */
 import {
   createContext,
   use,
   useCallback,
-  useRef,
   useState,
   type ReactElement,
   type ReactNode,
@@ -12,7 +12,6 @@ import {
 import { LayoutChangeEvent, Text, View } from "react-native";
 import { useKeyboardHandler } from "react-native-keyboard-controller";
 import Animated, {
-  runOnJS,
   useAnimatedProps,
   useAnimatedRef,
   useAnimatedStyle,
@@ -22,17 +21,13 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { TouchableGlass } from "../touchable-glass";
 import { KeyboardGestureArea } from "../tw";
 import { useChatContext } from "./chat-context";
 import type { ChatMessage } from "./types";
 
-const IS_GLASS = isLiquidGlassAvailable();
-
 const AnimatedLegendList = Animated.createAnimatedComponent(LegendList);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Reanimated animated styles are opaque worklet objects
 type AnimatedStyle = any;
 
 type ConversationContextValue = {
@@ -81,7 +76,28 @@ export function Conversation({
   // Tracks whether the current keyboard transition originated from an
   // interactive dismiss gesture (vs a programmatic tap-to-open).
   const wasInteractive = useSharedValue(false);
-  
+  // -- Layout bookkeeping --------------------------------------------------
+
+  const [composerOffsetHeight, setComposerOffsetHeight] = useState(68);
+  const composerHeight = useSharedValue(68);
+  const scrollViewHeight = useSharedValue(0);
+  const totalContentHeight = useSharedValue(0);
+  const messagesOnlyHeight = useSharedValue(0);
+
+  // -- Auto-scroll ---------------------------------------------------------
+
+  const scrollY = useSharedValue(0);
+  const lastContentHeight = useSharedValue(0);
+  const SCROLL_THRESHOLD = 50;
+  // Account for safe area + iOS navigation header (~44px) + breathing room.
+  // Using insets.top makes this work across all devices (notch, Dynamic Island, etc).
+  const topPadding = insets.top + 52;
+
+  const bottomInset = useDerivedValue(() => {
+    const keyboard = Math.abs(keyboardHeight.value);
+    return composerHeight.value + Math.max(insets.bottom, keyboard);
+  });
+
   // Create a worklet-safe scroll function
   const scrollToBottomWorklet = useCallback(() => {
     "worklet";
@@ -92,7 +108,7 @@ export function Conversation({
         viewOffset: -bottomInset.value,
       });
     }
-  }, []);
+  }, [bottomInset, listRef]);
   useKeyboardHandler(
     {
       onStart: (e) => {
@@ -129,25 +145,6 @@ export function Conversation({
     [],
   );
 
-  // -- Layout bookkeeping --------------------------------------------------
-
-  const [composerOffsetHeight, setComposerOffsetHeight] = useState(68);
-  const composerHeight = useSharedValue(68);
-  const scrollViewHeight = useSharedValue(0);
-  const totalContentHeight = useSharedValue(0);
-  const messagesOnlyHeight = useSharedValue(0);
-
-  // -- Auto-scroll ---------------------------------------------------------
-
-  const scrollY = useSharedValue(0);
-  const lastContentHeight = useSharedValue(0);
-  const SCROLL_THRESHOLD = 50;
-
-  const bottomInset = useDerivedValue(() => {
-    const keyboard = Math.abs(keyboardHeight.value);
-    return composerHeight.value + Math.max(insets.bottom, keyboard);
-  });
-
   const isAtBottom = useDerivedValue(() => {
     const maxScrollY =
       totalContentHeight.value - scrollViewHeight.value + bottomInset.value;
@@ -166,50 +163,62 @@ export function Conversation({
 
   const onScrollViewLayout = useCallback((e: LayoutChangeEvent) => {
     scrollViewHeight.value = e.nativeEvent.layout.height;
-  }, []);
+  }, [scrollViewHeight]);
 
   const onScroll = useCallback(
     (event: { nativeEvent: { contentOffset: { y: number } } }) => {
       scrollY.value = event.nativeEvent.contentOffset.y;
     },
-    [],
+    [scrollY],
   );
 
-  const onContentSizeChange = useCallback((_width: number, height: number) => {
-    const wasAtBottom = isAtBottom.value;
-    const heightIncreased = height > lastContentHeight.value;
+  const onContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      const wasAtBottom = isAtBottom.value;
+      const heightIncreased = height > lastContentHeight.value;
 
-    totalContentHeight.value = height;
-    lastContentHeight.value = height;
-    // Update messagesOnlyHeight here - this is safe as it's not in a worklet
-    const scrollHeight = scrollViewHeight.value;
-    const keyboard = Math.abs(keyboardHeight.value);
-    const bottom = composerHeight.value + Math.max(insets.bottom, keyboard);
-    const blankSpace = scrollHeight - messagesOnlyHeight.value - bottom;
-    const footerHeight = Math.max(0, blankSpace - topPadding);
-    messagesOnlyHeight.value = height - footerHeight;
+      totalContentHeight.value = height;
+      lastContentHeight.value = height;
+      // Update messagesOnlyHeight here - this is safe as it's not in a worklet
+      const scrollHeight = scrollViewHeight.value;
+      const keyboard = Math.abs(keyboardHeight.value);
+      const bottom = composerHeight.value + Math.max(insets.bottom, keyboard);
+      const blankSpace = scrollHeight - messagesOnlyHeight.value - bottom;
+      const footerHeight = Math.max(0, blankSpace - topPadding);
+      messagesOnlyHeight.value = height - footerHeight;
 
-    if (wasAtBottom && heightIncreased && listRef.current) {
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToEnd({
-          animated: true,
-          viewOffset: -bottomInset.value,
+      if (wasAtBottom && heightIncreased && listRef.current) {
+        requestAnimationFrame(() => {
+          listRef.current?.scrollToEnd({
+            animated: true,
+            viewOffset: -bottomInset.value,
+          });
         });
-      });
-    }
-  }, []);
+      }
+    },
+    [
+      bottomInset,
+      composerHeight,
+      insets.bottom,
+      isAtBottom,
+      keyboardHeight,
+      lastContentHeight,
+      listRef,
+      messagesOnlyHeight,
+      scrollViewHeight,
+      topPadding,
+      totalContentHeight,
+    ],
+  );
 
   const scrollToBottom = useCallback(() => {
     listRef.current?.scrollToEnd({
       animated: true,
       viewOffset: -bottomInset.value,
     });
-  }, []);
+  }, [bottomInset, listRef]);
 
   // -- Animated styles -----------------------------------------------------
-  // Account for safe area + iOS navigation header (~44px) + breathing room.
-  // Using insets.top makes this work across all devices (notch, Dynamic Island, etc).
-  const topPadding = insets.top + 52;
 
   const footerSpacerStyle = useAnimatedStyle(() => {
     const scrollHeight = scrollViewHeight.value;
@@ -265,7 +274,7 @@ export function Conversation({
     const h = e.nativeEvent.layout.height;
     composerHeight.value = h;
     setComposerOffsetHeight(h);
-  }, []);
+  }, [composerHeight]);
 
   // -- Context value -------------------------------------------------------
 

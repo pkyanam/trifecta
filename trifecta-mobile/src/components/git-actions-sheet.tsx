@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/set-state-in-effect, react-hooks/purity */
+/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -7,9 +7,14 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Alert,
 } from "react-native";
 import { SymbolImage } from "@/components/symbol-image";
-import { useGitService, type VcsStatusResult, type GitStackedAction } from "@/services/git";
+import { useGitService, type VcsStatusResult, type VcsRef, type GitStackedAction } from "@/services/git";
+import {
+  clearGitActionsRestore,
+  markGitActionsRestore,
+} from "@/utils/git-actions-restore";
 import { cn } from "@/utils/tailwind";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
@@ -19,14 +24,92 @@ interface GitActionsSheetProps {
   cwd: string;
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps) {
   const git = useGitService();
   const [status, setStatus] = useState<VcsStatusResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
+  const [switchingBranch, setSwitchingBranch] = useState(false);
+  const [switchingBranchName, setSwitchingBranchName] = useState<string | null>(null);
   const [toast, setToast] = useState<{ title: string; detail?: string; success: boolean } | null>(null);
   const [filesExpanded, setFilesExpanded] = useState(false);
+  const [showBranchSelector, setShowBranchSelector] = useState(false);
+  const [branches, setBranches] = useState<VcsRef[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+
+  const loadBranches = async () => {
+    setLoadingBranches(true);
+    try {
+      const result = await git.listRefs(cwd);
+      // Filter to show only local branches, not remote tracking branches
+      const localBranches = result.refs.filter(ref => !ref.isRemote);
+      setBranches(localBranches);
+    } catch (error) {
+      console.error("Failed to load branches:", error);
+    } finally {
+      setLoadingBranches(false);
+    }
+  };
+
+  const handleSwitchBranch = async (refName: string) => {
+    // Close the branch selector overlay first
+    setShowBranchSelector(false);
+    
+    // Check if there are uncommitted changes
+    if (status?.hasWorkingTreeChanges) {
+      // Show alert asking user to commit first
+      Alert.alert(
+        "Uncommitted Changes",
+        "You have uncommitted changes. Please commit or stash them before switching branches.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+    
+    setSwitchingBranch(true);
+    setSwitchingBranchName(refName);
+    markGitActionsRestore(cwd);
+    try {
+      await git.switchRef(cwd, refName);
+      const newStatus = await git.refreshStatus(cwd);
+      setStatus(newStatus);
+      clearGitActionsRestore();
+      showToast("Branch switched successfully", true);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const mayHaveReloadedBundle =
+        errorMessage.includes("Not connected") ||
+        errorMessage.includes("RPC request failed");
+
+      if (mayHaveReloadedBundle) {
+        for (let attempt = 0; attempt < 8; attempt++) {
+          try {
+            await sleep(750);
+            const recoveredStatus = await git.refreshStatus(cwd);
+            setStatus(recoveredStatus);
+            if (recoveredStatus.refName === refName) {
+              clearGitActionsRestore();
+              showToast("Branch switched successfully", true);
+              return;
+            }
+          } catch {
+          }
+        }
+        showToast("Branch switched; reconnecting", true);
+        return;
+      }
+
+      clearGitActionsRestore();
+      console.error("Branch switch failed:", error);
+      showToast("Branch switch failed", false, errorMessage);
+    } finally {
+      setSwitchingBranch(false);
+      setSwitchingBranchName(null);
+    }
+  };
 
   useEffect(() => {
     if (!visible || !cwd) return;
@@ -234,106 +317,115 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
         {/* Backdrop */}
         <Pressable className="absolute inset-0 bg-black/60" onPress={onClose} />
 
-        {/* Bottom sheet card */}
-        <Animated.View
-          entering={FadeIn}
-          exiting={FadeOut}
-          className="w-full"
-          style={{ maxHeight: "85%" }}
-        >
-          <View
-            className="bg-background/95 backdrop-blur-xl border-t border-border/50 overflow-hidden"
-            style={{
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              maxHeight: "100%",
-            }}
+          {/* Bottom sheet card */}
+          <Animated.View
+            entering={FadeIn}
+            exiting={FadeOut}
+            className="w-full"
+            style={{ maxHeight: "85%" }}
           >
-            {/* Header */}
-            <View className="px-5 py-4 border-b border-border/50">
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2">
-                  <SymbolImage name="arrow.triangle.branch" size={20} className="text-foreground" />
-                  <Text className="text-xl font-bold text-foreground">Git Status</Text>
+            <View
+              className="bg-background/95 backdrop-blur-xl border-t border-border/50 overflow-hidden"
+              style={{
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                maxHeight: "100%",
+              }}
+            >
+              {/* Header */}
+              <View className="px-5 py-4 border-b border-border/50">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center gap-2">
+                    <SymbolImage name="arrow.triangle.branch" size={20} className="text-foreground" />
+                    <Text className="text-xl font-bold text-foreground">Git Status</Text>
+                  </View>
+                  <Pressable
+                    onPress={onClose}
+                    className="w-8 h-8 items-center justify-center rounded-full active:bg-muted/50"
+                  >
+                    <SymbolImage name="xmark" size={18} className="text-foreground" />
+                  </Pressable>
                 </View>
-                <Pressable
-                  onPress={onClose}
-                  className="w-8 h-8 items-center justify-center rounded-full active:bg-muted/50"
-                >
-                  <SymbolImage name="xmark" size={18} className="text-foreground" />
-                </Pressable>
               </View>
-            </View>
 
-            {/* Scrollable Content */}
-            <ScrollView style={{ maxHeight: 500 }}>
-              <View className="p-5 space-y-4">
-                {loading && !status ? (
-                  <View className="items-center justify-center py-12">
-                    <ActivityIndicator size="small" />
-                    <Text className="text-sm text-muted-foreground mt-3">Loading git status…</Text>
-                  </View>
-                ) : error ? (
-                  <View>
-                    <Text className="text-sm text-destructive">{error}</Text>
-                  </View>
-                ) : status ? (
-                  <>
-                    {/* Status Block */}
-                    <View className="p-4 bg-muted/30 rounded-xl border border-border/50">
-                      <View className="flex-row items-center justify-between mb-2">
-                        <View className="flex-row items-center gap-2">
-                          <SymbolImage name="arrow.triangle.branch" size={14} className="text-muted-foreground" />
-                          <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
-                            {status.refName || "No branch"}
-                          </Text>
-                        </View>
-                        <View className="flex-row items-center gap-2">
-                          {status.aheadCount > 0 && (
-                            <View className="flex-row items-center gap-1 bg-blue-500/10 px-2 py-1 rounded-full">
-                              <SymbolImage name="arrow.up" size={10} className="text-blue-500" />
-                              <Text className="text-xs font-semibold text-blue-500">{status.aheadCount}</Text>
-                            </View>
-                          )}
-                          {status.behindCount > 0 && (
-                            <View className="flex-row items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-full">
-                              <SymbolImage name="arrow.down" size={10} className="text-yellow-500" />
-                              <Text className="text-xs font-semibold text-yellow-500">{status.behindCount}</Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-
-                      <Text className="text-sm text-foreground mb-1">{summaryLine()}</Text>
-                      <View className="flex-row items-center gap-2">
-                        {status.hasWorkingTreeChanges && (
-                          <View className="flex-row items-center gap-1">
-                            <Text className="text-xs text-success">+{status.workingTree.insertions}</Text>
-                            <Text className="text-xs text-destructive">-{status.workingTree.deletions}</Text>
-                          </View>
-                        )}
-                        {!status.hasUpstream && (
-                          <View className="flex-row items-center gap-1 bg-warning/20 px-2 py-0.5 rounded-full">
-                            <SymbolImage name="exclamationmark.triangle.fill" size={10} className="text-warning" />
-                            <Text className="text-xs font-semibold text-warning">NO UPSTREAM</Text>
-                          </View>
-                        )}
-                      </View>
+              {/* Scrollable Content */}
+              <ScrollView style={{ maxHeight: 500 }}>
+                <View className="p-5 space-y-4">
+                  {loading && !status ? (
+                    <View className="items-center justify-center py-12">
+                      <ActivityIndicator size="small" />
+                      <Text className="text-sm text-muted-foreground mt-3">Loading git status…</Text>
                     </View>
-
-                    {/* Changed Files - Collapsible */}
-                    {status.hasWorkingTreeChanges && status.workingTree.files.length > 0 && (
-                      <View className="rounded-xl border border-border/50 overflow-hidden bg-muted/20">
-                        <Pressable
-                          onPress={() => setFilesExpanded(!filesExpanded)}
-                          className="flex-row items-center justify-between px-4 py-3 border-b border-border/30 active:bg-muted/30"
-                        >
+                  ) : error ? (
+                    <View>
+                      <Text className="text-sm text-destructive">{error}</Text>
+                    </View>
+                  ) : status ? (
+                    <>
+                      {/* Status Block */}
+                      <View className="p-4 bg-muted/30 rounded-xl border border-border/50">
+                        <View className="flex-row items-center justify-between mb-2">
+                          <Pressable
+                            onPress={() => {
+                              loadBranches();
+                              setShowBranchSelector(true);
+                            }}
+                            disabled={loadingBranches}
+                            className="flex-row items-center gap-2"
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <SymbolImage name="arrow.triangle.branch" size={14} className="text-muted-foreground" />
+                            <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
+                              {status.refName || "No branch"}
+                            </Text>
+                            <SymbolImage name="chevron.down" size={12} className="text-muted-foreground" />
+                          </Pressable>
                           <View className="flex-row items-center gap-2">
-                            <SymbolImage name="doc.text" size={14} className="text-muted-foreground" />
-                            <Text className="text-sm font-semibold text-foreground">Changed Files</Text>
-                            <View className="px-2 py-0.5 bg-accent/20 rounded-full">
-                              <Text className="text-xs font-semibold text-accent">{status.workingTree.files.length}</Text>
+                            {status.aheadCount > 0 && (
+                              <View className="flex-row items-center gap-1 bg-blue-500/10 px-2 py-1 rounded-full">
+                                <SymbolImage name="arrow.up" size={10} className="text-blue-500" />
+                                <Text className="text-xs font-semibold text-blue-500">{status.aheadCount}</Text>
+                              </View>
+                            )}
+                            {status.behindCount > 0 && (
+                              <View className="flex-row items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-full">
+                                <SymbolImage name="arrow.down" size={10} className="text-yellow-500" />
+                                <Text className="text-xs font-semibold text-yellow-500">{status.behindCount}</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+
+                        <Text className="text-sm text-foreground mb-1">{summaryLine()}</Text>
+                        <View className="flex-row items-center gap-2">
+                          {status.hasWorkingTreeChanges && (
+                            <View className="flex-row items-center gap-1">
+                              <Text className="text-xs text-success">+{status.workingTree.insertions}</Text>
+                              <Text className="text-xs text-destructive">-{status.workingTree.deletions}</Text>
                             </View>
+                          )}
+                          {!status.hasUpstream && (
+                            <View className="flex-row items-center gap-1 bg-warning/20 px-2 py-0.5 rounded-full">
+                              <SymbolImage name="exclamationmark.triangle.fill" size={10} className="text-warning" />
+                              <Text className="text-xs font-semibold text-warning">NO UPSTREAM</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+
+                      {/* Changed Files - Collapsible */}
+                      {status.hasWorkingTreeChanges && status.workingTree.files.length > 0 && (
+                        <View className="rounded-xl border border-border/50 overflow-hidden bg-muted/20">
+                          <Pressable
+                            onPress={() => setFilesExpanded(!filesExpanded)}
+                            className="flex-row items-center justify-between px-4 py-3 border-b border-border/30 active:bg-muted/30"
+                          >
+                            <View className="flex-row items-center gap-2">
+                              <SymbolImage name="doc.text" size={14} className="text-muted-foreground" />
+                              <Text className="text-sm font-semibold text-foreground">Changed Files</Text>
+                              <View className="px-2 py-0.5 bg-accent/20 rounded-full">
+                                <Text className="text-xs font-semibold text-accent">{status.workingTree.files.length}</Text>
+                              </View>
                           </View>
                           <SymbolImage
                             name={filesExpanded ? "chevron.up" : "chevron.down"}
@@ -530,18 +622,83 @@ export function GitActionsSheet({ visible, onClose, cwd }: GitActionsSheetProps)
                     )}
                   </>
                 ) : null}
-              </View>
-            </ScrollView>
+                </View>
+              </ScrollView>
 
-            {/* Footer */}
-            <View className="px-5 py-3 border-t border-border/50 bg-muted/20">
-              <Text className="text-xs text-center text-muted-foreground">
-                {cwd}
-              </Text>
+              {/* Branch Selector Overlay */}
+              {showBranchSelector && (
+                <View className="absolute inset-0 bg-background/95 backdrop-blur-xl">
+                  <View className="px-5 py-4 border-b border-border/50">
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center gap-2">
+                        <SymbolImage name="arrow.triangle.branch" size={20} className="text-foreground" />
+                        <Text className="text-xl font-bold text-foreground">Switch Branch</Text>
+                      </View>
+                      <Pressable
+                        onPress={() => setShowBranchSelector(false)}
+                        className="w-8 h-8 items-center justify-center rounded-full active:bg-muted/50"
+                      >
+                        <SymbolImage name="xmark" size={18} className="text-foreground" />
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  <ScrollView style={{ maxHeight: 400 }}>
+                    <View className="p-5 space-y-2">
+                      {loadingBranches ? (
+                        <View className="items-center justify-center py-12">
+                          <ActivityIndicator size="small" />
+                          <Text className="text-sm text-muted-foreground mt-3">Loading branches…</Text>
+                        </View>
+                      ) : branches.length === 0 ? (
+                        <View className="items-center justify-center py-12">
+                          <Text className="text-sm text-muted-foreground">No branches found</Text>
+                        </View>
+                      ) : (
+                        branches.map((branch) => (
+                          <Pressable
+                            key={branch.name}
+                            onPress={() => handleSwitchBranch(branch.name)}
+                            disabled={switchingBranch}
+                            className={cn(
+                              "flex-row items-center justify-between px-4 py-3 rounded-lg border border-border active:bg-muted/30",
+                              branch.current && "bg-muted/50 border-muted-foreground/30",
+                              switchingBranch && "opacity-50"
+                            )}
+                          >
+                            <View className="flex-row items-center gap-3">
+                              <SymbolImage 
+                                name={branch.current ? "checkmark.circle.fill" : "circle"} 
+                                size={16} 
+                                className={branch.current ? "text-foreground" : "text-muted-foreground"} 
+                              />
+                              <Text className="text-sm font-medium text-foreground">{branch.name}</Text>
+                              {branch.isDefault && (
+                                <View className="px-2 py-0.5 bg-muted rounded-full">
+                                  <Text className="text-xs text-muted-foreground">default</Text>
+                                </View>
+                              )}
+                              {switchingBranch && branch.name === switchingBranchName && (
+                                <ActivityIndicator size="small" className="text-foreground" />
+                              )}
+                            </View>
+                          </Pressable>
+                        ))
+                      )}
+                    </View>
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Footer */}
+              <View className="px-5 py-3 border-t border-border/50 bg-muted/20">
+                <Text className="text-xs text-center text-muted-foreground">
+                  {cwd}
+                </Text>
+              </View>
             </View>
-          </View>
-        </Animated.View>
-      </View>
-    </Modal>
+          </Animated.View>
+        </View>
+      </Modal>
   );
 }

@@ -16,6 +16,7 @@ import { useModel } from "@/components/model-context";
 import { useActiveThread } from "@/stores/active-thread";
 import { useThreadList } from "@/stores/thread-list";
 import { useRouter } from "expo-router";
+import { shouldRestoreGitActions } from "@/utils/git-actions-restore";
 
 interface SmartHeaderProps {
   onMenuPress?: () => void;
@@ -36,8 +37,24 @@ export function SmartHeader({ onMenuPress }: SmartHeaderProps) {
   const project = activeThread?.projectId ? getProject(activeThread.projectId) : null;
   const newChatProject = newChatProjectId ? getProject(newChatProjectId) : null;
 
-  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project > server cwd
-  const cwd = activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
+  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project > server cwd.
+  // If an active thread exists but its snapshot has not rehydrated after a
+  // branch-triggered Metro reload, avoid falling back to the server home cwd.
+  const cwd = activeThreadId && !activeThread
+    ? ""
+    : activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
+
+  useEffect(() => {
+    let cancelled = false;
+    shouldRestoreGitActions(cwd).then((shouldRestore) => {
+      if (!cancelled && shouldRestore) {
+        setShowGitActions(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cwd]);
 
   // Fetch git status whenever cwd changes (mirrors iOS header behavior)
   useEffect(() => {
@@ -100,12 +117,7 @@ export function SmartHeader({ onMenuPress }: SmartHeaderProps) {
               onPress={() => setShowGitActions(true)}
               className="flex-row items-center gap-1.5 px-2 py-1 rounded-md active:bg-muted/50"
             >
-              <View
-                className={cn(
-                  "w-2 h-2 rounded-full",
-                  hasChanges ? "bg-orange-500" : "bg-foreground/40"
-                )}
-              />
+              <SymbolImage name="arrow.triangle.2.circlepath" size={16} className="text-foreground" />
               <Text className="text-sm font-medium text-foreground">Git</Text>
             </Pressable>
           ) : (

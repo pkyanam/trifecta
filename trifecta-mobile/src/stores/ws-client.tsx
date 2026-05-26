@@ -70,6 +70,10 @@ class WsRpcClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
   private alive = true;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly HEARTBEAT_INTERVAL = 5_000; // 5 seconds
+  private connectionTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly CONNECTION_TIMEOUT = 10_000; // 10 seconds
 
   constructor(
     private serverURL: string,
@@ -90,12 +94,23 @@ class WsRpcClient {
       const ws = new WebSocket(url);
       this.ws = ws;
 
+      // Set connection timeout
+      this.connectionTimeoutTimer = setTimeout(() => {
+        if (this.ws === ws && this.alive) {
+          this.ws.close();
+          this.onStatus("error");
+          this.scheduleReconnect();
+        }
+      }, this.CONNECTION_TIMEOUT);
+
       ws.onopen = () => {
         if (!this.alive || this.ws !== ws) return;
+        this.clearConnectionTimeout();
         this.reconnectAttempt = 0;
         this.onStatus("connected");
         this.resubscribeAll();
         this.fetchServerConfig();
+        this.startHeartbeat();
       };
 
       ws.onmessage = (evt) => {
@@ -105,22 +120,33 @@ class WsRpcClient {
         } catch {}
       };
 
-      ws.onerror = () => {
+      ws.onerror = (error) => {
         if (!this.alive || this.ws !== ws) return;
+        this.clearConnectionTimeout();
+        console.error("WebSocket error:", error);
         this.onStatus("error");
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         if (!this.alive) return;
         if (this.ws === ws) {
+          this.clearConnectionTimeout();
           this.ws = null;
+          this.stopHeartbeat();
+          console.log("WebSocket closed:", {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean,
+          });
           this.onStatus("offline");
           this.failPending();
+          // Don't clear streams on close - they should be resubscribed on reconnect
           this.scheduleReconnect();
         }
       };
-    } catch {
+    } catch (error) {
       if (!this.alive) return;
+      console.error("WebSocket connection error:", this.formatError(error));
       this.onStatus("error");
       this.scheduleReconnect();
     }
@@ -129,16 +155,52 @@ class WsRpcClient {
   destroy() {
     this.alive = false;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.clearConnectionTimeout();
+    this.stopHeartbeat();
     this.failPending();
+    this.streams.clear(); // Clear all stream subscriptions
     this.ws?.close();
     this.ws = null;
   }
 
+  private clearConnectionTimeout() {
+    if (this.connectionTimeoutTimer) {
+      clearTimeout(this.connectionTimeoutTimer);
+      this.connectionTimeoutTimer = null;
+    }
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if (!this.alive || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        this.stopHeartbeat();
+        return;
+      }
+      try {
+        this.send(JSON.stringify({ _tag: "Ping" }));
+      } catch {
+        this.stopHeartbeat();
+      }
+    }, this.HEARTBEAT_INTERVAL);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
   private handleData(text: string) {
-    const raw = JSON.parse(text);
-    const frames = Array.isArray(raw) ? raw : [raw];
-    for (const frame of frames) {
-      this.handleFrame(frame);
+    try {
+      const raw = JSON.parse(text);
+      const frames = Array.isArray(raw) ? raw : [raw];
+      for (const frame of frames) {
+        this.handleFrame(frame);
+      }
+    } catch (error) {
+      console.error("Failed to parse WebSocket message:", this.formatError(error));
     }
   }
 
@@ -164,7 +226,42 @@ class WsRpcClient {
           if (exit._tag === "Success") {
             pend.resolve(exit.value);
           } else {
-            pend.reject(new Error("RPC request failed"));
+            // Include error details in the rejection
+            let errorMessage = "RPC request failed";
+            
+            // Handle nested error structure from Effect
+            if (exit.cause && Array.isArray(exit.cause) && exit.cause.length > 0) {
+              const cause = exit.cause[0] as Record<string, unknown>;
+              if (cause.error && typeof cause.error === "object") {
+                const errorObj = cause.error as Record<string, unknown>;
+                if (typeof errorObj.detail === "string") {
+                  errorMessage = errorObj.detail;
+                } else if (typeof errorObj.message === "string") {
+                  errorMessage = errorObj.message;
+                } else {
+                  errorMessage = JSON.stringify(errorObj);
+                }
+              }
+            } else if (exit.error) {
+              if (typeof exit.error === "string") {
+                errorMessage = exit.error;
+              } else if (exit.error instanceof Error) {
+                errorMessage = exit.error.message;
+              } else if (typeof exit.error === "object" && exit.error !== null) {
+                // Try to extract message from error object
+                const errorObj = exit.error as Record<string, unknown>;
+                if (typeof errorObj.message === "string") {
+                  errorMessage = errorObj.message;
+                } else if (typeof errorObj.detail === "string") {
+                  errorMessage = errorObj.detail;
+                } else {
+                  errorMessage = JSON.stringify(errorObj);
+                }
+              }
+            }
+            
+            console.error("RPC request failed:", errorMessage);
+            pend.reject(new Error(errorMessage));
           }
         }
         // streams: exit means the subscription ended (shouldn't happen for long-lived subs)
@@ -186,11 +283,28 @@ class WsRpcClient {
   private scheduleReconnect() {
     if (!this.alive) return;
     this.reconnectAttempt++;
-    const exp = Math.min(this.reconnectAttempt - 1, 6);
-    const delay = Math.min(1000 * Math.pow(2, exp), 30_000) + Math.random() * 400;
+    const delay = this.calculateBackoffDelay(this.reconnectAttempt);
     this.reconnectTimer = setTimeout(() => {
       if (this.alive) this.connect();
     }, delay);
+  }
+
+  private calculateBackoffDelay(attempt: number): number {
+    const exponent = Math.min(attempt - 1, 6);
+    const base = 1000 * Math.pow(2, exponent);
+    const capped = Math.min(base, 30_000);
+    const jitter = Math.random() * 400; // 0-400ms jitter to prevent thundering herd
+    return capped + jitter;
+  }
+
+  private formatError(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message || error.name || "Unknown error";
+    }
+    if (typeof error === "string") {
+      return error;
+    }
+    return "Unknown error";
   }
 
   private failPending() {
@@ -210,7 +324,7 @@ class WsRpcClient {
       const raw = await this.request("server.getConfig", {}) as Record<string, unknown>;
       if (!raw) return;
       const cwd = (raw.cwd as string) ?? "";
-      const rawProviders = (raw.providers as Array<Record<string, unknown>>) ?? [];
+      const rawProviders = (raw.providers as Record<string, unknown>[]) ?? [];
       const providers: ServerConfig["providers"] = rawProviders.map((p) => ({
         instanceId: (p.instanceId as string) ?? "",
         driver: (p.driver as string) ?? "",
@@ -219,19 +333,19 @@ class WsRpcClient {
         enabled: (p.enabled as boolean) ?? false,
         installed: (p.installed as boolean) ?? false,
         status: p.status as string | undefined,
-        models: ((p.models as Array<Record<string, unknown>>) ?? []).map((m) => ({
+        models: ((p.models as Record<string, unknown>[]) ?? []).map((m) => ({
           slug: (m.slug as string) ?? "",
           name: (m.name as string) ?? "",
           shortName: m.shortName as string | undefined,
           subProvider: m.subProvider as string | undefined,
           eligible: m.eligible as boolean | undefined,
         })),
-        slashCommands: ((p.slashCommands as Array<Record<string, unknown>>) ?? []).map((sc) => ({
+        slashCommands: ((p.slashCommands as Record<string, unknown>[]) ?? []).map((sc) => ({
           name: (sc.name as string) ?? "",
           description: sc.description as string | undefined,
-          input: sc.input as { hint?: string } | undefined,
+          input: (sc.input && typeof sc.input === "object") ? (sc.input as { hint?: string }) : undefined,
         })),
-        skills: ((p.skills as Array<Record<string, unknown>>) ?? []).map((s) => ({
+        skills: ((p.skills as Record<string, unknown>[]) ?? []).map((s) => ({
           name: (s.name as string) ?? "",
           description: s.description as string | undefined,
           shortDescription: s.shortDescription as string | undefined,
@@ -293,9 +407,12 @@ export function WsClientProvider({
 
   useEffect(() => {
     if (!serverURL || !bearerToken) {
-      setStatus("offline");
-      setServerConfig(null);
-      return;
+      // Use setTimeout to avoid setState in effect warning
+      const timer = setTimeout(() => {
+        setStatus("offline");
+        setServerConfig(null);
+      }, 0);
+      return () => clearTimeout(timer);
     }
 
     const client = new WsRpcClient(serverURL, bearerToken, setStatus, setServerConfig);

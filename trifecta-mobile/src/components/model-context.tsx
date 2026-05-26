@@ -1,6 +1,6 @@
 import { useWsClient } from "@/stores/ws-client";
 import type { ModelSelection, ServerProvider } from "@/types/thread";
-import React, { createContext, use, useEffect, useState } from "react";
+import React, { createContext, use, useEffect, useMemo, useState } from "react";
 
 export type { ServerProvider };
 
@@ -31,21 +31,20 @@ export function labelForSelection(
 
 export function ModelProvider({ children }: { children: React.ReactNode }) {
   const { serverConfig } = useWsClient();
-  const providers = serverConfig?.providers ?? [];
+  const providers = useMemo(
+    () => serverConfig?.providers ?? [],
+    [serverConfig?.providers],
+  );
   const [selectedModelSelection, setSelectedModelSelection] =
     useState<ModelSelection | null>(null);
   const [extendedThinking, setExtendedThinking] = useState(false);
 
   useEffect(() => {
     if (selectedModelSelection) return;
-    for (const p of providers) {
-      if (!p.enabled || !p.installed) continue;
-      const eligible = p.models.find((m) => m.eligible !== false);
-      if (eligible) {
-        setSelectedModelSelection({ model: eligible.slug, instanceId: p.instanceId });
-        return;
-      }
-    }
+    const defaultSelection = findDefaultModelSelection(providers);
+    if (!defaultSelection) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- selection is derived from async server config arrival.
+    setSelectedModelSelection(defaultSelection);
   }, [providers, selectedModelSelection]);
 
   const selectedModelLabel = labelForSelection(selectedModelSelection, providers);
@@ -63,4 +62,17 @@ export function useModel() {
   const context = use(ModelContext);
   if (!context) throw new Error("useModel must be used within a ModelProvider");
   return context;
+}
+
+function findDefaultModelSelection(
+  providers: ServerProvider[],
+): ModelSelection | null {
+  for (const p of providers) {
+    if (!p.enabled || !p.installed) continue;
+    const eligible = p.models.find((m) => m.eligible !== false);
+    if (eligible) {
+      return { model: eligible.slug, instanceId: p.instanceId };
+    }
+  }
+  return null;
 }

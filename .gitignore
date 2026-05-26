@@ -4,6 +4,9 @@ t3code-original/
 # reference repos (development only)
 _reference/
 
+# agent scratch state
+.devin/
+
 # temporary local assets
 tempAssetsDoNotCommit/
 
@@ -13,6 +16,9 @@ tempAssetsDoNotCommit/
 
 # standalone cloud app — superseded by trifecta-www unified app
 trifecta-cloud/
+
+# stale native prototype removed from the monorepo
+trifecta-macos-swift/
 
 # system files
 .DS_Store

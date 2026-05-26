@@ -1,10 +1,9 @@
 import { SymbolImage } from "@/components/symbol-image";
 import { cn } from "@/utils/tailwind";
-import { Pressable, Text } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useEffect, useState } from "react";
 import Animated, { Layout } from "react-native-reanimated";
 import { useGitService, type VcsStatusResult } from "@/services/git";
-import { GitActionsAdvanced } from "./git-actions-advanced";
 
 interface GitStatusProps {
   cwd: string;
@@ -15,7 +14,6 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
   const git = useGitService();
   const [status, setStatus] = useState<VcsStatusResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showActions, setShowActions] = useState(false);
 
   useEffect(() => {
     const loadStatus = async () => {
@@ -55,7 +53,7 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
     <>
       <Animated.View layout={Layout.springify()}>
         <Pressable
-          onPress={() => setShowActions(true)}
+          onPress={onPress}
           className={cn(
             "flex-row items-center gap-2 px-3 py-2 bg-muted/30 rounded-lg",
             onPress && "active:bg-muted/50"
@@ -112,12 +110,6 @@ export function GitStatus({ cwd, onPress }: GitStatusProps) {
           )}
         </Pressable>
       </Animated.View>
-
-      <GitActionsAdvanced
-        visible={showActions}
-        onClose={() => setShowActions(false)}
-        cwd={cwd}
-      />
     </>
   );
 }
