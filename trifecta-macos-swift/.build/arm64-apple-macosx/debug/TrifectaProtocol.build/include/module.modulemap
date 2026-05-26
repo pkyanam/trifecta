@@ -1,3 +1,0 @@
-module TrifectaProtocol {
-    header "/Users/preetham/projects/trifecta/trifecta-macos-swift/.build/arm64-apple-macosx/debug/TrifectaProtocol.build/include/TrifectaProtocol-Swift.h"
-}

@@ -17,7 +17,7 @@
     },
     "apps/desktop": {
       "name": "@belweave/desktop",
-      "version": "0.0.35-alpha.2",
+      "version": "0.0.37-alpha.1",
       "dependencies": {
         "@effect/platform-node": "catalog:",
         "effect": "catalog:",
@@ -41,7 +41,7 @@
     },
     "apps/marketing": {
       "name": "@belweave/marketing",
-      "version": "0.0.0",
+      "version": "0.0.37-alpha.1",
       "dependencies": {
         "astro": "^6.3.1",
       },
@@ -52,7 +52,7 @@
     },
     "apps/server": {
       "name": "@belweave/trifecta",
-      "version": "0.0.35-alpha.2",
+      "version": "0.0.37-alpha.1",
       "bin": {
         "trifecta": "dist/bin.mjs",
       },
@@ -86,7 +86,7 @@
     },
     "apps/vscode": {
       "name": "trifecta-ide",
-      "version": "0.1.0",
+      "version": "0.0.37-alpha.1",
       "devDependencies": {
         "@types/node": "^25.6.2",
         "@types/vscode": "^1.85.0",
@@ -97,7 +97,7 @@
     },
     "apps/web": {
       "name": "@belweave/web",
-      "version": "0.0.35-alpha.2",
+      "version": "0.0.37-alpha.1",
       "dependencies": {
         "@base-ui/react": "^1.4.1",
         "@belweave/client-runtime": "workspace:*",
@@ -166,7 +166,7 @@
     },
     "packages/client-runtime": {
       "name": "@belweave/client-runtime",
-      "version": "0.0.0-alpha.1",
+      "version": "0.0.37-alpha.1",
       "dependencies": {
         "@belweave/contracts": "workspace:*",
         "effect": "catalog:",
@@ -179,7 +179,7 @@
     },
     "packages/contracts": {
       "name": "@belweave/contracts",
-      "version": "0.0.35-alpha.2",
+      "version": "0.0.37-alpha.1",
       "dependencies": {
         "effect": "catalog:",
       },
@@ -223,7 +223,7 @@
     },
     "packages/shared": {
       "name": "@belweave/shared",
-      "version": "0.0.0-alpha.1",
+      "version": "0.0.37-alpha.1",
       "dependencies": {
         "@belweave/contracts": "workspace:*",
         "effect": "catalog:",
@@ -239,7 +239,7 @@
     },
     "packages/ssh": {
       "name": "@belweave/ssh",
-      "version": "0.0.0-alpha.1",
+      "version": "0.0.37-alpha.1",
       "dependencies": {
         "@belweave/contracts": "workspace:*",
         "@belweave/shared": "workspace:*",
@@ -256,7 +256,7 @@
     },
     "packages/tailscale": {
       "name": "@belweave/tailscale",
-      "version": "0.0.0-alpha.1",
+      "version": "0.0.37-alpha.1",
       "dependencies": {
         "@effect/platform-node": "catalog:",
         "effect": "catalog:",
