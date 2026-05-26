@@ -41,8 +41,57 @@ export function useThread(threadId: ThreadId | null): UseThreadResult {
   const [session, setSession] = useState<OrchestrationSession | null>(null);
   const [isSending, setIsSending] = useState(false);
 
+  const applyMessageSent = useCallback((fields: Record<string, unknown>) => {
+    // Merge top-level fields with nested message object
+    const inner = (fields.message ?? {}) as Record<string, unknown>;
+    const merged = { ...fields, ...inner };
+
+    const msgId = (merged.messageId ?? merged.id) as string | undefined;
+    const role = merged.role as string | undefined;
+    if (!msgId || !role) return;
+
+    const payloadText = (merged.text as string) ?? "";
+    const streaming = (merged.streaming as boolean) ?? false;
+    const createdAt = (merged.createdAt as string) ?? new Date().toISOString();
+    const updatedAt = (merged.updatedAt as string) ?? createdAt;
+    const turnId = merged.turnId as string | undefined;
+
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.id === msgId);
+      if (idx >= 0) {
+        const updated = [...prev];
+        const existing = updated[idx];
+        updated[idx] = {
+          ...existing,
+          // streaming=true -> delta append; streaming=false + text -> replace; streaming=false + no text -> keep accumulated
+          text: streaming
+            ? existing.text + payloadText
+            : payloadText || existing.text,
+          streaming,
+          updatedAt,
+        };
+        return updated;
+      } else {
+        const msg: Message = {
+          id: msgId,
+          role: role as Message["role"],
+          text: payloadText,
+          streaming,
+          turnId,
+          createdAt,
+          updatedAt,
+        };
+        const next = [...prev, msg].sort(
+          (a, b) => (a.createdAt > b.createdAt ? 1 : -1),
+        );
+        return next;
+      }
+    });
+  }, []);
+
   useEffect(() => {
     if (!threadId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing stale subscription state when no thread is active is intentional.
       setDetail(null);
       setMessages([]);
       setSession(null);
@@ -94,55 +143,7 @@ export function useThread(threadId: ThreadId | null): UseThreadResult {
     );
 
     return unsubscribe;
-  }, [threadId, subscribe]);
-
-  function applyMessageSent(fields: Record<string, unknown>) {
-    // Merge top-level fields with nested message object
-    const inner = (fields.message ?? {}) as Record<string, unknown>;
-    const merged = { ...fields, ...inner };
-
-    const msgId = (merged.messageId ?? merged.id) as string | undefined;
-    const role = merged.role as string | undefined;
-    if (!msgId || !role) return;
-
-    const payloadText = (merged.text as string) ?? "";
-    const streaming = (merged.streaming as boolean) ?? false;
-    const createdAt = (merged.createdAt as string) ?? new Date().toISOString();
-    const updatedAt = (merged.updatedAt as string) ?? createdAt;
-    const turnId = merged.turnId as string | undefined;
-
-    setMessages((prev) => {
-      const idx = prev.findIndex((m) => m.id === msgId);
-      if (idx >= 0) {
-        const updated = [...prev];
-        const existing = updated[idx];
-        updated[idx] = {
-          ...existing,
-          // streaming=true → delta append; streaming=false + text → replace; streaming=false + no text → keep accumulated
-          text: streaming
-            ? existing.text + payloadText
-            : payloadText || existing.text,
-          streaming,
-          updatedAt,
-        };
-        return updated;
-      } else {
-        const msg: Message = {
-          id: msgId,
-          role: role as Message["role"],
-          text: payloadText,
-          streaming,
-          turnId,
-          createdAt,
-          updatedAt,
-        };
-        const next = [...prev, msg].sort(
-          (a, b) => (a.createdAt > b.createdAt ? 1 : -1),
-        );
-        return next;
-      }
-    });
-  }
+  }, [applyMessageSent, threadId, subscribe]);
 
   const sendMessage = useCallback(
     async (text: string, modelSelection: ModelSelection) => {
