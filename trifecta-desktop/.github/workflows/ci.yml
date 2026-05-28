@@ -47,7 +47,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Create Electron path stub
-        run: node -e "const fs=require('fs'),path=require('path');const dir=path.dirname(require.resolve('electron'));fs.writeFileSync(path.join(dir,'path.txt'),'electron-stub');"
+        run: bun -e "const{writeFileSync}=require('fs'),{join,dirname}=require('path');writeFileSync(join(dirname(require.resolve('electron')),'path.txt'),'electron-stub');"
 
       - name: Format
         run: bun run fmt:check
