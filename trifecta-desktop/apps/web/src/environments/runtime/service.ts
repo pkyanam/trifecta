@@ -1248,7 +1248,8 @@ function applySavedEnvironmentConfigEvent(
   environmentId: EnvironmentId,
   event: ServerConfigStreamEvent,
 ): void {
-  const currentConfig = useSavedEnvironmentRuntimeStore.getState().byId[environmentId]?.serverConfig;
+  const currentConfig =
+    useSavedEnvironmentRuntimeStore.getState().byId[environmentId]?.serverConfig;
   if (event.type === "snapshot") {
     useSavedEnvironmentRuntimeStore.getState().patch(environmentId, {
       descriptor: event.config.environment,

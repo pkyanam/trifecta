@@ -18,9 +18,20 @@ import * as Schema from "effect/Schema";
 import {
   InitializeResponse as InitializeResponseCodec,
   NewSessionResponse as NewSessionResponseCodec,
+  SessionConfigOption as SessionConfigOptionCodec,
+  SetSessionConfigOptionResponse as SetSessionConfigOptionResponseCodec,
   type InitializeResponse,
   type NewSessionResponse,
+  type SessionConfigOption,
+  type SetSessionConfigOptionResponse,
 } from "effect-acp/schema";
+
+const decodeInitializeResponse = Schema.decodeUnknownEffect(InitializeResponseCodec);
+const decodeNewSessionResponse = Schema.decodeUnknownEffect(NewSessionResponseCodec);
+const decodeSessionConfigOption = Schema.decodeUnknownOption(SessionConfigOptionCodec);
+const decodeSetSessionConfigOptionResponse = Schema.decodeUnknownEffect(
+  SetSessionConfigOptionResponseCodec,
+);
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
@@ -160,6 +171,136 @@ export function normalizeHermesNewSessionResult(raw: unknown): unknown {
   return next;
 }
 
+function normalizeSelectOption(option: unknown): unknown {
+  const o = asRecord(option);
+  if (!o) return option;
+  const value =
+    typeof o.value === "string"
+      ? o.value
+      : o.value !== undefined && o.value !== null
+        ? String(o.value)
+        : "";
+  const rawName =
+    typeof o.name === "string"
+      ? o.name
+      : typeof o.label === "string"
+        ? o.label
+        : typeof o.title === "string"
+          ? o.title
+          : "";
+  const name = rawName.trim().length > 0 ? rawName : value.length > 0 ? value : "option";
+  return { ...o, value, name };
+}
+
+function normalizeSelectGroup(group: unknown): unknown {
+  const o = asRecord(group);
+  if (!o) return group;
+  if (!Array.isArray(o.options)) {
+    return normalizeSelectOption(group);
+  }
+  const groupId =
+    typeof o.group === "string"
+      ? o.group
+      : typeof o.id === "string"
+        ? o.id
+        : typeof o.name === "string"
+          ? o.name
+          : "group";
+  const name = typeof o.name === "string" && o.name.trim().length > 0 ? o.name : groupId;
+  return { ...o, group: groupId, name, options: o.options.map(normalizeSelectOption) };
+}
+
+function normalizeSelectOptions(options: ReadonlyArray<unknown>): ReadonlyArray<unknown> {
+  const normalized = options.map(normalizeSelectGroup);
+  const hasFlatOptions = normalized.some((entry) => {
+    const o = asRecord(entry);
+    return o !== undefined && "value" in o;
+  });
+  const hasGroups = normalized.some((entry) => {
+    const o = asRecord(entry);
+    return o !== undefined && Array.isArray(o.options);
+  });
+  if (!hasFlatOptions || !hasGroups) {
+    return normalized;
+  }
+  return normalized.flatMap((entry) => {
+    const o = asRecord(entry);
+    if (!o) return [];
+    if ("value" in o) return [entry];
+    return Array.isArray(o.options) ? o.options : [];
+  });
+}
+
+function normalizeSessionConfigOptionEntry(option: unknown): unknown {
+  const o = asRecord(option);
+  if (!o) return option;
+  const id =
+    typeof o.id === "string"
+      ? o.id
+      : typeof (o as { configId?: unknown }).configId === "string"
+        ? (o as { configId: string }).configId
+        : "";
+  const rawName =
+    typeof o.name === "string"
+      ? o.name
+      : typeof o.label === "string"
+        ? o.label
+        : typeof o.title === "string"
+          ? o.title
+          : "";
+  const name = rawName.trim().length > 0 ? rawName : id.length > 0 ? id : "option";
+  const rawType = typeof o.type === "string" ? o.type : Array.isArray(o.options) ? "select" : "";
+  if (rawType === "boolean") {
+    return {
+      ...o,
+      id,
+      name,
+      type: "boolean",
+      currentValue:
+        typeof o.currentValue === "boolean"
+          ? o.currentValue
+          : o.currentValue === "true" || o.current_value === "true",
+    };
+  }
+  const options = Array.isArray(o.options) ? normalizeSelectOptions(o.options) : [];
+  const currentRaw = o.currentValue ?? o.current_value ?? undefined;
+  const currentValue =
+    typeof currentRaw === "string"
+      ? currentRaw
+      : currentRaw !== undefined && currentRaw !== null
+        ? String(currentRaw)
+        : "";
+  return {
+    ...o,
+    id,
+    name,
+    type: "select",
+    currentValue,
+    options,
+  };
+}
+
+export function normalizeHermesSessionConfigOptions(
+  raw: unknown,
+): ReadonlyArray<SessionConfigOption> {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeSessionConfigOptionEntry).flatMap((entry) => {
+    const decoded = decodeSessionConfigOption(entry);
+    return decoded._tag === "Some" ? [decoded.value] : [];
+  });
+}
+
+export function normalizeHermesSetSessionConfigOptionResult(raw: unknown): unknown {
+  const o = asRecord(raw);
+  if (!o) return raw;
+  const next = { ...o };
+  const rawOptions = next.configOptions ?? (next as { config_options?: unknown }).config_options;
+  if (Array.isArray(rawOptions)) {
+    next.configOptions = normalizeHermesSessionConfigOptions(rawOptions);
+  }
+  return next;
+}
+
 function minimalNewSessionForDecode(normalized: unknown): unknown {
   const o = asRecord(normalized);
   if (!o) return normalized;
@@ -178,7 +319,7 @@ function minimalNewSessionForDecode(normalized: unknown): unknown {
 export function decodeHermesInitializeResponse(
   raw: unknown,
 ): Effect.Effect<InitializeResponse, Schema.SchemaError> {
-  return Schema.decodeUnknownEffect(InitializeResponseCodec)(normalizeHermesInitializeResult(raw));
+  return decodeInitializeResponse(normalizeHermesInitializeResult(raw));
 }
 
 /** Decode Hermes `session/new` result; falls back to `sessionId` only if richer fields still fail decode. */
@@ -187,11 +328,16 @@ export function decodeHermesNewSessionResponse(
 ): Effect.Effect<NewSessionResponse, Schema.SchemaError> {
   const normalized = normalizeHermesNewSessionResult(raw);
   return Effect.gen(function* () {
-    const decoder = Schema.decodeUnknownEffect(NewSessionResponseCodec);
-    const attempt = yield* Effect.exit(decoder(normalized));
+    const attempt = yield* Effect.exit(decodeNewSessionResponse(normalized));
     if (Exit.isSuccess(attempt)) {
       return attempt.value;
     }
-    return yield* decoder(minimalNewSessionForDecode(normalized));
+    return yield* decodeNewSessionResponse(minimalNewSessionForDecode(normalized));
   });
+}
+
+export function decodeHermesSetSessionConfigOptionResponse(
+  raw: unknown,
+): Effect.Effect<SetSessionConfigOptionResponse, Schema.SchemaError> {
+  return decodeSetSessionConfigOptionResponse(normalizeHermesSetSessionConfigOptionResult(raw));
 }

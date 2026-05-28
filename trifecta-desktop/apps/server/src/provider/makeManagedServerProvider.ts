@@ -64,8 +64,10 @@ export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(
   });
   const settingsRef = yield* Ref.make(initialSettings);
   const enrichmentFiberRef = yield* Ref.make<Fiber.Fiber<void, unknown> | null>(null);
-  const refreshInFlightRef =
-    yield* Ref.make<Deferred.Deferred<ServerProvider, ServerSettingsError> | null>(null);
+  const refreshInFlightRef = yield* Ref.make<Deferred.Deferred<
+    ServerProvider,
+    ServerSettingsError
+  > | null>(null);
   const scope = yield* Effect.scope;
 
   const publishEnrichedSnapshot = Effect.fn("publishEnrichedSnapshot")(function* (
@@ -157,15 +159,17 @@ export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(
 
   const refreshSnapshot = Effect.fn("refreshSnapshot")(function* () {
     const deferred = yield* Deferred.make<ServerProvider, ServerSettingsError>();
-    const claim = yield* Ref.modify(refreshInFlightRef, (current): readonly [
-      RefreshClaim,
-      Deferred.Deferred<ServerProvider, ServerSettingsError> | null,
-    ] => {
-      if (current !== null) {
-        return [{ activeRefresh: current, ownsRefresh: false }, current] as const;
-      }
-      return [{ activeRefresh: deferred, ownsRefresh: true }, deferred] as const;
-    });
+    const claim = yield* Ref.modify(
+      refreshInFlightRef,
+      (
+        current,
+      ): readonly [RefreshClaim, Deferred.Deferred<ServerProvider, ServerSettingsError> | null] => {
+        if (current !== null) {
+          return [{ activeRefresh: current, ownsRefresh: false }, current] as const;
+        }
+        return [{ activeRefresh: deferred, ownsRefresh: true }, deferred] as const;
+      },
+    );
 
     if (!claim.ownsRefresh) {
       return yield* Deferred.await(claim.activeRefresh);

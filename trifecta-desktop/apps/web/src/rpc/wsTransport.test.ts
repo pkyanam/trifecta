@@ -201,9 +201,7 @@ describe("WsTransport", () => {
   });
 
   it("appends /ws under path-prefixed sandbox proxy bases", async () => {
-    const transport = createTransport(
-      "wss://sbx.belweave.com/3773-abc123/?wsToken=dynamic",
-    );
+    const transport = createTransport("wss://sbx.belweave.com/3773-abc123/?wsToken=dynamic");
 
     await waitFor(() => {
       expect(sockets).toHaveLength(1);

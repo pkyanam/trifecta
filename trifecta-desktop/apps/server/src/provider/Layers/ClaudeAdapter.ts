@@ -2344,7 +2344,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
                     windowDurationMins,
                   }
                 : null,
-            rateLimitReachedType: info.status === "rejected" ? info.rateLimitType ?? null : null,
+            rateLimitReachedType: info.status === "rejected" ? (info.rateLimitType ?? null) : null,
           },
         },
       });
