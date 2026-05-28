@@ -6,17 +6,17 @@ Embed a full coding-agent chat sidebar directly in your editor. Companion apps a
 
 Trifecta is a universal coding-agent interface — it wraps **nine** agents behind one UI in your editor's activity bar:
 
-| Agent | Connection | Install / sign in |
-|---|---|---|
-| **Codex** | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) · `codex login` |
-| **Claude Code** | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) · `claude auth login` |
-| **OpenCode** | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) · `opencode auth login` |
-| **Gemini** | Headless CLI | [Gemini CLI](https://github.com/google-gemini/gemini-cli) · `npm i -g @google/gemini-cli` |
-| **Antigravity** | Python SDK / CLI | Google Antigravity · `google-antigravity` SDK or the `agy` CLI |
-| **Cursor** | ACP (stdio) | [Cursor](https://cursor.sh) · bundled `cursor-agent` *(Early Access)* |
-| **Hermes** | ACP (stdio) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) · `hermes setup` |
-| **Devin** | ACP (stdio) | [Devin](https://devin.ai) · `devin acp` |
-| **ACP Registry** | ACP (stdio) | Any [ACP](https://agentclientprotocol.com)-compatible agent |
+| Agent            | Connection       | Install / sign in                                                                         |
+| ---------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| **Codex**        | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) · `codex login`                      |
+| **Claude Code**  | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) · `claude auth login`               |
+| **OpenCode**     | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) · `opencode auth login`                                   |
+| **Gemini**       | Headless CLI     | [Gemini CLI](https://github.com/google-gemini/gemini-cli) · `npm i -g @google/gemini-cli` |
+| **Antigravity**  | Python SDK / CLI | Google Antigravity · `google-antigravity` SDK or the `agy` CLI                            |
+| **Cursor**       | ACP (stdio)      | [Cursor](https://cursor.sh) · bundled `cursor-agent` _(Early Access)_                     |
+| **Hermes**       | ACP (stdio)      | [Hermes Agent](https://github.com/NousResearch/hermes-agent) · `hermes setup`             |
+| **Devin**        | ACP (stdio)      | [Devin](https://devin.ai) · `devin acp`                                                   |
+| **ACP Registry** | ACP (stdio)      | Any [ACP](https://agentclientprotocol.com)-compatible agent                               |
 
 ## Architecture
 
@@ -47,17 +47,17 @@ Then, in VS Code: **Extensions: Install from VSIX…** and select the built `.vs
 
 ### Settings
 
-| Setting | Default | Description |
-|---|---|---|
-| `trifecta.autoStart` | `true` | Auto-start the server when VS Code opens |
-| `trifecta.serverPort` | `0` | Server port (`0` = random) |
+| Setting               | Default | Description                              |
+| --------------------- | ------- | ---------------------------------------- |
+| `trifecta.autoStart`  | `true`  | Auto-start the server when VS Code opens |
+| `trifecta.serverPort` | `0`     | Server port (`0` = random)               |
 
 ### Commands
 
-| Command | ID | Description |
-|---|---|---|
-| Open Trifecta | `trifecta.openPanel` | Show the sidebar chat panel |
-| Focus Trifecta Chat | `trifecta.focusChat` | Focus the chat input |
+| Command             | ID                   | Description                 |
+| ------------------- | -------------------- | --------------------------- |
+| Open Trifecta       | `trifecta.openPanel` | Show the sidebar chat panel |
+| Focus Trifecta Chat | `trifecta.focusChat` | Focus the chat input        |
 
 ## Development
 
