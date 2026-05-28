@@ -17,8 +17,9 @@ tempAssetsDoNotCommit/
 # standalone cloud app — superseded by trifecta-www unified app
 trifecta-cloud/
 
-# stale native prototype removed from the monorepo
+# stale native prototypes removed from the monorepo
 trifecta-macos-swift/
+trifecta-ios/
 
 # system files
 .DS_Store
