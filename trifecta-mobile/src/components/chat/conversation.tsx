@@ -1,4 +1,5 @@
 import { SymbolImage } from "@/components/symbol-image";
+import { LiquidMetalButton } from "@/components/liquid-metal";
 import { LegendList, LegendListRef } from "@legendapp/list";
 /* eslint-disable react-hooks/immutability -- Reanimated shared values are mutable animation cells. */
 import {
@@ -21,7 +22,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { TouchableGlass } from "../touchable-glass";
 import { KeyboardGestureArea } from "../tw";
 import { useChatContext } from "./chat-context";
 import type { ChatMessage } from "./types";
@@ -345,17 +345,23 @@ export function ConversationScrollButton() {
       pointerEvents="box-none"
       style={[{ position: "absolute", right: 16 }, scrollButtonStyle]}
     >
-      <TouchableGlass
+      <LiquidMetalButton
         onPress={scrollToBottom}
-        hitSlop={8}
-        className="w-10 h-10 rounded-full justify-center items-center"
+        size={40}
+        accessibilityLabel="Scroll to bottom"
       >
         <SymbolImage
           name="chevron.down"
-          sfEffect={{effect: "wiggle", repeat: -1, }}
-          className="text-muted-foreground text-xs mt-1"
+          size={20}
+          style={{
+            tintColor: '#ffffff',
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.35,
+            shadowRadius: 2,
+          }}
         />
-      </TouchableGlass>
+      </LiquidMetalButton>
     </Animated.View>
   );
 }

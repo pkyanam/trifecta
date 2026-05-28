@@ -1,5 +1,7 @@
 import { Icon } from "@/components/icon";
 import { useConnection } from "@/stores/connection";
+import { useActiveThread } from "@/stores/active-thread";
+import { useThreadList } from "@/stores/thread-list";
 import { usePreferences, type ThemePreference } from "@/stores/preferences";
 import { cn } from "@/utils/tailwind";
 import { useRouter } from "expo-router";
@@ -16,6 +18,8 @@ import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
 
 export default function SettingsScreen() {
   const { serverURL, isPaired, unpair } = useConnection();
+  const { clearThreadState } = useActiveThread();
+  const { clearThreadList } = useThreadList();
   const { themePreference, setThemePreference, hapticsEnabled, setHapticsEnabled } = usePreferences();
   const router = useRouter();
 
@@ -29,6 +33,9 @@ export default function SettingsScreen() {
           text: "Disconnect",
           style: "destructive",
           onPress: async () => {
+            // Clear thread state and cache before disconnecting
+            clearThreadState();
+            clearThreadList();
             await unpair();
             router.replace("/pair");
           },

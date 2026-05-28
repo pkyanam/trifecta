@@ -1,4 +1,6 @@
 import { Icon } from "@/components/icon";
+import { LiquidMetalButton } from "@/components/liquid-metal";
+import { SymbolImage } from "@/components/symbol-image";
 import { exchangeToken, fetchEnvironment, parsePairingURL, getServerURLForPlatform } from "@/services/pairing";
 import { useConnection } from "@/stores/connection";
 import * as Clipboard from "expo-clipboard";
@@ -268,21 +270,43 @@ export default function PairScreen() {
         ) : null}
 
         {/* ── Connect Button ────────────────────────────── */}
-        <Pressable
-          onPress={handleConnect}
-          disabled={!canConnect || isConnecting}
-          className={`rounded-2xl px-4 py-4 items-center mb-8 ${
-            canConnect && !isConnecting ? "bg-foreground active:opacity-70" : "bg-muted"
-          }`}
-        >
-          <Text
-            className={`text-[16px] font-semibold ${
-              canConnect && !isConnecting ? "text-background" : "text-muted-foreground"
+        <View className="flex-row items-center gap-3 mb-8">
+          <Pressable
+            onPress={handleConnect}
+            disabled={!canConnect || isConnecting}
+            className={`flex-1 rounded-2xl px-4 py-4 items-center ${
+              canConnect && !isConnecting ? "bg-foreground active:opacity-70" : "bg-muted"
             }`}
           >
-            {isConnecting ? "Connecting…" : "Connect"}
-          </Text>
-        </Pressable>
+            <Text
+              className={`text-[16px] font-semibold ${
+                canConnect && !isConnecting ? "text-background" : "text-muted-foreground"
+              }`}
+            >
+              {isConnecting ? "Connecting…" : "Connect"}
+            </Text>
+          </Pressable>
+          <LiquidMetalButton
+            onPress={handleConnect}
+            disabled={!canConnect || isConnecting}
+            isLoading={isConnecting}
+            size={40}
+            variant="connect"
+            accessibilityLabel="Connect"
+          >
+            <SymbolImage
+              name="arrow.right"
+              size={20}
+              style={{
+                tintColor: '#ffffff',
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.35,
+                shadowRadius: 2,
+              }}
+            />
+          </LiquidMetalButton>
+        </View>
 
         {/* ── Tips ──────────────────────────────────────── */}
         <View>

@@ -19,6 +19,8 @@ interface ActiveThreadContextValue {
   setActiveThreadId: (id: ThreadId | null) => void;
   /** Switch to a new empty chat for the given project */
   startNewChat: (projectId?: string | null) => void;
+  /** Clear all thread state (called on manual disconnect) */
+  clearThreadState: () => void;
   createThread: (
     projectId: string,
     text: string,
@@ -195,6 +197,13 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
     }
   }, [persistActiveThreadId]);
 
+  const clearThreadState = useCallback(() => {
+    setActiveThreadId(null);
+    persistActiveThreadId(null);
+    setNewChatMode(false);
+    setNewChatProjectId(null);
+  }, [persistActiveThreadId]);
+
   return (
     <ActiveThreadContext
       value={{
@@ -204,6 +213,7 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
         newChatProjectId,
         setActiveThreadId: handleSetActiveThreadId,
         startNewChat,
+        clearThreadState,
         createThread,
         dispatchTurnStart,
       }}

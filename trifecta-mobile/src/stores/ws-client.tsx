@@ -74,6 +74,7 @@ class WsRpcClient {
   private readonly HEARTBEAT_INTERVAL = 5_000; // 5 seconds
   private connectionTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly CONNECTION_TIMEOUT = 10_000; // 10 seconds
+  private readonly REQUEST_TIMEOUT = 30_000; // 30 seconds
 
   constructor(
     private serverURL: string,
@@ -206,22 +207,37 @@ class WsRpcClient {
 
   private handleFrame(frame: Record<string, unknown>) {
     const tag = frame._tag as string;
+    console.log("[WS Client] Received frame:", tag, frame);
     switch (tag) {
       case "Chunk": {
         const requestId = frame.requestId as string;
         const values = (frame.values as unknown[]) ?? [];
+        console.log("[WS Client] Chunk for requestId:", requestId, "values:", values);
         const sub = this.streams.get(requestId);
         if (sub) {
+          console.log("[WS Client] Found subscription for requestId:", requestId, "method:", sub.method);
+          // Clear timeout on first chunk received
+          if ((sub as any).timeout) {
+            clearTimeout((sub as any).timeout);
+            (sub as any).timeout = null;
+          }
           for (const v of values) sub.onValue(v);
           this.send(JSON.stringify({ _tag: "Ack", requestId }));
+        } else {
+          console.log("[WS Client] No subscription found for requestId:", requestId);
         }
         break;
       }
       case "Exit": {
         const requestId = frame.requestId as string;
         const exit = (frame.exit ?? {}) as Record<string, unknown>;
+        console.log("[WS Client] Exit for requestId:", requestId, "exit:", exit);
         const pend = this.pending.get(requestId);
         if (pend) {
+          // Clear timeout if it exists
+          if ((pend as any).timeout) {
+            clearTimeout((pend as any).timeout);
+          }
           this.pending.delete(requestId);
           if (exit._tag === "Success") {
             pend.resolve(exit.value);
@@ -229,11 +245,17 @@ class WsRpcClient {
             // Include error details in the rejection
             let errorMessage = "RPC request failed";
             
-            // Handle nested error structure from Effect
+            // Handle nested error structure from Effect. The encoded cause is an
+            // array of { _tag: "Fail", error } | { _tag: "Die", defect } |
+            // { _tag: "Interrupt", fiberId }. A server-side defect (e.g. a thrown
+            // TypeError) arrives as "Die" with the thrown value under `defect`.
             if (exit.cause && Array.isArray(exit.cause) && exit.cause.length > 0) {
               const cause = exit.cause[0] as Record<string, unknown>;
-              if (cause.error && typeof cause.error === "object") {
-                const errorObj = cause.error as Record<string, unknown>;
+              const errLike = (cause.error ?? cause.defect) as unknown;
+              if (cause._tag === "Interrupt") {
+                errorMessage = "Request was interrupted by the server";
+              } else if (errLike && typeof errLike === "object") {
+                const errorObj = errLike as Record<string, unknown>;
                 if (typeof errorObj.detail === "string") {
                   errorMessage = errorObj.detail;
                 } else if (typeof errorObj.message === "string") {
@@ -241,6 +263,8 @@ class WsRpcClient {
                 } else {
                   errorMessage = JSON.stringify(errorObj);
                 }
+              } else if (typeof errLike === "string") {
+                errorMessage = errLike;
               }
             } else if (exit.error) {
               if (typeof exit.error === "string") {
@@ -265,7 +289,29 @@ class WsRpcClient {
           }
         }
         // streams: exit means the subscription ended (shouldn't happen for long-lived subs)
+        const sub = this.streams.get(requestId);
+        if (sub && (sub as any).timeout) {
+          clearTimeout((sub as any).timeout);
+        }
         this.streams.delete(requestId);
+        break;
+      }
+      case "Defect": {
+        // A connection-level protocol defect carries no requestId, so it cannot
+        // be tied to a specific call. It almost always signals a client/server
+        // contract mismatch (e.g. an unknown request tag). Log it loudly, but do
+        // NOT fail unrelated in-flight requests — that would reject calls that
+        // are about to succeed. Genuine handler failures arrive as request-scoped
+        // Exit/Failure frames (server sets disableFatalDefects), so they're
+        // handled in the "Exit" case above, not here.
+        const defect = frame.defect as Record<string, unknown> | string | undefined;
+        const detail =
+          typeof defect === "string"
+            ? defect
+            : defect && typeof defect === "object" && typeof defect.message === "string"
+              ? defect.message
+              : JSON.stringify(defect ?? frame);
+        console.error("[WS Client] Server protocol defect (ignored, no requestId):", detail);
         break;
       }
       case "Ping":
@@ -366,6 +412,15 @@ class WsRpcClient {
       const frame = makeRpcFrame(id, method, payload);
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(frame);
+        // Add request timeout
+        const timeout = setTimeout(() => {
+          if (this.pending.has(id)) {
+            this.pending.delete(id);
+            reject(new Error("Request timeout"));
+          }
+        }, this.REQUEST_TIMEOUT);
+        // Store timeout reference to clear it on completion
+        (this.pending.get(id) as any).timeout = timeout;
       } else {
         this.pending.delete(id);
         reject(new Error("Not connected"));
@@ -379,11 +434,29 @@ class WsRpcClient {
     onValue: (value: unknown) => void,
   ): () => void {
     const id = String(this.nextId++);
+    console.log("[WS Client] Subscribing to stream:", method, "with payload:", payload, "requestId:", id);
     this.streams.set(id, { method, payload, onValue });
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.send(makeRpcFrame(id, method, payload));
+      const frame = makeRpcFrame(id, method, payload);
+      console.log("[WS Client] Sending subscription frame:", frame);
+      this.send(frame);
+      // Add timeout for subscription to start receiving data
+      const timeout = setTimeout(() => {
+        if (this.streams.has(id)) {
+          console.log("[WS Client] Subscription timeout for requestId:", id);
+          this.streams.delete(id);
+        }
+      }, this.REQUEST_TIMEOUT);
+      (this.streams.get(id) as any).timeout = timeout;
+    } else {
+      console.log("[WS Client] WebSocket not ready, subscription will be sent on reconnect");
     }
     return () => {
+      console.log("[WS Client] Unsubscribing from stream:", method, "requestId:", id);
+      const sub = this.streams.get(id);
+      if (sub && (sub as any).timeout) {
+        clearTimeout((sub as any).timeout);
+      }
       this.streams.delete(id);
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.send(JSON.stringify({ _tag: "Interrupt", requestId: id, interruptors: [] }));
