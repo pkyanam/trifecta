@@ -79,6 +79,7 @@ import {
   SshHostProfileCreateInput,
   SshHostProfileList,
   SshHostProfileRemoveInput,
+  SshHostProfileUpdateInput,
   SshIssueSessionTokenInput,
   SshIssueSessionTokenResult,
   SshOpenSessionInput,
@@ -161,6 +162,7 @@ export const WS_METHODS = {
   sshListHosts: "ssh.listHosts",
   sshAddHost: "ssh.addHost",
   sshRemoveHost: "ssh.removeHost",
+  sshUpdateHost: "ssh.updateHost",
   sshOpenSession: "ssh.openSession",
   sshGetSession: "ssh.getSession",
   sshSendInput: "ssh.sendInput",
@@ -441,6 +443,12 @@ export const WsSshRemoveHostRpc = Rpc.make(WS_METHODS.sshRemoveHost, {
   error: SshError,
 });
 
+export const WsSshUpdateHostRpc = Rpc.make(WS_METHODS.sshUpdateHost, {
+  payload: SshHostProfileUpdateInput,
+  success: SshHostProfile,
+  error: SshError,
+});
+
 export const WsSshOpenSessionRpc = Rpc.make(WS_METHODS.sshOpenSession, {
   payload: SshOpenSessionInput,
   success: SshOpenSessionResult,
@@ -622,6 +630,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsSshListHostsRpc,
   WsSshAddHostRpc,
   WsSshRemoveHostRpc,
+  WsSshUpdateHostRpc,
   WsSshOpenSessionRpc,
   WsSshGetSessionRpc,
   WsSshSendInputRpc,

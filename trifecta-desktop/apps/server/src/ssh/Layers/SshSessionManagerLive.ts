@@ -6,7 +6,6 @@ import {
   SshHostId,
   SshHostKeyMismatchError,
   SshHostProfile,
-  SshHostProfileNotFoundError,
   SshSessionId,
   SshSessionLimitError,
   SshSessionNotFoundError,
@@ -689,9 +688,9 @@ const make = Effect.gen(function* () {
             ),
           );
         yield* hostProfiles
-          .setExpectedFingerprint({
+          .update({
             hostId: state.host.id,
-            fingerprint: state.pendingFingerprint.sha256,
+            expectedFingerprint: state.pendingFingerprint.sha256,
           })
           .pipe(Effect.catch(() => Effect.void));
       }

@@ -372,15 +372,8 @@ export const make = Effect.fn("makeGitHubCli")(function* () {
     isBranchProtected: (input) =>
       execute({
         cwd: input.cwd,
-        args: [
-          "api",
-          `repos/{owner}/{repo}/branches/${input.branch}`,
-          "--jq",
-          ".protected",
-        ],
-      }).pipe(
-        Effect.map((value) => value.stdout.trim().toLowerCase() === "true"),
-      ),
+        args: ["api", `repos/{owner}/{repo}/branches/${input.branch}`, "--jq", ".protected"],
+      }).pipe(Effect.map((value) => value.stdout.trim().toLowerCase() === "true")),
     checkoutPullRequest: (input) =>
       execute({
         cwd: input.cwd,

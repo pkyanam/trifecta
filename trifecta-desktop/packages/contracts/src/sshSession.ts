@@ -59,6 +59,7 @@ export const SshHostProfileCreateInput = Schema.Struct({
   port: PortSchema,
   username: SshUsernameSchema,
   authMethod: SshAuthMethod,
+  expectedFingerprint: Schema.NullOr(TrimmedNonEmptyString),
 });
 export type SshHostProfileCreateInput = typeof SshHostProfileCreateInput.Type;
 
@@ -66,6 +67,12 @@ export const SshHostProfileRemoveInput = Schema.Struct({
   hostId: SshHostId,
 });
 export type SshHostProfileRemoveInput = typeof SshHostProfileRemoveInput.Type;
+
+export const SshHostProfileUpdateInput = Schema.Struct({
+  hostId: SshHostId,
+  expectedFingerprint: Schema.NullOr(TrimmedNonEmptyString),
+});
+export type SshHostProfileUpdateInput = typeof SshHostProfileUpdateInput.Type;
 
 export const SshHostProfileList = Schema.Struct({
   hosts: Schema.Array(SshHostProfile),
@@ -234,6 +241,7 @@ export const SshAuditEventType = Schema.Literals([
   "auth-failed",
   "host-profile-created",
   "host-profile-removed",
+  "host-profile-updated",
 ]);
 export type SshAuditEventType = typeof SshAuditEventType.Type;
 

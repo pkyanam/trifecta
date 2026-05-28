@@ -546,13 +546,12 @@ const buildAppUnderTest = (options?: {
         create: (input) =>
           Effect.succeed({
             id: `ssh-host-${crypto.randomUUID()}` as SshHostProfile["id"],
-            expectedFingerprint: null,
             createdAt: DateTime.formatIso(TEST_EPOCH),
             updatedAt: DateTime.formatIso(TEST_EPOCH),
             ...input,
           }),
         remove: () => Effect.void,
-        setExpectedFingerprint: ({ hostId, fingerprint }) =>
+        update: ({ hostId, expectedFingerprint }) =>
           Effect.succeed({
             id: hostId,
             label: "SSH Host",
@@ -560,7 +559,7 @@ const buildAppUnderTest = (options?: {
             port: 22,
             username: "test",
             authMethod: "agent-forward" as const,
-            expectedFingerprint: fingerprint,
+            expectedFingerprint,
             createdAt: DateTime.formatIso(TEST_EPOCH),
             updatedAt: DateTime.formatIso(TEST_EPOCH),
           }),
