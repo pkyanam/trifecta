@@ -4,7 +4,6 @@ import {
   SshHostId,
   SshHostProfile,
   SshHostProfileConflictError,
-  SshHostProfileCreateInput,
   SshHostProfileNotFoundError,
 } from "@belweave/contracts";
 import * as DateTime from "effect/DateTime";
@@ -192,7 +191,7 @@ const make = Effect.gen(function* () {
           ${input.port},
           ${input.username},
           ${input.authMethod},
-          NULL,
+          ${input.expectedFingerprint ?? null},
           ${now},
           ${now}
         )
@@ -204,7 +203,7 @@ const make = Effect.gen(function* () {
         port: input.port,
         username: input.username,
         authMethod: input.authMethod,
-        expectedFingerprint: null,
+        expectedFingerprint: input.expectedFingerprint ?? null,
         createdAt: now,
         updatedAt: now,
       } satisfies SshHostProfile;
@@ -218,28 +217,23 @@ const make = Effect.gen(function* () {
       );
     });
 
-  const setExpectedFingerprint: SshHostProfilesShape["setExpectedFingerprint"] = ({
-    hostId,
-    fingerprint,
-  }) =>
+  const update: SshHostProfilesShape["update"] = (input) =>
     Effect.gen(function* () {
-      const existing = yield* get(hostId);
+      const existing = yield* get(input.hostId);
       const now = DateTime.formatIso(yield* DateTime.now);
       yield* sql`
         UPDATE ssh_host_profiles
-        SET expected_fingerprint = ${fingerprint}, updated_at = ${now}
-        WHERE id = ${hostId}
-      `.pipe(
-        Effect.mapError(toPersistenceSqlError("SshHostProfiles.setExpectedFingerprint:update")),
-      );
+        SET expected_fingerprint = ${input.expectedFingerprint}, updated_at = ${now}
+        WHERE id = ${input.hostId}
+      `.pipe(Effect.mapError(toPersistenceSqlError("SshHostProfiles.update:update")));
       return {
         ...existing,
-        expectedFingerprint: fingerprint,
+        expectedFingerprint: input.expectedFingerprint,
         updatedAt: now,
       } satisfies SshHostProfile;
     });
 
-  return SshHostProfiles.of({ list, get, create, remove, setExpectedFingerprint });
+  return SshHostProfiles.of({ list, get, create, remove, update });
 });
 
 export const SshHostProfilesSqliteLive = Layer.effect(SshHostProfiles, make);

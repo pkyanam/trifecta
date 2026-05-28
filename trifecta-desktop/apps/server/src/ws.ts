@@ -21,8 +21,7 @@ import {
   type GitManagerServiceError,
   OrchestrationDispatchCommandError,
   SshError,
-  SshHostId,
-  SshSessionId,
+  SshHostProfileUpdateInput,
   SshSetupShellProfileResult,
   SshSpawnError,
   type SshTerminalEvent,
@@ -1007,7 +1006,9 @@ const makeWsRpcLayer = (session: AuthenticatedSession) =>
               }),
             ).pipe(
               Effect.flatMap(() =>
-                serverSettings.updateSettings(patch).pipe(Effect.map(redactServerSettingsForClient)),
+                serverSettings
+                  .updateSettings(patch)
+                  .pipe(Effect.map(redactServerSettingsForClient)),
               ),
             ),
             {
@@ -1265,7 +1266,9 @@ const makeWsRpcLayer = (session: AuthenticatedSession) =>
             WS_METHODS.vcsCreateWorktree,
             reviewDenied(reviewDeniedGit("createWorktree", input.cwd)).pipe(
               Effect.flatMap(() =>
-                gitWorkflow.createWorktree(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+                gitWorkflow
+                  .createWorktree(input)
+                  .pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
               ),
             ),
             { "rpc.aggregate": "vcs" },
@@ -1275,7 +1278,9 @@ const makeWsRpcLayer = (session: AuthenticatedSession) =>
             WS_METHODS.vcsRemoveWorktree,
             reviewDenied(reviewDeniedGit("removeWorktree", input.cwd)).pipe(
               Effect.flatMap(() =>
-                gitWorkflow.removeWorktree(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+                gitWorkflow
+                  .removeWorktree(input)
+                  .pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
               ),
             ),
             { "rpc.aggregate": "vcs" },
@@ -1513,6 +1518,29 @@ const makeWsRpcLayer = (session: AuthenticatedSession) =>
             }).pipe(Effect.mapError((cause) => mapToSshError(cause))),
             { "rpc.aggregate": "ssh" },
           ),
+        [WS_METHODS.sshUpdateHost]: (input: SshHostProfileUpdateInput) =>
+          observeRpcEffect(
+            WS_METHODS.sshUpdateHost,
+            Effect.gen(function* () {
+              yield* reviewDenied(reviewDeniedSsh());
+              const profile = yield* sshHostProfiles.update(input);
+              yield* sshAuditLog
+                .append({
+                  type: "host-profile-updated",
+                  actorSessionId: currentSessionId,
+                  hostId: profile.id,
+                  hostname: profile.hostname,
+                  port: profile.port,
+                  username: profile.username,
+                  authMethod: profile.authMethod,
+                  sshSessionId: null,
+                  message: `Host profile updated: ${profile.label}`,
+                })
+                .pipe(Effect.catch(() => Effect.void));
+              return profile;
+            }).pipe(Effect.mapError((cause) => mapToSshError(cause))),
+            { "rpc.aggregate": "ssh" },
+          ),
         [WS_METHODS.sshOpenSession]: (input) =>
           observeRpcEffect(
             WS_METHODS.sshOpenSession,
@@ -1647,55 +1675,65 @@ const makeWsRpcLayer = (session: AuthenticatedSession) =>
         [WS_METHODS.sshSetupShellProfile]: (_input: unknown) =>
           observeRpcEffect(
             WS_METHODS.sshSetupShellProfile,
-            reviewDenied(reviewDeniedSsh()).pipe(Effect.flatMap(() => Effect.sync(() => {
-              if (process.platform !== "darwin") {
-                return SshSetupShellProfileResult.make({
-                  shellProfile: process.platform === "win32" ? "Windows OpenSSH" : "OpenSSH",
-                  alreadyPresent: true,
-                });
-              }
-
-              const home = process.env.HOME ?? process.cwd();
-              const marker = "# >>> trifecta-ssh-keychain >>>";
-              const markerEnd = "# <<< trifecta-ssh-keychain <<<";
-              const snippet = [
-                marker,
-                'if [ -n "$SSH_CONNECTION" ] && [ "$TERM" != "dumb" ]; then',
-                "  security unlock-keychain ~/Library/Keychains/login.keychain-db 2>/dev/null || true",
-                "fi",
-                markerEnd,
-              ].join("\n");
-              const fs = require("node:fs");
-              const path = require("node:path");
-              for (const rcFile of [".zshrc", ".bashrc", ".bash_profile"]) {
-                const rcPath = path.join(home, rcFile);
-                try {
-                  const content = fs.readFileSync(rcPath, "utf-8");
-                  if (content.includes(marker)) {
+            reviewDenied(reviewDeniedSsh()).pipe(
+              Effect.flatMap(() =>
+                Effect.sync(() => {
+                  if (process.platform !== "darwin") {
                     return SshSetupShellProfileResult.make({
-                      shellProfile: rcFile as any,
+                      shellProfile: process.platform === "win32" ? "Windows OpenSSH" : "OpenSSH",
                       alreadyPresent: true,
                     });
                   }
-                } catch {
-                  continue;
-                }
-              }
-              const shell = process.env.SHELL ?? "/bin/zsh";
-              const rcFile = shell.endsWith("zsh") ? ".zshrc" : ".bashrc";
-              const rcPath = path.join(home, rcFile);
-              let content = "";
-              try {
-                content = fs.readFileSync(rcPath, "utf-8");
-              } catch {
-                content = "";
-              }
-              fs.writeFileSync(rcPath, content.trimEnd() + "\n\n" + snippet + "\n", "utf-8");
-              return SshSetupShellProfileResult.make({
-                shellProfile: rcFile as any,
-                alreadyPresent: false,
-              });
-            }))),
+
+                  const home = process.env.HOME ?? process.cwd();
+                  const marker = "# >>> trifecta-ssh-keychain >>>";
+                  const markerEnd = "# <<< trifecta-ssh-keychain <<<";
+                  // No-op block: just the markers, no `security unlock-keychain`.
+                  // That command prompts for a password on stdout when the Keychain
+                  // is locked — the prompt appears verbatim in the mobile SSH terminal.
+                  // Keychain access is managed by the desktop app, not the remote shell.
+                  const snippet = [marker, markerEnd].join("\n");
+                  // Replace old blocks that contained the interactive unlock command.
+                  const blockRe =
+                    /# >>> trifecta-ssh-keychain >>>[\s\S]*?# <<< trifecta-ssh-keychain <<<\n?/;
+                  const fs = require("node:fs");
+                  const path = require("node:path");
+                  for (const rcFile of [".zshrc", ".bashrc", ".bash_profile"]) {
+                    const rcPath = path.join(home, rcFile);
+                    try {
+                      const content = fs.readFileSync(rcPath, "utf-8");
+                      if (content.includes(marker)) {
+                        // Upgrade: strip the interactive unlock command from existing installs.
+                        const upgraded = content.replace(blockRe, snippet + "\n");
+                        if (upgraded !== content) {
+                          fs.writeFileSync(rcPath, upgraded, "utf-8");
+                        }
+                        return SshSetupShellProfileResult.make({
+                          shellProfile: rcFile as any,
+                          alreadyPresent: true,
+                        });
+                      }
+                    } catch {
+                      continue;
+                    }
+                  }
+                  const shell = process.env.SHELL ?? "/bin/zsh";
+                  const rcFile = shell.endsWith("zsh") ? ".zshrc" : ".bashrc";
+                  const rcPath = path.join(home, rcFile);
+                  let content = "";
+                  try {
+                    content = fs.readFileSync(rcPath, "utf-8");
+                  } catch {
+                    content = "";
+                  }
+                  fs.writeFileSync(rcPath, content.trimEnd() + "\n\n" + snippet + "\n", "utf-8");
+                  return SshSetupShellProfileResult.make({
+                    shellProfile: rcFile as any,
+                    alreadyPresent: false,
+                  });
+                }),
+              ),
+            ),
             { "rpc.aggregate": "ssh" },
           ),
         [WS_METHODS.subscribeSshTerminal]: (input) =>
@@ -1762,6 +1800,11 @@ export const websocketRpcRouteLayer = Layer.unwrap(
         const session = yield* serverAuth.authenticateWebSocketUpgrade(request);
         const rpcWebSocketHttpEffect = yield* RpcServer.toHttpEffectWebsocket(WsRpcGroup, {
           disableTracing: true,
+          // A buggy handler (e.g. a thrown TypeError) must not be reported as a
+          // connection-level `Defect` frame with no requestId — that leaves the
+          // client's pending request hanging until it times out. With this set,
+          // the defect comes back as a request-scoped Exit/Failure instead.
+          disableFatalDefects: true,
         }).pipe(
           Effect.provide(
             makeWsRpcLayer(session).pipe(

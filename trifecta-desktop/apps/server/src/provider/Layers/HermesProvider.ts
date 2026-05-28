@@ -16,10 +16,18 @@ import * as Result from "effect/Result";
 import * as Scope from "effect/Scope";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-import type { HermesSettings, ServerProvider, ServerProviderModel } from "@belweave/contracts";
+import type {
+  HermesSettings,
+  ProviderOptionChoice,
+  ProviderOptionDescriptor,
+  ServerProvider,
+  ServerProviderModel,
+} from "@belweave/contracts";
 import { ServerSettingsError } from "@belweave/contracts";
+import { createModelCapabilities } from "@belweave/shared/model";
 
 import * as AcpClient from "effect-acp/client";
+import type * as AcpSchema from "effect-acp/schema";
 import { AGENT_METHODS } from "effect-acp/schema";
 
 import {
@@ -31,6 +39,7 @@ import {
 import {
   decodeHermesInitializeResponse,
   decodeHermesNewSessionResponse,
+  normalizeHermesSessionConfigOptions,
 } from "../hermes/HermesAcpWire.ts";
 import packageJson from "../../../package.json" with { type: "json" };
 
@@ -45,6 +54,86 @@ class HermesAcpProbeError extends Data.TaggedError("HermesAcpProbeError")<{
 export interface HermesProviderSnapshot {
   readonly models: ReadonlyArray<ServerProviderModel>;
   readonly version: string | undefined;
+}
+
+function flattenConfigOptionValues(
+  option: Extract<AcpSchema.SessionConfigOption, { readonly type: "select" }>,
+): ReadonlyArray<{ readonly value: string; readonly name: string; readonly description?: string }> {
+  return option.options.flatMap((entry) =>
+    "value" in entry
+      ? [
+          {
+            value: entry.value,
+            name: entry.name,
+            ...(entry.description ? { description: entry.description } : {}),
+          },
+        ]
+      : entry.options.map((grouped) => ({
+          value: grouped.value,
+          name: grouped.name,
+          ...(grouped.description ? { description: grouped.description } : {}),
+        })),
+  );
+}
+
+function modelOptionDescriptorsFromConfigOptions(
+  configOptions: ReadonlyArray<AcpSchema.SessionConfigOption>,
+): ReadonlyArray<ProviderOptionDescriptor> {
+  const descriptors: ProviderOptionDescriptor[] = [];
+  for (const option of configOptions) {
+    if (option.category === "model") continue;
+    if (option.type === "boolean") {
+      descriptors.push({
+        id: option.id,
+        label: option.name,
+        ...(option.description ? { description: option.description } : {}),
+        type: "boolean",
+        currentValue: option.currentValue,
+      });
+      continue;
+    }
+    const choices: ProviderOptionChoice[] = [];
+    for (const choice of flattenConfigOptionValues(option)) {
+      if (choice.value.trim().length === 0 || choice.name.trim().length === 0) continue;
+      choices.push({
+        id: choice.value,
+        label: choice.name,
+        ...(choice.description ? { description: choice.description } : {}),
+        ...(choice.value === option.currentValue ? { isDefault: true } : {}),
+      });
+    }
+    if (choices.length > 0) {
+      descriptors.push({
+        id: option.id,
+        label: option.name,
+        ...(option.description ? { description: option.description } : {}),
+        type: "select",
+        currentValue: option.currentValue,
+        options: choices,
+      });
+    }
+  }
+  return descriptors;
+}
+
+function modelsFromSessionConfigOptions(
+  configOptions: ReadonlyArray<AcpSchema.SessionConfigOption>,
+): ReadonlyArray<ServerProviderModel> {
+  const modelConfig = configOptions.find(
+    (option): option is Extract<AcpSchema.SessionConfigOption, { readonly type: "select" }> =>
+      option.type === "select" && option.category === "model",
+  );
+  if (!modelConfig) return [];
+  const descriptors = modelOptionDescriptorsFromConfigOptions(configOptions);
+  const capabilities = createModelCapabilities({ optionDescriptors: descriptors });
+  return flattenConfigOptionValues(modelConfig)
+    .filter((model) => model.value.trim().length > 0 && model.name.trim().length > 0)
+    .map((model) => ({
+      slug: model.value,
+      name: model.name,
+      isCustom: false,
+      capabilities,
+    }));
 }
 
 const probeHermesProvider = Effect.fn("probeHermesProvider")(function* (input: {
@@ -135,16 +224,21 @@ const probeHermesProvider = Effect.fn("probeHermesProvider")(function* (input: {
       ),
     );
 
+    const configOptions = normalizeHermesSessionConfigOptions(session.configOptions ?? []);
+    const optionModels = modelsFromSessionConfigOptions(configOptions);
     const availableModels = session.models?.availableModels ?? [];
+    const descriptors = modelOptionDescriptorsFromConfigOptions(configOptions);
+    const capabilities =
+      descriptors.length > 0 ? createModelCapabilities({ optionDescriptors: descriptors }) : null;
     const models: ServerProviderModel[] = availableModels.map((m) => ({
       slug: m.modelId,
       name: m.name ?? m.modelId,
       isCustom: false,
-      capabilities: null,
+      capabilities,
     }));
 
     const version = initialized.agentInfo?.version ?? undefined;
-    return { models, version };
+    return { models: models.length > 0 ? models : optionModels, version };
   }).pipe(Effect.provide(acpLayer));
 });
 

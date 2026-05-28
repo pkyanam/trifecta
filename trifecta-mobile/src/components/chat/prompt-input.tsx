@@ -1,16 +1,15 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { SymbolImage } from "@/components/symbol-image";
 import { TouchableGlass } from "@/components/touchable-glass";
+import { LiquidMetalSubmitButton } from "@/components/LiquidMetalSubmitButton";
 import {
   GlassContainer,
   GlassView,
   isLiquidGlassAvailable,
 } from "expo-glass-effect";
 import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import { Text, TextInput, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 
-import { cn } from "@/utils/tailwind";
 import { BlurView } from "expo-blur";
 import { useChatContext } from "./chat-context";
 import { useConversationContext } from "./conversation";
@@ -458,44 +457,21 @@ export function PromptInputTextarea({
 /**
  * Submit button that sends the current input. Shows a spinner while the model
  * is generating. Reads state from `ChatContext`.
+ * Now uses LiquidMetalSubmitButton with animated shader effect.
+ * Uses 'stop' variant with higher turbulence when generating.
  */
 export function PromptInputSubmit() {
   const { input, isGenerating, onSend } = useChatContext();
   const disabled = !input.trim() || isGenerating;
 
   return (
-    <Pressable
-      style={({ pressed }) => ({
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        borderCurve: "continuous",
-        justifyContent: "center",
-        alignItems: "center",
-        opacity: pressed ? 0.7 : 1,
-        margin: 5,
-      })}
-      className={disabled ? "bg-secondary" : "bg-foreground"}
+    <LiquidMetalSubmitButton
       onPress={onSend}
       disabled={disabled}
-    >
-      {isGenerating ? (
-        <Animated.View entering={FadeIn} exiting={FadeOut}>
-          <ActivityIndicator size="small" colorClassName="text-foreground" className="text-foreground" />
-        </Animated.View>
-      ) : (
-          <SymbolImage
-            name="arrow.up"
-            size={16}
-            sfEffect="scale/up"
-            className={cn(
-              "font-semibold",
-              disabled
-                ? "text-muted-foreground"
-                : "text-background",
-            )}
-          />
-      )}
-    </Pressable>
+      isLoading={isGenerating}
+      size={34}
+      variant={isGenerating ? 'stop' : 'default'}
+      style={{ margin: 5 }}
+    />
   );
 }

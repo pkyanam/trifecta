@@ -160,6 +160,20 @@ const buildCmd = Command.make(
       const repoRoot = yield* RepoRoot;
       const serverDir = path.join(repoRoot, "apps/server");
 
+      // tsdown does NOT typecheck, so gate the build on the two ship-breaking
+      // Effect mistakes that have reached packaged builds before: calls to a
+      // non-existent Effect API, and unprovided layer dependencies. See
+      // scripts/typecheck-gate.mjs (it deliberately ignores advisory noise).
+      yield* Effect.log("[cli] Running Effect typecheck gate...");
+      yield* runCommand(
+        ChildProcess.make(process.execPath, ["scripts/typecheck-gate.mjs"], {
+          cwd: serverDir,
+          stdout: "inherit",
+          stderr: "inherit",
+          shell: process.platform === "win32",
+        }),
+      );
+
       yield* Effect.log("[cli] Running tsdown...");
       yield* runCommand(
         ChildProcess.make(process.execPath, ["--run", "build:bundle"], {

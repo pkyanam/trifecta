@@ -13,6 +13,7 @@ import { PreferencesProvider, usePreferences } from "@/stores/preferences";
 import { WsClientProvider } from "@/stores/ws-client";
 import { ThreadListProvider } from "@/stores/thread-list";
 import { ActiveThreadProvider } from "@/stores/active-thread";
+import { SshProvider } from "@/stores/ssh";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -77,7 +78,9 @@ function WsClientInner({ children }: { children: React.ReactNode }) {
     >
       <ThreadListProvider>
         <ActiveThreadProvider>
-          {children}
+          <SshProvider>
+            {children}
+          </SshProvider>
         </ActiveThreadProvider>
       </ThreadListProvider>
     </WsClientProvider>
@@ -207,6 +210,18 @@ function StackLayout() {
           title: "New Chat",
           presentation: "formSheet",
           sheetAllowedDetents: "fitToContents",
+          sheetCornerRadius: IS_ANDROID ? 28 : undefined,
+          sheetGrabberVisible: true,
+          headerShown: false,
+        }}
+      />
+
+      <Stack.Screen
+        name="ssh"
+        options={{
+          title: "SSH Terminal",
+          presentation: IS_ANDROID ? undefined : "formSheet",
+          sheetAllowedDetents: [0.85],
           sheetCornerRadius: IS_ANDROID ? 28 : undefined,
           sheetGrabberVisible: true,
           headerShown: false,

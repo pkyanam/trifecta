@@ -227,7 +227,10 @@ const SshBaseLayerLive = Layer.mergeAll(
   SshHostProfilesSqliteLive,
   SshKnownHostsSqliteLive,
   SshAuditLogSqliteLive,
-  SshCredentialsLive,
+  // SshCredentialsLive now uses ProcessRunner (ssh-add agent unlock). mergeAll
+  // does NOT wire siblings into each other, so feed ProcessRunner in directly —
+  // otherwise its requirement leaks out unsatisfied and the server fails to boot.
+  SshCredentialsLive.pipe(Layer.provide(ProcessRunner.layer)),
   SshTokenAuthorityLive,
   ProcessRunner.layer,
 );

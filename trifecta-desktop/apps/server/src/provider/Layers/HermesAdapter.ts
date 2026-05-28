@@ -28,6 +28,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import {
   type ApprovalRequestId,
   type CanonicalItemType,
+  type CanonicalRequestType,
   type HermesSettings,
   type ProviderApprovalDecision,
   type ProviderRuntimeEvent,
@@ -44,6 +45,7 @@ import {
   RuntimeRequestId,
   TurnId as TurnIdSchema,
 } from "@belweave/contracts";
+import { getProviderOptionSelectionValue } from "@belweave/shared/model";
 
 import * as AcpClient from "effect-acp/client";
 import type * as AcpSchema from "effect-acp/schema";
@@ -59,10 +61,28 @@ import {
 import {
   decodeHermesInitializeResponse,
   decodeHermesNewSessionResponse,
+  decodeHermesSetSessionConfigOptionResponse,
+  normalizeHermesSessionConfigOptions,
 } from "../hermes/HermesAcpWire.ts";
 import type { ProviderAdapterShape, ProviderThreadSnapshot } from "../Services/ProviderAdapter.ts";
 
 const PROVIDER = ProviderDriverKind.make("hermesAgent");
+
+function findConfigOption(
+  configOptions: ReadonlyArray<AcpSchema.SessionConfigOption>,
+  id: string,
+): AcpSchema.SessionConfigOption | undefined {
+  return configOptions.find((option) => option.id === id);
+}
+
+function findModelConfigOption(
+  configOptions: ReadonlyArray<AcpSchema.SessionConfigOption>,
+): AcpSchema.SessionConfigOption | undefined {
+  return (
+    configOptions.find((option) => option.category === "model") ??
+    findConfigOption(configOptions, "model")
+  );
+}
 
 /** `session/set_model` via transport `raw.request`: avoids RpcClient success/error decoding that can defect on Hermes. */
 function bestEffortHermesSetSessionModel(
@@ -76,6 +96,13 @@ function bestEffortHermesSetSessionModel(
       modelId,
     })
     .pipe(Effect.ignoreCause);
+}
+
+function coerceConfigOptionValue(
+  option: AcpSchema.SessionConfigOption,
+  rawValue: string | boolean,
+): string | boolean {
+  return option.type === "boolean" ? rawValue === true || rawValue === "true" : String(rawValue);
 }
 
 export interface HermesAdapterOptions {
@@ -93,6 +120,9 @@ interface HermesAdapterSession {
     ApprovalRequestId,
     Deferred.Deferred<ProviderApprovalDecision, never>
   >;
+  configOptions: ReadonlyArray<AcpSchema.SessionConfigOption>;
+  createdAt: string;
+  runtimeMode: ProviderSession["runtimeMode"];
   currentTurnId: TurnId | undefined;
   activeTurnFiber: Fiber.Fiber<void, never> | undefined;
   stopped: boolean;
@@ -131,9 +161,12 @@ function toolCallKindToItemType(kind: string | undefined): CanonicalItemType {
     case "read":
       return "file_change";
     case "edit":
+    case "delete":
+    case "move":
       return "file_change";
     case "execute":
       return "command_execution";
+    case "search":
     case "fetch":
       return "web_search";
     case "think":
@@ -141,6 +174,63 @@ function toolCallKindToItemType(kind: string | undefined): CanonicalItemType {
     default:
       return "dynamic_tool_call";
   }
+}
+
+function permissionKindToRequestType(kind: string | undefined): CanonicalRequestType {
+  switch (kind) {
+    case "execute":
+      return "command_execution_approval";
+    case "read":
+      return "file_read_approval";
+    case "edit":
+    case "delete":
+    case "move":
+      return "file_change_approval";
+    default:
+      return "unknown";
+  }
+}
+
+function extractTextToolContent(
+  content: ReadonlyArray<AcpSchema.ToolCallContent> | null | undefined,
+): string | undefined {
+  if (!content) return undefined;
+  const chunks = content.flatMap((entry) => {
+    if (entry.type !== "content" || entry.content.type !== "text") return [];
+    const text = entry.content.text.trim();
+    return text.length > 0 ? [text] : [];
+  });
+  return chunks.length > 0 ? chunks.join("\n") : undefined;
+}
+
+function makeToolData(
+  update: Extract<
+    AcpSchema.SessionNotification["update"],
+    { readonly sessionUpdate: "tool_call" | "tool_call_update" }
+  >,
+): Record<string, unknown> {
+  return {
+    toolCallId: update.toolCallId,
+    ...(update.kind ? { kind: update.kind } : {}),
+    ...(update.rawInput !== undefined ? { rawInput: update.rawInput } : {}),
+    ...(update.rawOutput !== undefined ? { rawOutput: update.rawOutput } : {}),
+    ...(update.content !== undefined ? { content: update.content } : {}),
+    ...(update.locations !== undefined ? { locations: update.locations } : {}),
+  };
+}
+
+function configOptionsFromRawSetConfigResponse(
+  raw: unknown,
+): ReadonlyArray<AcpSchema.SessionConfigOption> {
+  if (raw !== null && typeof raw === "object" && !Array.isArray(raw) && "configOptions" in raw) {
+    return normalizeHermesSessionConfigOptions((raw as { configOptions?: unknown }).configOptions);
+  }
+  if (raw !== null && typeof raw === "object" && !Array.isArray(raw) && "config_options" in raw) {
+    return normalizeHermesSessionConfigOptions(
+      (raw as { config_options?: unknown }).config_options,
+    );
+  }
+  return normalizeHermesSessionConfigOptions(raw);
 }
 
 function mapAcpUpdate(
@@ -186,6 +276,7 @@ function mapAcpUpdate(
   if (update.sessionUpdate === "tool_call") {
     const itemId = update.toolCallId;
     const itemType = toolCallKindToItemType(update.kind ?? undefined);
+    const detail = extractTextToolContent(update.content);
     return Effect.gen(function* () {
       const base = yield* makeEventBase(session, turnId, itemId);
       yield* Queue.offer(queue, {
@@ -195,7 +286,10 @@ function mapAcpUpdate(
           itemType,
           status: "inProgress" as const,
           ...(update.title ? { title: update.title } : {}),
+          ...(detail ? { detail } : {}),
+          data: makeToolData(update),
         },
+        raw: { source: "acp.jsonrpc" as const, method: "session/update", payload: notification },
       });
     });
   }
@@ -205,6 +299,7 @@ function mapAcpUpdate(
     const status = update.status;
     if (status !== "completed" && status !== "failed") return Effect.void;
     const itemType = toolCallKindToItemType(update.kind ?? undefined);
+    const detail = extractTextToolContent(update.content) ?? update.title ?? undefined;
     return Effect.gen(function* () {
       const base = yield* makeEventBase(session, turnId, itemId);
       yield* Queue.offer(queue, {
@@ -212,9 +307,12 @@ function mapAcpUpdate(
         type: "item.completed",
         payload: {
           itemType,
-          status: "completed" as const,
-          ...(update.title ? { detail: update.title } : {}),
+          status: status === "failed" ? ("failed" as const) : ("completed" as const),
+          ...(update.title ? { title: update.title } : {}),
+          ...(detail ? { detail } : {}),
+          data: makeToolData(update),
         },
+        raw: { source: "acp.jsonrpc" as const, method: "session/update", payload: notification },
       });
     });
   }
@@ -288,6 +386,82 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
       });
     }
     return session;
+  });
+
+  const setHermesConfigOption = Effect.fn("setHermesConfigOption")(function* (
+    session: HermesAdapterSession,
+    configId: string,
+    value: string | boolean,
+  ): Effect.fn.Return<void, never> {
+    const option = findConfigOption(session.configOptions, configId);
+    const coercedValue = option ? coerceConfigOptionValue(option, value) : value;
+    const payload =
+      typeof coercedValue === "boolean"
+        ? ({
+            sessionId: session.sessionId,
+            configId,
+            type: "boolean" as const,
+            value: coercedValue,
+          } satisfies AcpSchema.SetSessionConfigOptionRequest)
+        : ({
+            sessionId: session.sessionId,
+            configId,
+            value: coercedValue,
+          } satisfies AcpSchema.SetSessionConfigOptionRequest);
+
+    const raw = yield* session.client.raw
+      .request(AGENT_METHODS.session_set_config_option, payload)
+      .pipe(Effect.exit);
+    if (Exit.isFailure(raw)) {
+      return;
+    }
+    const decoded = yield* decodeHermesSetSessionConfigOptionResponse(raw.value).pipe(
+      Effect.map((response) => response.configOptions),
+      Effect.orElseSucceed(() => configOptionsFromRawSetConfigResponse(raw.value)),
+    );
+    if (decoded.length > 0) {
+      session.configOptions = decoded;
+    }
+  });
+
+  const applyHermesModelSelection = Effect.fn("applyHermesModelSelection")(function* (
+    session: HermesAdapterSession,
+    modelSelection: ProviderSendTurnInput["modelSelection"],
+  ): Effect.fn.Return<void, never> {
+    if (!modelSelection) return;
+
+    const modelConfig = findModelConfigOption(session.configOptions);
+    if (modelSelection.model) {
+      if (modelConfig) {
+        yield* setHermesConfigOption(session, modelConfig.id, modelSelection.model);
+      } else {
+        yield* bestEffortHermesSetSessionModel(
+          session.client,
+          session.sessionId,
+          modelSelection.model,
+        );
+      }
+    }
+
+    for (const option of session.configOptions) {
+      if (option.id === modelConfig?.id) continue;
+      const value = getProviderOptionSelectionValue(modelSelection.options, option.id);
+      if (value !== undefined) {
+        yield* setHermesConfigOption(session, option.id, value);
+      }
+    }
+
+    const base = yield* makeEventBase(session);
+    yield* Queue.offer(runtimeEventQueue, {
+      ...base,
+      type: "session.configured",
+      payload: {
+        config: {
+          ...(modelSelection.model ? { model: modelSelection.model } : {}),
+          ...(modelSelection.options ? { options: modelSelection.options } : {}),
+        },
+      },
+    }).pipe(Effect.ignore);
   });
 
   const stopSessionInternal = Effect.fn("stopSessionInternal")(function* (
@@ -427,6 +601,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
               }),
           ),
         );
+        const now = yield* makeIsoNow;
 
         const session: HermesAdapterSession = {
           threadId: input.threadId,
@@ -435,6 +610,9 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
           client: acpClient,
           providerInstanceId: boundInstanceId,
           pendingRequests: new Map(),
+          configOptions: normalizeHermesSessionConfigOptions(sessionResponse.configOptions ?? []),
+          createdAt: now,
+          runtimeMode: input.runtimeMode ?? "full-access",
           currentTurnId: undefined,
           activeTurnFiber: undefined,
           stopped: false,
@@ -454,20 +632,53 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
             const deferred = yield* Deferred.make<ProviderApprovalDecision, never>();
             session.pendingRequests.set(reqId, deferred);
 
-            const permTitle = request.toolCall?.title ?? undefined;
+            const permTitle =
+              extractTextToolContent(request.toolCall?.content) ??
+              request.toolCall?.title ??
+              undefined;
             const base = yield* makeEventBase(session, session.currentTurnId, undefined, reqId);
             yield* Queue.offer(runtimeEventQueue, {
               ...base,
               requestId: RuntimeRequestId.make(reqId),
               type: "request.opened",
               payload: {
-                requestType: "command_execution_approval" as const,
+                requestType: permissionKindToRequestType(request.toolCall?.kind ?? undefined),
                 ...(permTitle ? { detail: permTitle } : {}),
+                args: {
+                  toolCallId: request.toolCall?.toolCallId,
+                  kind: request.toolCall?.kind,
+                  rawInput: request.toolCall?.rawInput,
+                  options: request.options.map((option) => ({
+                    optionId: option.optionId,
+                    kind: option.kind,
+                    name: option.name,
+                  })),
+                },
+              },
+              raw: {
+                source: "acp.jsonrpc" as const,
+                method: "session/request_permission",
+                payload: request,
               },
             });
 
             const decision = yield* Deferred.await(deferred);
             session.pendingRequests.delete(reqId);
+            const resolvedBase = yield* makeEventBase(
+              session,
+              session.currentTurnId,
+              undefined,
+              reqId,
+            );
+            yield* Queue.offer(runtimeEventQueue, {
+              ...resolvedBase,
+              requestId: RuntimeRequestId.make(reqId),
+              type: "request.resolved",
+              payload: {
+                requestType: permissionKindToRequestType(request.toolCall?.kind ?? undefined),
+                decision,
+              },
+            });
 
             if (decision === "cancel") {
               return {
@@ -479,9 +690,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
             const wantAlways = decision === "acceptForSession";
             const wantReject = decision === "decline";
             const targetKind = wantReject
-              ? wantAlways
-                ? "reject_always"
-                : "reject_once"
+              ? "reject_once"
               : wantAlways
                 ? "allow_always"
                 : "allow_once";
@@ -504,14 +713,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
           }),
         );
 
-        // Apply model selection if provided
-        if (input.modelSelection?.model) {
-          yield* bestEffortHermesSetSessionModel(
-            acpClient,
-            session.sessionId,
-            input.modelSelection.model,
-          );
-        }
+        yield* applyHermesModelSelection(session, input.modelSelection);
 
         sessions.set(input.threadId, session);
         sessionScopeTransferred = true;
@@ -523,14 +725,13 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
           payload: {},
         });
 
-        const now = yield* makeIsoNow;
         return {
           provider: PROVIDER,
           providerInstanceId: boundInstanceId,
           status: "ready" as const,
-          runtimeMode: input.runtimeMode ?? "full-access",
+          runtimeMode: session.runtimeMode,
           threadId: input.threadId,
-          createdAt: now,
+          createdAt: session.createdAt,
           updatedAt: now,
         } satisfies ProviderSession;
       }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)),
@@ -551,14 +752,7 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
         payload: {},
       });
 
-      // Apply model switch if requested
-      if (input.modelSelection?.model) {
-        yield* bestEffortHermesSetSessionModel(
-          session.client,
-          session.sessionId,
-          input.modelSelection.model,
-        );
-      }
+      yield* applyHermesModelSelection(session, input.modelSelection);
 
       const promptContent: ReadonlyArray<AcpSchema.ContentBlock> = input.input
         ? [{ type: "text" as const, text: input.input }]
@@ -704,16 +898,21 @@ export const makeHermesAdapter = Effect.fn("makeHermesAdapter")(function* (
       const now = yield* makeIsoNow;
       return Array.from(sessions.values())
         .filter((s) => !s.stopped)
-        .map((s) => ({
-          provider: PROVIDER,
-          providerInstanceId: s.providerInstanceId,
-          status: "ready" as const,
-          runtimeMode: "full-access" as const,
-          threadId: s.threadId,
-          ...(s.currentTurnId ? { activeTurnId: s.currentTurnId } : {}),
-          createdAt: now,
-          updatedAt: now,
-        }));
+        .map((s) => {
+          const session: ProviderSession = {
+            provider: PROVIDER,
+            providerInstanceId: s.providerInstanceId,
+            status: "ready" as const,
+            runtimeMode: s.runtimeMode,
+            threadId: s.threadId,
+            createdAt: s.createdAt,
+            updatedAt: now,
+          };
+          if (s.currentTurnId) {
+            return Object.assign(session, { activeTurnId: s.currentTurnId });
+          }
+          return session;
+        });
     });
 
   const hasSession: ProviderAdapterShape<ProviderAdapterError>["hasSession"] = (threadId) =>

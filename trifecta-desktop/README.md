@@ -9,17 +9,17 @@ It wraps **nine** coding agents behind a single interface, and pairs with the co
 > [!IMPORTANT]
 > Trifecta drives agents you already have installed. Set up and authenticate at least one before pairing a client.
 
-| Agent | Connection | Install / sign in |
-|---|---|---|
-| **Codex** | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) · `codex login` |
-| **Claude Code** | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) · `claude auth login` |
-| **OpenCode** | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) · `opencode auth login` |
-| **Gemini** | Headless CLI | [Gemini CLI](https://github.com/google-gemini/gemini-cli) · `npm i -g @google/gemini-cli` |
-| **Antigravity** | Python SDK / CLI | Google Antigravity · `google-antigravity` SDK or the `agy` CLI |
-| **Cursor** | ACP (stdio) | [Cursor](https://cursor.sh) · bundled `cursor-agent` *(Early Access)* |
-| **Hermes** | ACP (stdio) | [Hermes Agent](https://github.com/NousResearch/hermes-agent) · `hermes setup` |
-| **Devin** | ACP (stdio) | [Devin](https://devin.ai) · `devin acp` |
-| **ACP Registry** | ACP (stdio) | Any [ACP](https://agentclientprotocol.com)-compatible agent (configurable command + args) |
+| Agent            | Connection       | Install / sign in                                                                         |
+| ---------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| **Codex**        | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) · `codex login`                      |
+| **Claude Code**  | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) · `claude auth login`               |
+| **OpenCode**     | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) · `opencode auth login`                                   |
+| **Gemini**       | Headless CLI     | [Gemini CLI](https://github.com/google-gemini/gemini-cli) · `npm i -g @google/gemini-cli` |
+| **Antigravity**  | Python SDK / CLI | Google Antigravity · `google-antigravity` SDK or the `agy` CLI                            |
+| **Cursor**       | ACP (stdio)      | [Cursor](https://cursor.sh) · bundled `cursor-agent` _(Early Access)_                     |
+| **Hermes**       | ACP (stdio)      | [Hermes Agent](https://github.com/NousResearch/hermes-agent) · `hermes setup`             |
+| **Devin**        | ACP (stdio)      | [Devin](https://devin.ai) · `devin acp`                                                   |
+| **ACP Registry** | ACP (stdio)      | Any [ACP](https://agentclientprotocol.com)-compatible agent (configurable command + args) |
 
 ### Run without installing
 
@@ -64,37 +64,37 @@ The same server binary backs the desktop app, the VS Code extension, and remote/
 
 **Apps**
 
-| Package | Path | Role |
-|---|---|---|
-| `@belweave/trifecta` | `apps/server` | Agent-orchestration server — Effect-TS, WebSocket RPC, provider registry, Git, SSH |
-| `@belweave/web` | `apps/web` | Web UI — React 19, Vite 8, Tailwind 4, Zustand, Lexical |
-| `@belweave/desktop` | `apps/desktop` | Electron shell + auto-update |
-| `trifecta-ide` | `apps/vscode` | VS Code / Cursor extension ([README](./apps/vscode/README.md)) |
-| `@belweave/marketing` | `apps/marketing` | In-repo marketing site (Astro) |
+| Package               | Path             | Role                                                                               |
+| --------------------- | ---------------- | ---------------------------------------------------------------------------------- |
+| `@belweave/trifecta`  | `apps/server`    | Agent-orchestration server — Effect-TS, WebSocket RPC, provider registry, Git, SSH |
+| `@belweave/web`       | `apps/web`       | Web UI — React 19, Vite 8, Tailwind 4, Zustand, Lexical                            |
+| `@belweave/desktop`   | `apps/desktop`   | Electron shell + auto-update                                                       |
+| `trifecta-ide`        | `apps/vscode`    | VS Code / Cursor extension ([README](./apps/vscode/README.md))                     |
+| `@belweave/marketing` | `apps/marketing` | In-repo marketing site (Astro)                                                     |
 
 **Packages**
 
-| Package | Path | Role |
-|---|---|---|
-| `@belweave/contracts` | `packages/contracts` | Effect Schema contracts — events, RPC, models, settings (schema only) |
-| `@belweave/shared` | `packages/shared` | Shared runtime utilities (git, stores, helpers) |
-| `@belweave/client-runtime` | `packages/client-runtime` | Client-side WebSocket / RPC runtime |
-| `@belweave/ssh` | `packages/ssh` | SSH terminal + tunnel helpers |
-| `@belweave/tailscale` | `packages/tailscale` | Tailscale integration for remote access |
-| `effect-acp` | `packages/effect-acp` | Effect bindings for the Agent Client Protocol |
-| `effect-codex-app-server` | `packages/effect-codex-app-server` | Effect bindings for the Codex app-server protocol |
-| `oxlint-plugin-trifecta` | `oxlint-plugin-trifecta` | Custom oxlint rules |
+| Package                    | Path                               | Role                                                                  |
+| -------------------------- | ---------------------------------- | --------------------------------------------------------------------- |
+| `@belweave/contracts`      | `packages/contracts`               | Effect Schema contracts — events, RPC, models, settings (schema only) |
+| `@belweave/shared`         | `packages/shared`                  | Shared runtime utilities (git, stores, helpers)                       |
+| `@belweave/client-runtime` | `packages/client-runtime`          | Client-side WebSocket / RPC runtime                                   |
+| `@belweave/ssh`            | `packages/ssh`                     | SSH terminal + tunnel helpers                                         |
+| `@belweave/tailscale`      | `packages/tailscale`               | Tailscale integration for remote access                               |
+| `effect-acp`               | `packages/effect-acp`              | Effect bindings for the Agent Client Protocol                         |
+| `effect-codex-app-server`  | `packages/effect-codex-app-server` | Effect bindings for the Codex app-server protocol                     |
+| `oxlint-plugin-trifecta`   | `oxlint-plugin-trifecta`           | Custom oxlint rules                                                   |
 
 ### Tech stack
 
-| Layer | Technology |
-|---|---|
-| Runtime | Electron 41 (desktop), Node.js (server) |
-| Framework | Effect-TS (functional effect system) |
-| Build | Turborepo, tsdown, Vite 8 |
-| Web UI | React 19, Tailwind CSS 4, Zustand, Lexical |
-| Lint / format | oxlint + oxfmt (Oxc toolchain) |
-| Agents | 9 providers via JSON-RPC or ACP over stdio |
+| Layer         | Technology                                 |
+| ------------- | ------------------------------------------ |
+| Runtime       | Electron 41 (desktop), Node.js (server)    |
+| Framework     | Effect-TS (functional effect system)       |
+| Build         | Turborepo, tsdown, Vite 8                  |
+| Web UI        | React 19, Tailwind CSS 4, Zustand, Lexical |
+| Lint / format | oxlint + oxfmt (Oxc toolchain)             |
+| Agents        | 9 providers via JSON-RPC or ACP over stdio |
 
 ## Development
 

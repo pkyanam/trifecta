@@ -35,7 +35,9 @@ const ANTIGRAVITY_SDK_RESUME_CURSOR_V = 1 as const;
 const DEFAULT_PYTHON_COMMAND = "python3";
 const DEFAULT_SAVE_DIR = `${process.env.HOME || "."}/.trifecta/antigravity-sdk`;
 
-const nodeChildProcess = process.getBuiltinModule("child_process") as typeof import("node:child_process");
+const nodeChildProcess = process.getBuiltinModule(
+  "child_process",
+) as typeof import("node:child_process");
 const nodeReadline = process.getBuiltinModule("readline") as typeof import("node:readline");
 
 type BridgeRequest =
@@ -147,7 +149,10 @@ interface AntigravitySdkSession {
   readonly cwd: string;
   bridge: AntigravitySdkBridge;
   readonly saveDir: string;
-  readonly activeToolItems: Map<string, { readonly itemType: ReturnType<typeof toolNameToItemType>; readonly title: string }>;
+  readonly activeToolItems: Map<
+    string,
+    { readonly itemType: ReturnType<typeof toolNameToItemType>; readonly title: string }
+  >;
   currentTurnId: TurnId | undefined;
   conversationId: string | undefined;
   activeTurnFiber: Fiber.Fiber<void, never> | undefined;
@@ -383,7 +388,9 @@ function expandUserPath(path: string): string {
   return path;
 }
 
-function antigravitySdkResumeCursor(session: Pick<AntigravitySdkSession, "conversationId" | "saveDir">) {
+function antigravitySdkResumeCursor(
+  session: Pick<AntigravitySdkSession, "conversationId" | "saveDir">,
+) {
   return {
     v: ANTIGRAVITY_SDK_RESUME_CURSOR_V,
     antigravitySdk: {
@@ -431,7 +438,11 @@ function toolNameToRequestType(toolName: string | undefined) {
   if (normalized.includes("read") || normalized.includes("view")) {
     return "file_read_approval" as const;
   }
-  if (normalized.includes("edit") || normalized.includes("write") || normalized.includes("create")) {
+  if (
+    normalized.includes("edit") ||
+    normalized.includes("write") ||
+    normalized.includes("create")
+  ) {
     return "file_change_approval" as const;
   }
   return "unknown" as const;
@@ -472,7 +483,10 @@ const makeEventBase = Effect.fn("makeAntigravitySdkEventBase")(function* (
 class AntigravitySdkBridge {
   readonly #child: import("node:child_process").ChildProcessWithoutNullStreams;
   readonly #stdout: import("node:readline").Interface;
-  readonly #pending = new Map<string, { resolve: (message: BridgeMessage) => void; reject: (error: Error) => void }>();
+  readonly #pending = new Map<
+    string,
+    { resolve: (message: BridgeMessage) => void; reject: (error: Error) => void }
+  >();
   readonly #onEvent: (message: BridgeMessage) => void;
   #stderr = "";
   #closed = false;
@@ -484,12 +498,16 @@ class AntigravitySdkBridge {
     readonly onEvent: (message: BridgeMessage) => void;
   }) {
     this.#onEvent = input.onEvent;
-    this.#child = nodeChildProcess.spawn(input.pythonPath, ["-u", "-c", ANTIGRAVITY_SDK_BRIDGE_SOURCE], {
-      cwd: input.cwd,
-      env: input.env,
-      stdio: "pipe",
-      shell: process.platform === "win32",
-    });
+    this.#child = nodeChildProcess.spawn(
+      input.pythonPath,
+      ["-u", "-c", ANTIGRAVITY_SDK_BRIDGE_SOURCE],
+      {
+        cwd: input.cwd,
+        env: input.env,
+        stdio: "pipe",
+        shell: process.platform === "win32",
+      },
+    );
     this.#stdout = nodeReadline.createInterface({ input: this.#child.stdout });
     this.#stdout.on("line", (line) => this.#handleStdoutLine(line));
     this.#child.stderr.on("data", (chunk: Buffer) => {
@@ -546,7 +564,9 @@ class AntigravitySdkBridge {
       const pending = this.#pending.get(parsed.id);
       if (pending) {
         this.#pending.delete(parsed.id);
-        pending.reject(new Error(parsed.detail || parsed.message || "Antigravity SDK bridge error."));
+        pending.reject(
+          new Error(parsed.detail || parsed.message || "Antigravity SDK bridge error."),
+        );
         return;
       }
     }
@@ -574,479 +594,470 @@ class AntigravitySdkBridge {
   }
 }
 
-export const makeAntigravitySdkAdapter = Effect.fn("makeAntigravitySdkAdapter")(
-  function* (input: AntigravitySdkAdapterInput) {
-    const runtimeEventQueue = yield* Queue.unbounded<ProviderRuntimeEvent>();
-    const runtimeContext = yield* Effect.context<never>();
-    const runFork = Effect.runForkWith(runtimeContext);
-    const sessions = new Map<ThreadId, AntigravitySdkSession>();
-    const pendingApprovals = new Map<string, AntigravitySdkSession>();
-    const pendingUserInputs = new Map<string, AntigravitySdkSession>();
+export const makeAntigravitySdkAdapter = Effect.fn("makeAntigravitySdkAdapter")(function* (
+  input: AntigravitySdkAdapterInput,
+) {
+  const runtimeEventQueue = yield* Queue.unbounded<ProviderRuntimeEvent>();
+  const runtimeContext = yield* Effect.context<never>();
+  const runFork = Effect.runForkWith(runtimeContext);
+  const sessions = new Map<ThreadId, AntigravitySdkSession>();
+  const pendingApprovals = new Map<string, AntigravitySdkSession>();
+  const pendingUserInputs = new Map<string, AntigravitySdkSession>();
 
-    const emit = (event: ProviderRuntimeEvent): void => {
-      runFork(Queue.offer(runtimeEventQueue, event).pipe(Effect.ignore));
-    };
+  const emit = (event: ProviderRuntimeEvent): void => {
+    runFork(Queue.offer(runtimeEventQueue, event).pipe(Effect.ignore));
+  };
 
-    const requireSession = Effect.fn("antigravitySdk.requireSession")(function* (
-      threadId: ThreadId,
-    ) {
-      const session = sessions.get(threadId);
-      if (!session || session.stopped) {
-        return yield* new ProviderAdapterSessionNotFoundError({
-          provider: DRIVER_KIND,
-          threadId,
-        });
-      }
-      return session;
-    });
-
-    const stopSessionInternal = Effect.fn("antigravitySdk.stopSessionInternal")(function* (
-      session: AntigravitySdkSession,
-    ) {
-      if (session.stopped) return;
-      session.stopped = true;
-      sessions.delete(session.threadId);
-      if (session.activeTurnFiber) {
-        yield* Fiber.interrupt(session.activeTurnFiber).pipe(Effect.ignoreCause);
-        session.activeTurnFiber = undefined;
-      }
-      session.bridge.close();
-      const base = yield* makeEventBase(session);
-      yield* Queue.offer(runtimeEventQueue, {
-        ...base,
-        type: "session.exited",
-        payload: { reason: "Session stopped" },
-      }).pipe(Effect.ignore);
-    });
-
-    const handleBridgeEvent = (
-      session: AntigravitySdkSession,
-      message: BridgeMessage,
-    ): void => {
-      if (message.type === "content_delta" && message.delta) {
-        runFork(
-          Effect.gen(function* () {
-            const base = yield* makeEventBase(session, session.currentTurnId);
-            yield* Queue.offer(runtimeEventQueue, {
-              ...base,
-              type: "content.delta",
-              payload: { streamKind: "assistant_text", delta: message.delta ?? "" },
-            });
-          }),
-        );
-        return;
-      }
-
-      if (message.type === "thought_delta" && message.delta) {
-        runFork(
-          Effect.gen(function* () {
-            const base = yield* makeEventBase(session, session.currentTurnId);
-            yield* Queue.offer(runtimeEventQueue, {
-              ...base,
-              type: "content.delta",
-              payload: { streamKind: "reasoning_text", delta: message.delta ?? "" },
-            });
-          }),
-        );
-        return;
-      }
-
-      if (message.type === "tool_call") {
-        runFork(
-          Effect.gen(function* () {
-            const itemId = message.toolCallId || `tool-${message.name ?? "unknown"}`;
-            const itemType = toolNameToItemType(message.name);
-            const title = message.name || "Antigravity tool";
-            session.activeToolItems.set(itemId, { itemType, title });
-            const base = yield* makeEventBase(session, session.currentTurnId, itemId);
-            yield* Queue.offer(runtimeEventQueue, {
-              ...base,
-              type: "item.started",
-              payload: {
-                itemType,
-                status: "inProgress" as const,
-                title,
-                data: { args: message.args },
-              },
-            });
-          }),
-        );
-        return;
-      }
-
-      if (message.type === "approval_required") {
-        pendingApprovals.set(message.requestId, session);
-        runFork(
-          Effect.gen(function* () {
-            const base = yield* makeEventBase(
-              session,
-              session.currentTurnId,
-              undefined,
-              message.requestId,
-            );
-            yield* Queue.offer(runtimeEventQueue, {
-              ...base,
-              type: "request.opened",
-              payload: {
-                requestType: toolNameToRequestType(message.toolName),
-                detail: message.toolName || "Antigravity tool request",
-                args: message.args,
-              },
-            });
-          }),
-        );
-        return;
-      }
-
-      if (message.type === "user_input_required") {
-        pendingUserInputs.set(message.requestId, session);
-        runFork(
-          Effect.gen(function* () {
-            const base = yield* makeEventBase(
-              session,
-              session.currentTurnId,
-              undefined,
-              message.requestId,
-            );
-            yield* Queue.offer(runtimeEventQueue, {
-              ...base,
-              type: "user-input.requested",
-              payload: { questions: [...(message.questions ?? [])] },
-            });
-          }),
-        );
-      }
-    };
-
-    const startSession: ProviderAdapterShape<ProviderAdapterError>["startSession"] = (
-      sessionInput,
-    ) =>
-      Effect.gen(function* () {
-        if (sessionInput.provider !== undefined && sessionInput.provider !== DRIVER_KIND) {
-          return yield* new ProviderAdapterValidationError({
-            provider: DRIVER_KIND,
-            operation: "startSession",
-            issue: `Expected provider '${DRIVER_KIND}' but received '${sessionInput.provider}'.`,
-          });
-        }
-
-        const existing = sessions.get(sessionInput.threadId);
-        if (existing && !existing.stopped) {
-          yield* Effect.suspend(() => stopSessionInternal(existing));
-        }
-
-        const persisted = parseAntigravitySdkResume(sessionInput.resumeCursor);
-        const cwd = sessionInput.cwd ?? process.cwd();
-        const configuredSaveDir = input.saveDirectory?.trim();
-        const saveDir = expandUserPath(persisted.saveDir ?? (configuredSaveDir || DEFAULT_SAVE_DIR));
-        const session: AntigravitySdkSession = {
-          threadId: sessionInput.threadId,
-          providerInstanceId: input.instanceId,
-          cwd,
-          bridge: undefined as unknown as AntigravitySdkBridge,
-          saveDir,
-          activeToolItems: new Map(),
-          conversationId: persisted.conversationId,
-          currentTurnId: undefined,
-          activeTurnFiber: undefined,
-          stopped: false,
-        };
-        const bridge = new AntigravitySdkBridge({
-          pythonPath: input.pythonPath?.trim() || DEFAULT_PYTHON_COMMAND,
-          cwd,
-          env: input.environment,
-          onEvent: (message) => handleBridgeEvent(session, message),
-        });
-        Object.assign(session, { bridge });
-
-        const initId = `init-${yield* Random.nextUUIDv4}`;
-        const ready = yield* Effect.tryPromise({
-          try: () =>
-            bridge.send({
-              type: "init",
-              id: initId,
-              cwd,
-              saveDir,
-              conversationId: persisted.conversationId,
-              model:
-                sessionInput.modelSelection?.model && sessionInput.modelSelection.model !== "auto"
-                  ? sessionInput.modelSelection.model
-                  : undefined,
-              apiKey: input.apiKey?.trim() || input.environment.GEMINI_API_KEY,
-            }),
-          catch: (cause) =>
-            new ProviderAdapterProcessError({
-              provider: DRIVER_KIND,
-              threadId: sessionInput.threadId,
-              detail:
-                cause instanceof Error
-                  ? cause.message
-                  : `Failed to start Antigravity SDK bridge: ${String(cause)}`,
-              cause,
-            }),
-        });
-        if (ready.type === "ready" && ready.conversationId) {
-          session.conversationId = ready.conversationId;
-        }
-        sessions.set(sessionInput.threadId, session);
-
-        const startedBase = yield* makeEventBase(session);
-        yield* Queue.offer(runtimeEventQueue, {
-          ...startedBase,
-          type: "session.started",
-          payload: {},
-        });
-
-        const now = yield* makeIsoNow;
-        return {
-          provider: DRIVER_KIND,
-          providerInstanceId: input.instanceId,
-          status: "ready" as const,
-          runtimeMode: sessionInput.runtimeMode ?? "full-access",
-          cwd,
-          ...(sessionInput.modelSelection?.model ? { model: sessionInput.modelSelection.model } : {}),
-          threadId: sessionInput.threadId,
-          createdAt: now,
-          updatedAt: now,
-          resumeCursor: antigravitySdkResumeCursor(session),
-        } satisfies ProviderSession;
+  const requireSession = Effect.fn("antigravitySdk.requireSession")(function* (threadId: ThreadId) {
+    const session = sessions.get(threadId);
+    if (!session || session.stopped) {
+      return yield* new ProviderAdapterSessionNotFoundError({
+        provider: DRIVER_KIND,
+        threadId,
       });
+    }
+    return session;
+  });
 
-    const sendTurn: ProviderAdapterShape<ProviderAdapterError>["sendTurn"] = Effect.fn(
-      "antigravitySdk.sendTurn",
-    )(function* (turnInput: ProviderSendTurnInput) {
-      const session = yield* requireSession(turnInput.threadId);
-      const ms = yield* Clock.currentTimeMillis;
-      const uuid = yield* Random.nextUUIDv4;
-      const turnId = TurnIdSchema.make(`agysdk-turn-${ms}-${uuid.slice(0, 8)}`);
-      session.currentTurnId = turnId;
+  const stopSessionInternal = Effect.fn("antigravitySdk.stopSessionInternal")(function* (
+    session: AntigravitySdkSession,
+  ) {
+    if (session.stopped) return;
+    session.stopped = true;
+    sessions.delete(session.threadId);
+    if (session.activeTurnFiber) {
+      yield* Fiber.interrupt(session.activeTurnFiber).pipe(Effect.ignoreCause);
+      session.activeTurnFiber = undefined;
+    }
+    session.bridge.close();
+    const base = yield* makeEventBase(session);
+    yield* Queue.offer(runtimeEventQueue, {
+      ...base,
+      type: "session.exited",
+      payload: { reason: "Session stopped" },
+    }).pipe(Effect.ignore);
+  });
 
-      const prompt = buildPromptText(turnInput);
-      if (!prompt) {
+  const handleBridgeEvent = (session: AntigravitySdkSession, message: BridgeMessage): void => {
+    if (message.type === "content_delta" && message.delta) {
+      runFork(
+        Effect.gen(function* () {
+          const base = yield* makeEventBase(session, session.currentTurnId);
+          yield* Queue.offer(runtimeEventQueue, {
+            ...base,
+            type: "content.delta",
+            payload: { streamKind: "assistant_text", delta: message.delta ?? "" },
+          });
+        }),
+      );
+      return;
+    }
+
+    if (message.type === "thought_delta" && message.delta) {
+      runFork(
+        Effect.gen(function* () {
+          const base = yield* makeEventBase(session, session.currentTurnId);
+          yield* Queue.offer(runtimeEventQueue, {
+            ...base,
+            type: "content.delta",
+            payload: { streamKind: "reasoning_text", delta: message.delta ?? "" },
+          });
+        }),
+      );
+      return;
+    }
+
+    if (message.type === "tool_call") {
+      runFork(
+        Effect.gen(function* () {
+          const itemId = message.toolCallId || `tool-${message.name ?? "unknown"}`;
+          const itemType = toolNameToItemType(message.name);
+          const title = message.name || "Antigravity tool";
+          session.activeToolItems.set(itemId, { itemType, title });
+          const base = yield* makeEventBase(session, session.currentTurnId, itemId);
+          yield* Queue.offer(runtimeEventQueue, {
+            ...base,
+            type: "item.started",
+            payload: {
+              itemType,
+              status: "inProgress" as const,
+              title,
+              data: { args: message.args },
+            },
+          });
+        }),
+      );
+      return;
+    }
+
+    if (message.type === "approval_required") {
+      pendingApprovals.set(message.requestId, session);
+      runFork(
+        Effect.gen(function* () {
+          const base = yield* makeEventBase(
+            session,
+            session.currentTurnId,
+            undefined,
+            message.requestId,
+          );
+          yield* Queue.offer(runtimeEventQueue, {
+            ...base,
+            type: "request.opened",
+            payload: {
+              requestType: toolNameToRequestType(message.toolName),
+              detail: message.toolName || "Antigravity tool request",
+              args: message.args,
+            },
+          });
+        }),
+      );
+      return;
+    }
+
+    if (message.type === "user_input_required") {
+      pendingUserInputs.set(message.requestId, session);
+      runFork(
+        Effect.gen(function* () {
+          const base = yield* makeEventBase(
+            session,
+            session.currentTurnId,
+            undefined,
+            message.requestId,
+          );
+          yield* Queue.offer(runtimeEventQueue, {
+            ...base,
+            type: "user-input.requested",
+            payload: { questions: [...(message.questions ?? [])] },
+          });
+        }),
+      );
+    }
+  };
+
+  const startSession: ProviderAdapterShape<ProviderAdapterError>["startSession"] = (sessionInput) =>
+    Effect.gen(function* () {
+      if (sessionInput.provider !== undefined && sessionInput.provider !== DRIVER_KIND) {
         return yield* new ProviderAdapterValidationError({
           provider: DRIVER_KIND,
-          operation: "sendTurn",
-          issue: "Empty prompt.",
+          operation: "startSession",
+          issue: `Expected provider '${DRIVER_KIND}' but received '${sessionInput.provider}'.`,
         });
       }
 
-      const startedBase = yield* makeEventBase(session, turnId);
-      yield* Queue.offer(runtimeEventQueue, {
-        ...startedBase,
-        type: "turn.started",
-        payload: {
-          ...(turnInput.modelSelection?.model ? { model: turnInput.modelSelection.model } : {}),
-        },
-      });
+      const existing = sessions.get(sessionInput.threadId);
+      if (existing && !existing.stopped) {
+        yield* Effect.suspend(() => stopSessionInternal(existing));
+      }
 
-      const turnEffect = Effect.tryPromise({
+      const persisted = parseAntigravitySdkResume(sessionInput.resumeCursor);
+      const cwd = sessionInput.cwd ?? process.cwd();
+      const configuredSaveDir = input.saveDirectory?.trim();
+      const saveDir = expandUserPath(persisted.saveDir ?? (configuredSaveDir || DEFAULT_SAVE_DIR));
+      const session: AntigravitySdkSession = {
+        threadId: sessionInput.threadId,
+        providerInstanceId: input.instanceId,
+        cwd,
+        bridge: undefined as unknown as AntigravitySdkBridge,
+        saveDir,
+        activeToolItems: new Map(),
+        conversationId: persisted.conversationId,
+        currentTurnId: undefined,
+        activeTurnFiber: undefined,
+        stopped: false,
+      };
+      const bridge = new AntigravitySdkBridge({
+        pythonPath: input.pythonPath?.trim() || DEFAULT_PYTHON_COMMAND,
+        cwd,
+        env: input.environment,
+        onEvent: (message) => handleBridgeEvent(session, message),
+      });
+      Object.assign(session, { bridge });
+
+      const initId = `init-${yield* Random.nextUUIDv4}`;
+      const ready = yield* Effect.tryPromise({
         try: () =>
-          session.bridge.send({
-            type: "chat",
-            id: `chat-${uuid}`,
-            prompt,
+          bridge.send({
+            type: "init",
+            id: initId,
+            cwd,
+            saveDir,
+            conversationId: persisted.conversationId,
+            model:
+              sessionInput.modelSelection?.model && sessionInput.modelSelection.model !== "auto"
+                ? sessionInput.modelSelection.model
+                : undefined,
+            apiKey: input.apiKey?.trim() || input.environment.GEMINI_API_KEY,
           }),
         catch: (cause) =>
-          new ProviderAdapterRequestError({
+          new ProviderAdapterProcessError({
             provider: DRIVER_KIND,
-            method: "antigravity-sdk/chat",
+            threadId: sessionInput.threadId,
             detail:
               cause instanceof Error
                 ? cause.message
-                : `Antigravity SDK chat failed: ${String(cause)}`,
+                : `Failed to start Antigravity SDK bridge: ${String(cause)}`,
             cause,
           }),
-      }).pipe(
-        Effect.flatMap((done) =>
-          Effect.gen(function* () {
-            if ((done.type === "done" || done.type === "cancelled") && done.conversationId) {
-              session.conversationId = done.conversationId;
-            }
-            for (const [itemId, item] of session.activeToolItems) {
-              const itemBase = yield* makeEventBase(session, turnId, itemId);
-              yield* Queue.offer(runtimeEventQueue, {
-                ...itemBase,
-                type: "item.completed",
-                payload: {
-                  itemType: item.itemType,
-                  status: "completed" as const,
-                  title: item.title,
-                },
-              });
-            }
-            session.activeToolItems.clear();
-            const completedBase = yield* makeEventBase(session, turnId);
-            yield* Queue.offer(runtimeEventQueue, {
-              ...completedBase,
-              type: "turn.completed",
-              payload: { state: done.type === "cancelled" ? "interrupted" : "completed" },
-            });
-          }),
-        ),
-        Effect.catch((error: ProviderAdapterRequestError) =>
-          Effect.gen(function* () {
-            const base = yield* makeEventBase(session, turnId);
-            yield* Queue.offer(runtimeEventQueue, {
-              ...base,
-              type: "runtime.error",
-              payload: { message: error.detail, class: "provider_error" as const },
-            });
-            const completedBase = yield* makeEventBase(session, turnId);
-            yield* Queue.offer(runtimeEventQueue, {
-              ...completedBase,
-              type: "turn.completed",
-              payload: { state: "completed" as const, errorMessage: error.detail },
-            });
-          }),
-        ),
-        Effect.forkDetach({ startImmediately: true }),
-      );
+      });
+      if (ready.type === "ready" && ready.conversationId) {
+        session.conversationId = ready.conversationId;
+      }
+      sessions.set(sessionInput.threadId, session);
 
-      const turnFiber = yield* turnEffect;
-      session.activeTurnFiber = turnFiber as Fiber.Fiber<void, never>;
-      yield* Fiber.join(turnFiber).pipe(
-        Effect.ensuring(
-          Effect.sync(() => {
-            session.activeTurnFiber = undefined;
-          }),
-        ),
-      );
+      const startedBase = yield* makeEventBase(session);
+      yield* Queue.offer(runtimeEventQueue, {
+        ...startedBase,
+        type: "session.started",
+        payload: {},
+      });
 
+      const now = yield* makeIsoNow;
       return {
-        threadId: turnInput.threadId,
-        turnId,
+        provider: DRIVER_KIND,
+        providerInstanceId: input.instanceId,
+        status: "ready" as const,
+        runtimeMode: sessionInput.runtimeMode ?? "full-access",
+        cwd,
+        ...(sessionInput.modelSelection?.model ? { model: sessionInput.modelSelection.model } : {}),
+        threadId: sessionInput.threadId,
+        createdAt: now,
+        updatedAt: now,
         resumeCursor: antigravitySdkResumeCursor(session),
-      };
+      } satisfies ProviderSession;
     });
 
-    const interruptTurn: ProviderAdapterShape<ProviderAdapterError>["interruptTurn"] = (
-      threadId,
-    ) =>
-      requireSession(threadId).pipe(
-        Effect.flatMap((session) =>
-          Effect.gen(function* () {
-            session.bridge.notify({ type: "cancel", id: `cancel-${yield* Random.nextUUIDv4}` });
-            if (session.activeTurnFiber) {
-              yield* Fiber.interrupt(session.activeTurnFiber).pipe(Effect.ignoreCause);
-              session.activeTurnFiber = undefined;
-            }
-          }),
-        ),
-      );
+  const sendTurn: ProviderAdapterShape<ProviderAdapterError>["sendTurn"] = Effect.fn(
+    "antigravitySdk.sendTurn",
+  )(function* (turnInput: ProviderSendTurnInput) {
+    const session = yield* requireSession(turnInput.threadId);
+    const ms = yield* Clock.currentTimeMillis;
+    const uuid = yield* Random.nextUUIDv4;
+    const turnId = TurnIdSchema.make(`agysdk-turn-${ms}-${uuid.slice(0, 8)}`);
+    session.currentTurnId = turnId;
 
-    const respondToRequest: ProviderAdapterShape<ProviderAdapterError>["respondToRequest"] =
-      Effect.fn("antigravitySdk.respondToRequest")(function* (threadId, requestId, decision) {
-        const session = yield* requireSession(threadId);
-        const pendingSession = pendingApprovals.get(requestId);
-        if (pendingSession !== session) {
-          return yield* new ProviderAdapterRequestError({
-            provider: DRIVER_KIND,
-            method: "antigravity-sdk/approval",
-            detail: `Unknown pending Antigravity approval request: ${requestId}`,
-          });
-        }
-        pendingApprovals.delete(requestId);
-        session.bridge.notify({
-          type: "approval_response",
-          id: `approval-${yield* Random.nextUUIDv4}`,
-          requestId,
-          allow: approvalDecisionToAllow(decision),
-        });
-        const base = yield* makeEventBase(session, session.currentTurnId, undefined, requestId);
-        yield* Queue.offer(runtimeEventQueue, {
-          ...base,
-          type: "request.resolved",
-          payload: {
-            requestType: "unknown" as const,
-            decision,
-          },
-        });
+    const prompt = buildPromptText(turnInput);
+    if (!prompt) {
+      return yield* new ProviderAdapterValidationError({
+        provider: DRIVER_KIND,
+        operation: "sendTurn",
+        issue: "Empty prompt.",
       });
+    }
 
-    const respondToUserInput: ProviderAdapterShape<ProviderAdapterError>["respondToUserInput"] =
-      Effect.fn("antigravitySdk.respondToUserInput")(function* (threadId, requestId, answers) {
-        const session = yield* requireSession(threadId);
-        const pendingSession = pendingUserInputs.get(requestId);
-        if (pendingSession !== session) {
-          return yield* new ProviderAdapterRequestError({
-            provider: DRIVER_KIND,
-            method: "antigravity-sdk/user-input",
-            detail: `Unknown pending Antigravity user-input request: ${requestId}`,
+    const startedBase = yield* makeEventBase(session, turnId);
+    yield* Queue.offer(runtimeEventQueue, {
+      ...startedBase,
+      type: "turn.started",
+      payload: {
+        ...(turnInput.modelSelection?.model ? { model: turnInput.modelSelection.model } : {}),
+      },
+    });
+
+    const turnEffect = Effect.tryPromise({
+      try: () =>
+        session.bridge.send({
+          type: "chat",
+          id: `chat-${uuid}`,
+          prompt,
+        }),
+      catch: (cause) =>
+        new ProviderAdapterRequestError({
+          provider: DRIVER_KIND,
+          method: "antigravity-sdk/chat",
+          detail:
+            cause instanceof Error
+              ? cause.message
+              : `Antigravity SDK chat failed: ${String(cause)}`,
+          cause,
+        }),
+    }).pipe(
+      Effect.flatMap((done) =>
+        Effect.gen(function* () {
+          if ((done.type === "done" || done.type === "cancelled") && done.conversationId) {
+            session.conversationId = done.conversationId;
+          }
+          for (const [itemId, item] of session.activeToolItems) {
+            const itemBase = yield* makeEventBase(session, turnId, itemId);
+            yield* Queue.offer(runtimeEventQueue, {
+              ...itemBase,
+              type: "item.completed",
+              payload: {
+                itemType: item.itemType,
+                status: "completed" as const,
+                title: item.title,
+              },
+            });
+          }
+          session.activeToolItems.clear();
+          const completedBase = yield* makeEventBase(session, turnId);
+          yield* Queue.offer(runtimeEventQueue, {
+            ...completedBase,
+            type: "turn.completed",
+            payload: { state: done.type === "cancelled" ? "interrupted" : "completed" },
           });
-        }
-        pendingUserInputs.delete(requestId);
-        session.bridge.notify({
-          type: "user_input_response",
-          id: `question-${yield* Random.nextUUIDv4}`,
-          requestId,
-          answers: answers as Record<string, unknown>,
-        });
-        const base = yield* makeEventBase(session, session.currentTurnId, undefined, requestId);
-        yield* Queue.offer(runtimeEventQueue, {
-          ...base,
-          type: "user-input.resolved",
-          payload: { answers },
-        });
-      });
+        }),
+      ),
+      Effect.catch((error: ProviderAdapterRequestError) =>
+        Effect.gen(function* () {
+          const base = yield* makeEventBase(session, turnId);
+          yield* Queue.offer(runtimeEventQueue, {
+            ...base,
+            type: "runtime.error",
+            payload: { message: error.detail, class: "provider_error" as const },
+          });
+          const completedBase = yield* makeEventBase(session, turnId);
+          yield* Queue.offer(runtimeEventQueue, {
+            ...completedBase,
+            type: "turn.completed",
+            payload: { state: "completed" as const, errorMessage: error.detail },
+          });
+        }),
+      ),
+      Effect.forkDetach({ startImmediately: true }),
+    );
 
-    const readThread: ProviderAdapterShape<ProviderAdapterError>["readThread"] = (threadId) =>
-      requireSession(threadId).pipe(
-        Effect.map((s) => ({ threadId: s.threadId, turns: [] }) satisfies ProviderThreadSnapshot),
-      );
-
-    const stopAll: ProviderAdapterShape<ProviderAdapterError>["stopAll"] = () =>
-      Effect.forEach(Array.from(sessions.values()), stopSessionInternal, {
-        concurrency: 1,
-        discard: true,
-      }).pipe(Effect.asVoid);
-
-    yield* Effect.acquireRelease(Effect.void, () =>
-      stopAll().pipe(Effect.andThen(Queue.shutdown(runtimeEventQueue)), Effect.ignore),
+    const turnFiber = yield* turnEffect;
+    session.activeTurnFiber = turnFiber as Fiber.Fiber<void, never>;
+    yield* Fiber.join(turnFiber).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          session.activeTurnFiber = undefined;
+        }),
+      ),
     );
 
     return {
-      provider: DRIVER_KIND,
-      capabilities: { sessionModelSwitch: "unsupported" },
-      startSession,
-      sendTurn,
-      interruptTurn,
-      respondToRequest,
-      respondToUserInput,
-      stopSession: (threadId) =>
+      threadId: turnInput.threadId,
+      turnId,
+      resumeCursor: antigravitySdkResumeCursor(session),
+    };
+  });
+
+  const interruptTurn: ProviderAdapterShape<ProviderAdapterError>["interruptTurn"] = (threadId) =>
+    requireSession(threadId).pipe(
+      Effect.flatMap((session) =>
         Effect.gen(function* () {
-          const session = sessions.get(threadId);
-          if (session) yield* stopSessionInternal(session);
+          session.bridge.notify({ type: "cancel", id: `cancel-${yield* Random.nextUUIDv4}` });
+          if (session.activeTurnFiber) {
+            yield* Fiber.interrupt(session.activeTurnFiber).pipe(Effect.ignoreCause);
+            session.activeTurnFiber = undefined;
+          }
         }),
-      listSessions: () =>
-        Effect.gen(function* () {
-          const now = yield* makeIsoNow;
-          return Array.from(sessions.values())
-            .filter((s) => !s.stopped)
-            .map((s) => {
-              const providerSession: ProviderSession = {
-                provider: DRIVER_KIND,
-                providerInstanceId: s.providerInstanceId,
-                status: "ready",
-                runtimeMode: "full-access",
-                cwd: s.cwd,
-                threadId: s.threadId,
-                createdAt: now,
-                updatedAt: now,
-                resumeCursor: antigravitySdkResumeCursor(s),
-              };
-              return s.currentTurnId
-                ? Object.assign(providerSession, { activeTurnId: s.currentTurnId })
-                : providerSession;
-            });
-        }),
-      hasSession: (threadId) =>
-        Effect.succeed(Boolean(sessions.get(threadId) && !sessions.get(threadId)?.stopped)),
-      readThread,
-      rollbackThread: (threadId, _numTurns) => readThread(threadId),
-      stopAll,
-      get streamEvents() {
-        return Stream.fromQueue(runtimeEventQueue);
-      },
-    } satisfies ProviderAdapterShape<ProviderAdapterError>;
-  },
-);
+      ),
+    );
+
+  const respondToRequest: ProviderAdapterShape<ProviderAdapterError>["respondToRequest"] =
+    Effect.fn("antigravitySdk.respondToRequest")(function* (threadId, requestId, decision) {
+      const session = yield* requireSession(threadId);
+      const pendingSession = pendingApprovals.get(requestId);
+      if (pendingSession !== session) {
+        return yield* new ProviderAdapterRequestError({
+          provider: DRIVER_KIND,
+          method: "antigravity-sdk/approval",
+          detail: `Unknown pending Antigravity approval request: ${requestId}`,
+        });
+      }
+      pendingApprovals.delete(requestId);
+      session.bridge.notify({
+        type: "approval_response",
+        id: `approval-${yield* Random.nextUUIDv4}`,
+        requestId,
+        allow: approvalDecisionToAllow(decision),
+      });
+      const base = yield* makeEventBase(session, session.currentTurnId, undefined, requestId);
+      yield* Queue.offer(runtimeEventQueue, {
+        ...base,
+        type: "request.resolved",
+        payload: {
+          requestType: "unknown" as const,
+          decision,
+        },
+      });
+    });
+
+  const respondToUserInput: ProviderAdapterShape<ProviderAdapterError>["respondToUserInput"] =
+    Effect.fn("antigravitySdk.respondToUserInput")(function* (threadId, requestId, answers) {
+      const session = yield* requireSession(threadId);
+      const pendingSession = pendingUserInputs.get(requestId);
+      if (pendingSession !== session) {
+        return yield* new ProviderAdapterRequestError({
+          provider: DRIVER_KIND,
+          method: "antigravity-sdk/user-input",
+          detail: `Unknown pending Antigravity user-input request: ${requestId}`,
+        });
+      }
+      pendingUserInputs.delete(requestId);
+      session.bridge.notify({
+        type: "user_input_response",
+        id: `question-${yield* Random.nextUUIDv4}`,
+        requestId,
+        answers: answers as Record<string, unknown>,
+      });
+      const base = yield* makeEventBase(session, session.currentTurnId, undefined, requestId);
+      yield* Queue.offer(runtimeEventQueue, {
+        ...base,
+        type: "user-input.resolved",
+        payload: { answers },
+      });
+    });
+
+  const readThread: ProviderAdapterShape<ProviderAdapterError>["readThread"] = (threadId) =>
+    requireSession(threadId).pipe(
+      Effect.map((s) => ({ threadId: s.threadId, turns: [] }) satisfies ProviderThreadSnapshot),
+    );
+
+  const stopAll: ProviderAdapterShape<ProviderAdapterError>["stopAll"] = () =>
+    Effect.forEach(Array.from(sessions.values()), stopSessionInternal, {
+      concurrency: 1,
+      discard: true,
+    }).pipe(Effect.asVoid);
+
+  yield* Effect.acquireRelease(Effect.void, () =>
+    stopAll().pipe(Effect.andThen(Queue.shutdown(runtimeEventQueue)), Effect.ignore),
+  );
+
+  return {
+    provider: DRIVER_KIND,
+    capabilities: { sessionModelSwitch: "unsupported" },
+    startSession,
+    sendTurn,
+    interruptTurn,
+    respondToRequest,
+    respondToUserInput,
+    stopSession: (threadId) =>
+      Effect.gen(function* () {
+        const session = sessions.get(threadId);
+        if (session) yield* stopSessionInternal(session);
+      }),
+    listSessions: () =>
+      Effect.gen(function* () {
+        const now = yield* makeIsoNow;
+        return Array.from(sessions.values())
+          .filter((s) => !s.stopped)
+          .map((s) => {
+            const providerSession: ProviderSession = {
+              provider: DRIVER_KIND,
+              providerInstanceId: s.providerInstanceId,
+              status: "ready",
+              runtimeMode: "full-access",
+              cwd: s.cwd,
+              threadId: s.threadId,
+              createdAt: now,
+              updatedAt: now,
+              resumeCursor: antigravitySdkResumeCursor(s),
+            };
+            return s.currentTurnId
+              ? Object.assign(providerSession, { activeTurnId: s.currentTurnId })
+              : providerSession;
+          });
+      }),
+    hasSession: (threadId) =>
+      Effect.succeed(Boolean(sessions.get(threadId) && !sessions.get(threadId)?.stopped)),
+    readThread,
+    rollbackThread: (threadId, _numTurns) => readThread(threadId),
+    stopAll,
+    get streamEvents() {
+      return Stream.fromQueue(runtimeEventQueue);
+    },
+  } satisfies ProviderAdapterShape<ProviderAdapterError>;
+});

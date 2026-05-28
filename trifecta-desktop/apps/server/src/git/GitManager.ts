@@ -1640,9 +1640,7 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
             : false;
         const shouldAutoFeatureBranch = wantsPr && isProtectedRef && !input.featureBranch;
 
-        const effectiveInput = shouldAutoFeatureBranch
-          ? { ...input, featureBranch: true }
-          : input;
+        const effectiveInput = shouldAutoFeatureBranch ? { ...input, featureBranch: true } : input;
 
         if (effectiveInput.featureBranch && !wantsCommit) {
           return yield* gitManagerError(

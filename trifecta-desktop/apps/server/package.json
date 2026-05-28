@@ -2,31 +2,27 @@
   "name": "@belweave/trifecta",
   "version": "0.0.37-alpha.1",
   "description": "Trifecta server — orchestrate AI coding agents (Codex, Claude Code, OpenCode, Gemini, Cursor, and more) behind one interface, paired with the Trifecta desktop, web, iOS, and Android clients.",
-  "license": "MIT",
+  "keywords": [
+    "acp",
+    "agent-orchestration",
+    "ai",
+    "claude-code",
+    "cli",
+    "codex",
+    "coding-agent",
+    "cursor",
+    "gemini",
+    "opencode"
+  ],
   "homepage": "https://github.com/pkyanam/trifecta#readme",
+  "bugs": {
+    "url": "https://github.com/pkyanam/trifecta/issues"
+  },
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pkyanam/trifecta.git",
     "directory": "apps/server"
-  },
-  "bugs": {
-    "url": "https://github.com/pkyanam/trifecta/issues"
-  },
-  "keywords": [
-    "ai",
-    "coding-agent",
-    "agent-orchestration",
-    "codex",
-    "claude-code",
-    "opencode",
-    "gemini",
-    "cursor",
-    "acp",
-    "cli"
-  ],
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org"
   },
   "bin": {
     "trifecta": "dist/bin.mjs"
@@ -38,12 +34,17 @@
     "!dist/**/*.publish-bak"
   ],
   "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "scripts": {
     "dev": "node --watch src/bin.ts",
     "build": "node scripts/cli.ts build",
     "build:bundle": "tsdown",
     "start": "node dist/bin.mjs",
     "typecheck": "tsc --noEmit",
+    "typecheck:gate": "node scripts/typecheck-gate.mjs",
     "test": "vitest run",
     "test:process-reaper": "vitest run src/server.test.ts src/provider/Layers/ClaudeAdapter.test.ts src/provider/Layers/ProviderSessionDirectory.test.ts src/provider/Layers/ProviderSessionReaper.test.ts src/provider/Layers/CodexAdapter.test.ts"
   },

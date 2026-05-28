@@ -7,6 +7,7 @@ import type {
   SshHostProfileConflictError,
   SshHostProfileCreateInput,
   SshHostProfileNotFoundError,
+  SshHostProfileUpdateInput,
 } from "@belweave/contracts";
 
 import type { PersistenceDecodeError, PersistenceSqlError } from "../../persistence/Errors.ts";
@@ -24,10 +25,9 @@ export interface SshHostProfilesShape {
   readonly remove: (
     hostId: SshHostId,
   ) => Effect.Effect<void, SshHostProfileNotFoundError | SshHostProfileRepositoryError>;
-  readonly setExpectedFingerprint: (input: {
-    readonly hostId: SshHostId;
-    readonly fingerprint: string;
-  }) => Effect.Effect<SshHostProfile, SshHostProfileNotFoundError | SshHostProfileRepositoryError>;
+  readonly update: (
+    input: SshHostProfileUpdateInput,
+  ) => Effect.Effect<SshHostProfile, SshHostProfileNotFoundError | SshHostProfileRepositoryError>;
 }
 
 export class SshHostProfiles extends Context.Service<SshHostProfiles, SshHostProfilesShape>()(

@@ -1007,8 +1007,7 @@ export function ProviderSettingsPanel() {
     serverProviders,
     refreshProviders: refreshActiveProviders,
     updateProvider: updateActiveProvider,
-  } =
-    useActiveProviderSettingsContext();
+  } = useActiveProviderSettingsContext();
   const [isRefreshingProviders, setIsRefreshingProviders] = useState(false);
   const [isAddInstanceDialogOpen, setIsAddInstanceDialogOpen] = useState(false);
   const [updatingProviderDrivers, setUpdatingProviderDrivers] = useState<
@@ -1057,53 +1056,54 @@ export function ProviderSettingsPanel() {
       });
   }, [refreshActiveProviders]);
 
-  const runProviderMaintenance = useCallback(async (input: {
-    readonly driver: ProviderDriverKind;
-    readonly instanceId: ProviderInstanceId;
-    readonly label: string;
-    readonly failureVerb: string;
-  }) => {
-    let started = false;
-    setUpdatingProviderDrivers((previous) => {
-      if (previous.has(input.driver)) {
-        return previous;
-      }
-      started = true;
-      const next = new Set(previous);
-      next.add(input.driver);
-      return next;
-    });
-    if (!started) {
-      return;
-    }
-
-    try {
-      await updateActiveProvider({
-        provider: input.driver,
-        instanceId: input.instanceId,
-      });
-    } catch (error) {
-      toastManager.add(
-        stackedThreadToast({
-          type: "error",
-          title: `Could not ${input.failureVerb} ${input.label}`,
-          description:
-            error instanceof Error
-              ? error.message
-              : "The provider command could not be started.",
-        }),
-      );
-    } finally {
+  const runProviderMaintenance = useCallback(
+    async (input: {
+      readonly driver: ProviderDriverKind;
+      readonly instanceId: ProviderInstanceId;
+      readonly label: string;
+      readonly failureVerb: string;
+    }) => {
+      let started = false;
       setUpdatingProviderDrivers((previous) => {
-        if (!previous.has(input.driver)) {
+        if (previous.has(input.driver)) {
           return previous;
         }
+        started = true;
         const next = new Set(previous);
-        next.delete(input.driver);
+        next.add(input.driver);
         return next;
       });
-    }
-  }, [updateActiveProvider]);
+      if (!started) {
+        return;
+      }
+
+      try {
+        await updateActiveProvider({
+          provider: input.driver,
+          instanceId: input.instanceId,
+        });
+      } catch (error) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: `Could not ${input.failureVerb} ${input.label}`,
+            description:
+              error instanceof Error ? error.message : "The provider command could not be started.",
+          }),
+        );
+      } finally {
+        setUpdatingProviderDrivers((previous) => {
+          if (!previous.has(input.driver)) {
+            return previous;
+          }
+          const next = new Set(previous);
+          next.delete(input.driver);
+          return next;
+        });
+      }
+    },
+    [updateActiveProvider],
+  );
 
   const runProviderUpdate = useCallback(
     async (candidate: ProviderUpdateCandidate) =>

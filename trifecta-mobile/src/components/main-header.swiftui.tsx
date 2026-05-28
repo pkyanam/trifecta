@@ -150,12 +150,12 @@ export function MainHeader() {
   const project = activeThread?.projectId ? getProject(activeThread.projectId) : null;
   const newChatProject = newChatProjectId ? getProject(newChatProjectId) : null;
 
-  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project > server cwd.
-  // If an active thread exists but its snapshot has not rehydrated after a
-  // branch-triggered Metro reload, avoid falling back to the server home cwd.
+  // Get the correct CWD: thread worktreePath > project workspaceRoot > new chat project.
+  // Only use a CWD if we have an active thread or new chat project with valid paths.
+  // Never fall back to server cwd to avoid fetching git status for unrelated directories.
   const cwd = activeThreadId && !activeThread
     ? ""
-    : activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || serverConfig?.cwd || "";
+    : activeThread?.worktreePath || project?.workspaceRoot || newChatProject?.workspaceRoot || "";
 
   useEffect(() => {
     let cancelled = false;
@@ -179,9 +179,7 @@ export function MainHeader() {
 
     const fetchGitStatus = async () => {
       try {
-        console.log("[MainHeader] Fetching git status for:", cwd);
         const status = await request("vcs.refreshStatus", { cwd }) as any;
-        console.log("[MainHeader] Git status:", status);
         if (status?.refName) {
           setBranchName(status.refName);
           setHasChanges(status?.hasWorkingTreeChanges || false);
@@ -189,7 +187,6 @@ export function MainHeader() {
           setBranchName("");
         }
       } catch (error) {
-        console.error("[MainHeader] Git status error:", error);
         setBranchName("");
       }
     };

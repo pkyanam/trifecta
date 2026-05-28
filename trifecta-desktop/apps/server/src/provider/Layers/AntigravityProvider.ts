@@ -111,10 +111,7 @@ export const checkAntigravityProviderStatus = Effect.fn("checkAntigravityProvide
         command,
         ChildProcess.make(
           command,
-          [
-            "-c",
-            "import google.antigravity; print('google-antigravity sdk available')",
-          ],
+          ["-c", "import google.antigravity; print('google-antigravity sdk available')"],
           {
             cwd: process.cwd(),
             env: environment,

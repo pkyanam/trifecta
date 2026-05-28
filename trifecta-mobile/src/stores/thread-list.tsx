@@ -13,6 +13,7 @@ interface ThreadListContextValue {
   activeThreads: ThreadShell[];
   getThread: (threadId: string) => ThreadShell | undefined;
   getProject: (projectId: string) => ProjectShell | undefined;
+  clearThreadList: () => void;
 }
 
 const ThreadListContext = createContext<ThreadListContextValue | null>(null);
@@ -103,8 +104,13 @@ export function ThreadListProvider({ children }: { children: React.ReactNode }) 
     return projects.find((p) => p.id === projectId);
   };
 
+  const clearThreadList = () => {
+    setProjects([]);
+    setThreads([]);
+  };
+
   return (
-    <ThreadListContext value={{ projects, threads, activeThreads, getThread, getProject }}>
+    <ThreadListContext value={{ projects, threads, activeThreads, getThread, getProject, clearThreadList }}>
       {children}
     </ThreadListContext>
   );

@@ -1551,7 +1551,9 @@ export default function GitActionsControl({
     if (quickAction.action) {
       // Auto-enable feature branch when on protected ref for PR actions
       const isProtectedRef = gitStatusForActions?.isProtectedRef === true;
-      const featureBranch = isProtectedRef && (quickAction.action === "create_pr" || quickAction.action === "commit_push_pr");
+      const featureBranch =
+        isProtectedRef &&
+        (quickAction.action === "create_pr" || quickAction.action === "commit_push_pr");
       void runGitActionWithToast({ action: quickAction.action, featureBranch });
     }
   };

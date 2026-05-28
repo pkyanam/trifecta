@@ -1,7 +1,9 @@
 import "@/global.css";
 
 import { Icon } from "@/components/icon";
+import { SymbolImage } from "@/components/symbol-image";
 import { labelForSelection, useModel } from "@/components/model-context";
+import { LiquidMetalButton } from "@/components/liquid-metal";
 import { TouchableGlass } from "@/components/touchable-glass";
 import { SafeAreaView } from "@/components/tw";
 import { useActiveThread } from "@/stores/active-thread";
@@ -12,7 +14,7 @@ import type { ProjectShell, ThreadShell } from "@/types/thread";
 import { projectDisplayName } from "@/utils/projects";
 import { cn } from "@/utils/tailwind";
 import type { Href } from "expo-router";
-import { ChevronDown, ChevronRight, Plus, Server, Wifi } from "lucide-react-native";
+import { ChevronDown, ChevronRight, Server, Wifi } from "lucide-react-native";
 
 import React, { createContext, use, useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -262,17 +264,52 @@ export function DrawerContent({
           </Text>
         </TouchableGlass>
         <View className="flex-1" />
-        <TouchableGlass
-          onPress={() => {
-            if (process.env.EXPO_OS === "android") {
-              onNavigate("/");
-            }
-            onOpenModal("/new-chat");
-          }}
-          className="w-10 h-10 rounded-full bg-foreground active:bg-muted items-center justify-center"
-        >
-          <Icon icon={Plus} className="w-6 h-6 text-background" />
-        </TouchableGlass>
+        <View className="flex-row items-center gap-3">
+          <LiquidMetalButton
+            onPress={() => {
+              if (process.env.EXPO_OS === "android") {
+                onNavigate("/ssh");
+              }
+              onOpenModal("/ssh");
+            }}
+            size={40}
+            accessibilityLabel="SSH Terminal"
+          >
+            <SymbolImage
+              name="terminal"
+              size={22}
+              style={{
+                tintColor: '#ffffff',
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.35,
+                shadowRadius: 2,
+              }}
+            />
+          </LiquidMetalButton>
+          <LiquidMetalButton
+            onPress={() => {
+              if (process.env.EXPO_OS === "android") {
+                onNavigate("/");
+              }
+              onOpenModal("/new-chat");
+            }}
+            size={40}
+            accessibilityLabel="New chat"
+          >
+            <SymbolImage
+              name="plus"
+              size={24}
+              style={{
+                tintColor: '#ffffff',
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.35,
+                shadowRadius: 2,
+              }}
+            />
+          </LiquidMetalButton>
+        </View>
       </View>
     </SafeAreaView>
   );
