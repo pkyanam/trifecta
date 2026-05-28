@@ -73,6 +73,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Create Electron path stub
+        run: node -e "const fs=require('fs'),path=require('path');const dir=path.dirname(require.resolve('electron'));fs.writeFileSync(path.join(dir,'path.txt'),'electron-stub');"
+
       - id: release_meta
         name: Resolve release version
         shell: bash
