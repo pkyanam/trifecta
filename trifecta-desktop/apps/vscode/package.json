@@ -1,7 +1,7 @@
 {
   "name": "trifecta-ide",
   "displayName": "Trifecta — AI Coding Agent",
-  "version": "0.0.37-alpha.1",
+  "version": "0.0.38-alpha.1",
   "description": "Universal coding agent interface for Codex, Claude Code, OpenCode, and Cursor — directly inside your IDE.",
   "categories": [
     "Chat",
