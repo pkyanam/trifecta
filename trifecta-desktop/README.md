@@ -29,18 +29,7 @@ npx @belweave/trifecta
 
 ### Desktop app
 
-Grab the latest build from [GitHub Releases](https://github.com/pkyanam/trifecta/releases), or a package registry:
-
-```bash
-# macOS (Homebrew)
-brew install --cask belweave-code
-
-# Windows (winget)
-winget install Belweave.T3Code
-
-# Arch Linux (AUR)
-yay -S belweave-bin
-```
+Grab the latest build from [GitHub Releases](https://github.com/pkyanam/trifecta/releases).
 
 ## Architecture
 

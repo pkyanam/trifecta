@@ -1,4 +1,4 @@
-# Trifecta
+# Trifecta [![Socket Badge](https://socket.dev/api/badge/npm/package/@belweave/trifecta)](https://socket.dev/npm/package/@belweave/trifecta)
 
 A cross-platform coding-agent platform with four clients: Desktop, Web, Mobile, and VS Code/Cursor extension. All clients connect to the same server over WebSocket to chat with AI agents, review diffs, approve actions, and drive Git.
 

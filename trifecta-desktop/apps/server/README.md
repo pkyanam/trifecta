@@ -36,13 +36,7 @@ This starts the server and opens the web UI. Run `npx @belweave/trifecta --help`
 
 ## Prefer a desktop app?
 
-Grab a signed build from [GitHub Releases](https://github.com/pkyanam/trifecta/releases), or:
-
-```bash
-brew install --cask belweave-code   # macOS
-winget install Belweave.T3Code       # Windows
-yay -S belweave-bin                  # Arch Linux (AUR)
-```
+Grab a signed build from [GitHub Releases](https://github.com/pkyanam/trifecta/releases).
 
 ## Documentation
 
