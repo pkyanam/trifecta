@@ -16,6 +16,7 @@ export function getDaytonaClient(): Daytona {
 export interface SandboxInfo {
   id: string;
   daytonaSandboxId: string;
+  pairingToken: string;
   status: string;
 }
 
@@ -24,6 +25,7 @@ export interface SandboxStatus {
 }
 
 const DATA_DIR = '/home/daytona/data';
+const PROJECTS_DIR = '/home/daytona/projects';
 const TRIFECTA_LOG = `${DATA_DIR}/trifecta.log`;
 const TRIFECTA_PID = `${DATA_DIR}/trifecta.pid`;
 const TERMINAL_PORT = 22222; // Daytona's built-in terminal port — no preview-URL warning
@@ -36,22 +38,17 @@ function execScriptCommand(scriptLines: string[]): string {
   return `echo "${encoded}" | base64 -d | bash`;
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function trifectaEnv(pairingToken?: string): Record<string, string> {
+function trifectaEnv(): Record<string, string> {
   return {
     BELWEAVE_HOST: '0.0.0.0',
     BELWEAVE_PORT: config.trifecta.serverPort.toString(),
     BELWEAVE_HOME: DATA_DIR,
     BELWEAVE_MODE: 'server',
     BELWEAVE_NO_BROWSER: 'true',
-    ...(pairingToken ? { BELWEAVE_REVIEW_PAIRING_TOKEN: pairingToken } : {}),
   };
 }
 
-function startTrifectaCommand(pairingToken: string): string {
+function startTrifectaCommand(): string {
   // SECURITY: trifecta serve must run as the daytona user, not root.
   // Its built-in terminal inherits the process owner, so root → root shell for users.
   //
@@ -70,14 +67,14 @@ function startTrifectaCommand(pairingToken: string): string {
     `export BELWEAVE_HOME=${DATA_DIR}`,
     `export BELWEAVE_MODE=server`,
     `export BELWEAVE_NO_BROWSER=true`,
-    `export BELWEAVE_REVIEW_PAIRING_TOKEN=${shellQuote(pairingToken)}`,
-    `nohup trifecta serve --mode server --host 0.0.0.0 --port ${config.trifecta.serverPort} --base-dir ${DATA_DIR} --no-browser ${DATA_DIR} >${TRIFECTA_LOG} 2>&1 </dev/null &`,
+    `unset BELWEAVE_REVIEW_PAIRING_TOKEN`,
+    `nohup trifecta serve --mode server --host 0.0.0.0 --port ${config.trifecta.serverPort} --base-dir ${DATA_DIR} --no-browser ${PROJECTS_DIR} >${TRIFECTA_LOG} 2>&1 </dev/null &`,
     `echo $! >${TRIFECTA_PID}`,
   ];
   const innerB64 = Buffer.from(innerLines.join('\n')).toString('base64');
 
   const outerLines = [
-    `mkdir -p ${DATA_DIR} && chown -R daytona:daytona ${DATA_DIR}`,
+    `mkdir -p ${DATA_DIR} ${PROJECTS_DIR} && chown -R daytona:daytona /home/daytona`,
     `[ -f ${TRIFECTA_PID} ] && kill "$(cat ${TRIFECTA_PID})" 2>/dev/null; rm -f ${TRIFECTA_PID}`,
     `su - daytona -c "echo ${innerB64} | base64 -d | bash"`,
   ];
@@ -98,7 +95,7 @@ function startTerminalCommand(): string {
   // shell, SHLVL becomes 2, so the exec never fires again.
   const guard = '[ "$SHLVL" = "1" ] && [ "$(id -u)" = "0" ] && exec su - daytona';
   const script = [
-    `mkdir -p ${DATA_DIR} && chown -R daytona:daytona ${DATA_DIR}`,
+    `mkdir -p ${DATA_DIR} ${PROJECTS_DIR} && chown -R daytona:daytona /home/daytona`,
     `printf '#!/bin/sh\\n${guard}\\n' > /etc/profile.d/99-daytona-user.sh && chmod +x /etc/profile.d/99-daytona-user.sh`,
     `grep -qF 'exec su - daytona' /root/.bash_profile 2>/dev/null || printf '\\n${guard}\\n' >> /root/.bash_profile`,
     `grep -qF 'exec su - daytona' /root/.bashrc 2>/dev/null || printf '\\n${guard}\\n' >> /root/.bashrc`,
@@ -130,6 +127,28 @@ async function waitForTrifecta(sandbox: Sandbox): Promise<void> {
   }
 }
 
+async function readPairingToken(sandbox: Sandbox): Promise<string> {
+  const result = await sandbox.process.executeCommand(
+    [
+      'for i in $(seq 1 20); do',
+      `  token="$(sed -n 's/^Token: //p' ${TRIFECTA_LOG} | tail -1)"`,
+      '  [ -n "$token" ] && printf "%s" "$token" && exit 0',
+      '  sleep 1',
+      'done',
+      'echo "Trifecta did not emit an owner pairing token." >&2',
+      'exit 1',
+    ].join('\n'),
+    DATA_DIR,
+    undefined,
+    30,
+  );
+  const pairingToken = result.result.trim();
+  if (result.exitCode !== 0 || !pairingToken) {
+    throw new Error(result.result || 'Trifecta did not emit an owner pairing token.');
+  }
+  return pairingToken;
+}
+
 export function assertSandboxResourcesSupported(tier: SandboxTier, diskGiB: number = SANDBOX_TIERS.launch.disk): void {
   if (tier !== 'launch' || diskGiB !== SANDBOX_TIERS.launch.disk) {
     throw new Error(
@@ -138,7 +157,7 @@ export function assertSandboxResourcesSupported(tier: SandboxTier, diskGiB: numb
   }
 }
 
-export async function createSandbox(opts: { name: string; tier: SandboxTier; pairingToken: string; idleTimeoutMinutes?: number; gpuCount?: number; diskGiB?: number }): Promise<SandboxInfo> {
+export async function createSandbox(opts: { name: string; tier: SandboxTier; idleTimeoutMinutes?: number; gpuCount?: number; diskGiB?: number }): Promise<SandboxInfo> {
   let sandbox: Sandbox | undefined;
 
   try {
@@ -163,7 +182,7 @@ export async function createSandbox(opts: { name: string; tier: SandboxTier; pai
         ...(useGpu ? { gpu: 'true' } : {}),
       },
       envVars: {
-        ...trifectaEnv(opts.pairingToken),
+        ...trifectaEnv(),
       },
       autoStopInterval: opts.idleTimeoutMinutes ?? 15,
     });
@@ -177,17 +196,19 @@ export async function createSandbox(opts: { name: string; tier: SandboxTier; pai
     }
 
     // Start the Trifecta server
-    const trifectaStart = await sandbox.process.executeCommand(startTrifectaCommand(opts.pairingToken), DATA_DIR, trifectaEnv(opts.pairingToken), 15);
+    const trifectaStart = await sandbox.process.executeCommand(startTrifectaCommand(), DATA_DIR, trifectaEnv(), 15);
     if (trifectaStart.exitCode !== 0) {
       throw new Error(trifectaStart.result || 'Failed to start Trifecta.');
     }
     await waitForTrifecta(sandbox);
+    const pairingToken = await readPairingToken(sandbox);
 
     console.log(`[Daytona] Trifecta server started on ${sandbox.id}`);
 
     return {
       id: sandbox.id, // Using Daytona ID here, caller will map
       daytonaSandboxId: sandbox.id,
+      pairingToken,
       status: 'running',
     };
   } catch (error) {
@@ -202,7 +223,7 @@ export async function createSandbox(opts: { name: string; tier: SandboxTier; pai
   }
 }
 
-export async function startSandbox(daytonaSandboxId: string, pairingToken: string, idleTimeoutMinutes?: number): Promise<void> {
+export async function startSandbox(daytonaSandboxId: string, idleTimeoutMinutes?: number): Promise<string> {
   try {
     const client = getDaytonaClient();
     const sandbox = await client.get(daytonaSandboxId);
@@ -223,13 +244,15 @@ export async function startSandbox(daytonaSandboxId: string, pairingToken: strin
     }
 
     // Start the Trifecta server
-    const trifectaStart = await sandbox.process.executeCommand(startTrifectaCommand(pairingToken), DATA_DIR, trifectaEnv(pairingToken), 15);
+    const trifectaStart = await sandbox.process.executeCommand(startTrifectaCommand(), DATA_DIR, trifectaEnv(), 15);
     if (trifectaStart.exitCode !== 0) {
       throw new Error(trifectaStart.result || 'Failed to start Trifecta.');
     }
     await waitForTrifecta(sandbox);
+    const pairingToken = await readPairingToken(sandbox);
 
     console.log(`[Daytona] Sandbox ${daytonaSandboxId} started successfully`);
+    return pairingToken;
   } catch (error) {
     console.error(`[Daytona] Failed to start sandbox ${daytonaSandboxId}:`, error);
     throw error;
