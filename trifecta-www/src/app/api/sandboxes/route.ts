@@ -117,9 +117,10 @@ export async function POST(request: Request) {
     const gpuCount = gpuAddon ? 1 : 0;
 
     after(
-      daytonaCreateSandbox({ name, tier: tier as SandboxTier, pairingToken, idleTimeoutMinutes, gpuCount, diskGiB })
+      daytonaCreateSandbox({ name, tier: tier as SandboxTier, idleTimeoutMinutes, gpuCount, diskGiB })
         .then((info) => updateSandbox(record.id, userId, {
           daytona_sandbox_id: info.daytonaSandboxId,
+          pairing_token: info.pairingToken,
           status: 'running',
           started_at: new Date().toISOString(),
         }))

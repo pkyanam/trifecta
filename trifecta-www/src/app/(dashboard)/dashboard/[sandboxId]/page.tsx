@@ -200,7 +200,7 @@ export default function SandboxDetail() {
                     export ANTHROPIC_API_KEY=sk-ant-…
                   </code>
                 </li>
-                <li>Navigate to <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs">/home/daytona/data</code></li>
+                <li>Navigate to <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs">/home/daytona/projects</code></li>
                 <li>Scan the QR or open the pairing link in the Trifecta app</li>
               </ol>
             </div>

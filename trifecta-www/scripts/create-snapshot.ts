@@ -72,9 +72,9 @@ async function main() {
       // Make sure /usr/local/bin is on the system-wide PATH for all login shells.
       'echo \'export PATH="/usr/local/bin:$PATH"\' > /etc/profile.d/local-bin.sh',
 
-      // Create non-root user and data dir — always last so chown is complete.
+      // Create non-root user, state dir, and visible workspace dir — always last so chown is complete.
       'useradd -m -s /bin/bash daytona',
-      'mkdir -p /home/daytona/data',
+      'mkdir -p /home/daytona/data /home/daytona/projects',
       'chown -R daytona:daytona /home/daytona',
 
       // Allow daytona to run specific admin commands without a password.

@@ -1,6 +1,5 @@
 import { createSandbox } from '../src/lib/daytona';
 import dotenv from 'dotenv';
-import crypto from 'crypto';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -11,17 +10,15 @@ async function main() {
   const name = nameArg ? nameArg.split('=')[1] : `test-${Math.random().toString(36).substring(7)}`;
 
   console.log(`Seeding sandbox: ${name}`);
-  const pairingToken = crypto.randomUUID();
 
   try {
     const info = await createSandbox({
       name,
       tier: 'launch',
-      pairingToken,
     });
 
     console.log('Success:', info);
-    console.log('Pairing Token:', pairingToken);
+    console.log('Pairing Token:', info.pairingToken);
   } catch (e) {
     console.error('Failed:', e);
   }
