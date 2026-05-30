@@ -850,6 +850,18 @@ describe("GeneralSettingsPanel observability", () => {
     await page.getByRole("button", { name: "Create link", exact: true }).click();
     await expect.element(page.getByText("Create pairing link")).toBeInTheDocument();
     await page.getByRole("button", { name: "Create link", exact: true }).click();
+    const pairingLinkDialog = page.getByRole("dialog", { name: "Create pairing link" });
+    await expect
+      .element(
+        pairingLinkDialog.getByRole("img", {
+          name: "New pairing link — scan to open on another device",
+        }),
+      )
+      .toBeInTheDocument();
+    await expect
+      .element(pairingLinkDialog.getByRole("button", { name: "Copy pairing URL", exact: true }))
+      .toBeInTheDocument();
+    await pairingLinkDialog.getByRole("button", { name: "Done", exact: true }).click();
     authAccessHarness.emitPairingLinkUpserted(pairingLinks[0]!);
     authAccessHarness.emitClientUpserted(clientSessions[1]!);
     await expect
@@ -1013,6 +1025,14 @@ describe("GeneralSettingsPanel observability", () => {
     await expect
       .element(addEnvironmentDialog.getByRole("heading", { name: "Add Environment", exact: true }))
       .toBeInTheDocument();
+    await expect
+      .element(addEnvironmentDialog.getByRole("link", { name: "View pricing", exact: true }))
+      .toHaveAttribute("href", "https://trifecta.belweave.ai/pricing");
+    await expect
+      .element(
+        addEnvironmentDialog.getByRole("link", { name: "Open cloud dashboard", exact: true }),
+      )
+      .toHaveAttribute("href", "https://trifecta.belweave.ai/dashboard");
     await addEnvironmentDialog.getByRole("button", { name: /^SSH\b/ }).click();
     await vi.waitFor(() => {
       expect(discoverSshHosts).toHaveBeenCalledTimes(1);
