@@ -1,6 +1,8 @@
 import {
   ChevronDownIcon,
   ChevronsLeftRightEllipsisIcon,
+  CloudIcon,
+  ExternalLinkIcon,
   PlusIcon,
   QrCodeIcon,
   RefreshCwIcon,
@@ -484,6 +486,29 @@ function resolveCurrentOriginPairingUrl(credential: string): string {
   return setPairingTokenOnUrl(url, credential).toString();
 }
 
+function resolveShareablePairingUrl(input: {
+  credential: string;
+  endpointUrl: string | null | undefined;
+  endpoints: ReadonlyArray<AdvertisedEndpoint>;
+  defaultEndpointKey: string | null;
+}): string | null {
+  const endpoint = selectPairingEndpoint(input.endpoints, input.defaultEndpointKey);
+  if (endpoint) {
+    return resolveAdvertisedEndpointPairingUrl(endpoint, input.credential);
+  }
+
+  if (input.endpointUrl != null && input.endpointUrl !== "") {
+    return (
+      resolveHostedPairingUrl(input.endpointUrl, input.credential) ??
+      resolveDesktopPairingUrl(input.endpointUrl, input.credential)
+    );
+  }
+
+  return isLoopbackHostname(window.location.hostname)
+    ? null
+    : resolveCurrentOriginPairingUrl(input.credential);
+}
+
 function isHostedAppPairingUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -519,21 +544,16 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
   );
   const [isRevealDialogOpen, setIsRevealDialogOpen] = useState(false);
 
-  const currentOriginPairingUrl = useMemo(
-    () => resolveCurrentOriginPairingUrl(pairingLink.credential),
-    [pairingLink.credential],
-  );
-  const hostedPairingUrl = useMemo(
+  const shareablePairingUrl = useMemo(
     () =>
-      endpointUrl != null && endpointUrl !== ""
-        ? resolveHostedPairingUrl(endpointUrl, pairingLink.credential)
-        : null,
-    [endpointUrl, pairingLink.credential],
+      resolveShareablePairingUrl({
+        credential: pairingLink.credential,
+        endpointUrl,
+        endpoints,
+        defaultEndpointKey,
+      }),
+    [defaultEndpointKey, endpointUrl, endpoints, pairingLink.credential],
   );
-  const endpointPairingUrl = useMemo(() => {
-    const endpoint = selectPairingEndpoint(endpoints, defaultEndpointKey);
-    return endpoint ? resolveAdvertisedEndpointPairingUrl(endpoint, pairingLink.credential) : null;
-  }, [defaultEndpointKey, endpoints, pairingLink.credential]);
   const endpointCopyOptions = useMemo(
     () =>
       endpoints
@@ -549,13 +569,6 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
         }),
     [endpoints, pairingLink.credential],
   );
-  const shareablePairingUrl =
-    endpointPairingUrl ??
-    (endpointUrl != null && endpointUrl !== ""
-      ? (hostedPairingUrl ?? resolveDesktopPairingUrl(endpointUrl, pairingLink.credential))
-      : isLoopbackHostname(window.location.hostname)
-        ? null
-        : currentOriginPairingUrl);
   const revealValue = shareablePairingUrl ?? pairingLink.credential;
   const isShareableHostedAppPairingUrl =
     shareablePairingUrl !== null && isHostedAppPairingUrl(shareablePairingUrl);
@@ -947,12 +960,18 @@ const ConnectedClientListRow = memo(function ConnectedClientListRow({
 });
 
 type AuthorizedClientsHeaderActionProps = {
+  endpointUrl: string | null | undefined;
+  endpoints: ReadonlyArray<AdvertisedEndpoint>;
+  defaultEndpointKey: string | null;
   clientSessions: ReadonlyArray<ServerClientSessionRecord>;
   isRevokingOtherClients: boolean;
   onRevokeOtherClients: () => void;
 };
 
 const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderAction({
+  endpointUrl,
+  endpoints,
+  defaultEndpointKey,
   clientSessions,
   isRevokingOtherClients,
   onRevokeOtherClients,
@@ -960,13 +979,48 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pairingLabel, setPairingLabel] = useState("");
   const [isCreatingPairingLink, setIsCreatingPairingLink] = useState(false);
+  const [createdPairingValue, setCreatedPairingValue] = useState<{
+    value: string;
+    isUrl: boolean;
+  } | null>(null);
+
+  const { copyToClipboard } = useCopyToClipboard<"code" | "url">({
+    onCopy: (kind) => {
+      toastManager.add({
+        type: "success",
+        title: kind === "url" ? "Pairing URL copied" : "Pairing code copied",
+        description:
+          kind === "url"
+            ? "Open it on the device you want to connect."
+            : "Paste it into another client to finish pairing.",
+      });
+    },
+    onError: (error, kind) => {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: kind === "url" ? "Could not copy pairing URL" : "Could not copy pairing code",
+          description: error.message,
+        }),
+      );
+    },
+  });
 
   const handleCreatePairingLink = useCallback(async () => {
     setIsCreatingPairingLink(true);
     try {
-      await createServerPairingCredential(pairingLabel);
+      const pairingLink = await createServerPairingCredential(pairingLabel);
+      const pairingUrl = resolveShareablePairingUrl({
+        credential: pairingLink.credential,
+        endpointUrl,
+        endpoints,
+        defaultEndpointKey,
+      });
+      setCreatedPairingValue({
+        value: pairingUrl ?? pairingLink.credential,
+        isUrl: pairingUrl !== null,
+      });
       setPairingLabel("");
-      setDialogOpen(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create pairing URL.";
       toastManager.add(
@@ -979,7 +1033,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
     } finally {
       setIsCreatingPairingLink(false);
     }
-  }, [pairingLabel]);
+  }, [defaultEndpointKey, endpointUrl, endpoints, pairingLabel]);
 
   return (
     <div className="flex items-center gap-2">
@@ -999,6 +1053,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
           setDialogOpen(open);
           if (!open) {
             setPairingLabel("");
+            setCreatedPairingValue(null);
           }
         }}
       >
@@ -1014,35 +1069,85 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
           <DialogHeader>
             <DialogTitle>Create pairing link</DialogTitle>
             <DialogDescription>
-              Generate a one-time link that another device can use to pair with this backend as an
-              authorized client.
+              {createdPairingValue
+                ? createdPairingValue.isUrl
+                  ? "Scan the QR code or copy the URL to pair another device with this backend."
+                  : "Copy the pairing code into another client using this backend's reachable host."
+                : "Generate a one-time link that another device can use to pair with this backend as an authorized client."}
             </DialogDescription>
           </DialogHeader>
-          <DialogPanel>
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Client label (optional)
-              </span>
-              <Input
-                value={pairingLabel}
-                onChange={(event) => setPairingLabel(event.target.value)}
-                placeholder="e.g. Living room iPad"
-                disabled={isCreatingPairingLink}
-                autoFocus
-              />
-            </label>
+          <DialogPanel className="space-y-4">
+            {createdPairingValue ? (
+              <>
+                <Textarea
+                  readOnly
+                  value={createdPairingValue.value}
+                  rows={createdPairingValue.isUrl ? 4 : 3}
+                  className="text-xs leading-relaxed"
+                  onFocus={(event) => event.currentTarget.select()}
+                  onClick={(event) => event.currentTarget.select()}
+                />
+                {createdPairingValue.isUrl ? (
+                  <div className="flex justify-center rounded-xl border border-border/60 bg-muted/30 p-4">
+                    <QRCodeSvg
+                      value={createdPairingValue.value}
+                      size={160}
+                      level="M"
+                      marginSize={2}
+                      title="New pairing link — scan to open on another device"
+                    />
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-foreground">
+                  Client label (optional)
+                </span>
+                <Input
+                  value={pairingLabel}
+                  onChange={(event) => setPairingLabel(event.target.value)}
+                  placeholder="e.g. Living room iPad"
+                  disabled={isCreatingPairingLink}
+                  autoFocus
+                />
+              </label>
+            )}
           </DialogPanel>
           <DialogFooter variant="bare">
-            <Button
-              variant="outline"
-              disabled={isCreatingPairingLink}
-              onClick={() => setDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button disabled={isCreatingPairingLink} onClick={() => void handleCreatePairingLink()}>
-              {isCreatingPairingLink ? "Creating…" : "Create link"}
-            </Button>
+            {createdPairingValue ? (
+              <>
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Done
+                </Button>
+                <Button
+                  onClick={() =>
+                    copyToClipboard(
+                      createdPairingValue.value,
+                      createdPairingValue.isUrl ? "url" : "code",
+                    )
+                  }
+                >
+                  {createdPairingValue.isUrl ? "Copy pairing URL" : "Copy pairing code"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={isCreatingPairingLink}
+                  onClick={() => setDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={isCreatingPairingLink}
+                  onClick={() => void handleCreatePairingLink()}
+                >
+                  {isCreatingPairingLink ? "Creating…" : "Create link"}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogPopup>
       </Dialog>
@@ -2191,6 +2296,41 @@ export function ConnectionsSettings() {
   );
   const renderRemoteModeBody = () => (
     <div className="space-y-4">
+      <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+        <div className="flex gap-3">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground">
+            <CloudIcon aria-hidden className="size-4" />
+          </span>
+          <div className="min-w-0 space-y-2">
+            <div>
+              <p className="text-xs font-medium text-foreground">Need a cloud sandbox?</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                Configure a hosted Trifecta sandbox, then paste its pairing URL below.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <a
+                href="https://trifecta.belweave.ai/pricing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                View pricing
+                <ExternalLinkIcon aria-hidden className="size-3" />
+              </a>
+              <a
+                href="https://trifecta.belweave.ai/dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                Open cloud dashboard
+                <ExternalLinkIcon aria-hidden className="size-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
       {renderRemoteFields()}
       {savedBackendError ? <p className="text-xs text-destructive">{savedBackendError}</p> : null}
       <Button
@@ -2474,6 +2614,9 @@ export function ConnectionsSettings() {
               title="Authorized clients"
               headerAction={
                 <AuthorizedClientsHeaderAction
+                  endpointUrl={desktopServerExposureState?.endpointUrl}
+                  endpoints={visibleDesktopAdvertisedEndpoints}
+                  defaultEndpointKey={defaultDesktopAdvertisedEndpointKey}
                   clientSessions={desktopClientSessions}
                   isRevokingOtherClients={isRevokingOtherDesktopClients}
                   onRevokeOtherClients={handleRevokeOtherDesktopClients}
