@@ -1,5 +1,5 @@
 import { Daytona, type Sandbox } from '@daytonaio/sdk';
-import { config, SandboxTier } from './config';
+import { config, SANDBOX_TIERS, SandboxTier } from './config';
 
 let daytonaClient: Daytona | null = null;
 
@@ -130,11 +130,22 @@ async function waitForTrifecta(sandbox: Sandbox): Promise<void> {
   }
 }
 
+export function assertSandboxResourcesSupported(tier: SandboxTier, diskGiB: number = SANDBOX_TIERS.launch.disk): void {
+  if (tier !== 'launch' || diskGiB !== SANDBOX_TIERS.launch.disk) {
+    throw new Error(
+      'Custom CPU tiers and storage sizes are temporarily unavailable. Create a Launch sandbox with 10 GiB storage.',
+    );
+  }
+}
+
 export async function createSandbox(opts: { name: string; tier: SandboxTier; pairingToken: string; idleTimeoutMinutes?: number; gpuCount?: number; diskGiB?: number }): Promise<SandboxInfo> {
+  let sandbox: Sandbox | undefined;
+
   try {
     const client = getDaytonaClient();
 
     console.log(`[Daytona] Creating sandbox: ${opts.name} (${opts.tier})`);
+    assertSandboxResourcesSupported(opts.tier, opts.diskGiB);
 
     const useGpu = (opts.gpuCount ?? 0) > 0;
     if (useGpu && !config.trifecta.gpuSnapshotName) {
@@ -142,16 +153,9 @@ export async function createSandbox(opts: { name: string; tier: SandboxTier; pai
     }
 
     const snapshot = useGpu ? config.trifecta.gpuSnapshotName : config.trifecta.snapshotName;
-    const diskGiB = opts.diskGiB ?? 10;
-
-    // Daytona's runtime checks 'snapshot' and 'resources' independently — both work
-    // together even though the TypeScript overloads treat them as mutually exclusive.
-    // @ts-expect-error: resources is only typed on CreateSandboxFromImageParams but
-    // the SDK's create() forwards disk to the API regardless of the snapshot/image path.
-    const sandbox = await client.create({
+    sandbox = await client.create({
       name: opts.name,
       snapshot,
-      resources: { disk: diskGiB },
       labels: {
         app: 'trifecta-cloud',
         name: opts.name,
@@ -188,6 +192,12 @@ export async function createSandbox(opts: { name: string; tier: SandboxTier; pai
     };
   } catch (error) {
     console.error('[Daytona] Failed to create sandbox:', error);
+    if (sandbox) {
+      const failedSandbox = sandbox;
+      await getDaytonaClient().delete(failedSandbox).catch((cleanupError) => {
+        console.error(`[Daytona] Failed to clean up sandbox ${failedSandbox.id}:`, cleanupError);
+      });
+    }
     throw error;
   }
 }
