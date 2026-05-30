@@ -2,7 +2,7 @@ import { after } from 'next/server';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getAllSandboxes, createSandbox as dbCreateSandbox, getCloudAccount, updateSandbox, addRuntimeCreditsUsed } from '@/lib/db';
-import { createSandbox as daytonaCreateSandbox, getSandboxStatus } from '@/lib/daytona';
+import { assertSandboxResourcesSupported, createSandbox as daytonaCreateSandbox, getSandboxStatus } from '@/lib/daytona';
 import { SandboxTier } from '@/lib/config';
 import { getIsAdmin } from '@/lib/admin';
 import { canCreateSandbox } from '@/lib/cloud-access';
@@ -96,6 +96,15 @@ export async function POST(request: Request) {
 
     if (gpuAddon && !isAdmin && !account?.gpu_enabled) {
       return NextResponse.json({ error: 'GPU add-ons are available on Pro and Team plans.' }, { status: 403 });
+    }
+
+    try {
+      assertSandboxResourcesSupported(tier as SandboxTier, diskGiB);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Unsupported sandbox resources.' },
+        { status: 422 },
+      );
     }
 
     const record = await dbCreateSandbox({ name, tier, disk_gib: diskGiB, pairing_token: pairingToken, user_id: userId });

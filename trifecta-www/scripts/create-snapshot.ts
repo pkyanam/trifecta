@@ -1,5 +1,6 @@
 import { Daytona, Image } from '@daytonaio/sdk';
 import dotenv from 'dotenv';
+import { SANDBOX_SIZE_TIERS } from '../src/lib/billing';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -89,6 +90,11 @@ async function main() {
       {
         name: snapshotName,
         image,
+        resources: {
+          cpu: SANDBOX_SIZE_TIERS.launch.cpu,
+          memory: SANDBOX_SIZE_TIERS.launch.memory,
+          disk: SANDBOX_SIZE_TIERS.launch.disk,
+        },
       },
       {
         onLogs: (chunk) => process.stdout.write(chunk.toString()),
