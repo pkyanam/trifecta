@@ -105,6 +105,10 @@ One-time Vercel dashboard setup:
   - No automatic download or install.
   - The desktop UI shows a rocket update button when an update is available; click once to download, click again after download to restart/install.
 - Provider: GitHub Releases (`provider: github`) configured at build time.
+- Stable track discovery:
+  - stable-channel builds are published as GitHub Latest releases, including alpha builds whose versions carry a semver prerelease suffix such as `0.0.38-alpha.1`
+  - nightly builds remain GitHub prereleases and use the dedicated `nightly` updater channel
+  - the release workflow verifies that GitHub exposes the stable tag through `/releases/latest` and that macOS, Windows, and Linux updater manifests are present
 - Repository slug source:
   - `BELWEAVE_DESKTOP_UPDATE_REPOSITORY` (format `owner/repo`), if set.
   - otherwise `GITHUB_REPOSITORY` from GitHub Actions.
