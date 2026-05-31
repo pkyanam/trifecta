@@ -143,13 +143,11 @@ jobs:
             echo "tag=v$version" >> "$GITHUB_OUTPUT"
             echo "name=Trifecta v$version" >> "$GITHUB_OUTPUT"
             echo "cli_dist_tag=latest" >> "$GITHUB_OUTPUT"
-            if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
-              echo "make_latest=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
-              echo "make_latest=false" >> "$GITHUB_OUTPUT"
-            fi
+            # Stable-channel builds may carry a semver prerelease suffix while
+            # the product is in alpha. They must still back GitHub's Latest
+            # endpoint because electron-updater uses it for the stable track.
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "make_latest=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Lint
@@ -574,6 +572,51 @@ jobs:
             release-assets/*.yml
           fail_on_unmatched_files: true
           token: ${{ steps.app_token.outputs.token }}
+
+      - name: Verify desktop updater release metadata
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          RELEASE_CHANNEL: ${{ needs.preflight.outputs.release_channel }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"
+          prerelease="$(jq -r '.prerelease' <<< "$release_json")"
+
+          if [[ "$RELEASE_CHANNEL" == "stable" ]]; then
+            if [[ "$prerelease" != "false" ]]; then
+              echo "Stable desktop release ${RELEASE_TAG} was published as a GitHub prerelease." >&2
+              exit 1
+            fi
+
+            latest_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
+            if [[ "$latest_tag" != "$RELEASE_TAG" ]]; then
+              echo "Stable desktop release ${RELEASE_TAG} is not exposed by GitHub's Latest endpoint (found ${latest_tag})." >&2
+              exit 1
+            fi
+
+            manifest_prefix="latest"
+          else
+            if [[ "$prerelease" != "true" ]]; then
+              echo "Nightly desktop release ${RELEASE_TAG} was not published as a GitHub prerelease." >&2
+              exit 1
+            fi
+
+            manifest_prefix="nightly"
+          fi
+
+          asset_names="$(jq -r '.assets[].name' <<< "$release_json")"
+          for manifest in \
+            "${manifest_prefix}-mac.yml" \
+            "${manifest_prefix}.yml" \
+            "${manifest_prefix}-linux.yml"; do
+            if ! grep -Fxq "$manifest" <<< "$asset_names"; then
+              echo "Desktop release ${RELEASE_TAG} is missing updater manifest ${manifest}." >&2
+              exit 1
+            fi
+          done
 
   deploy_web:
     name: Deploy hosted web app
