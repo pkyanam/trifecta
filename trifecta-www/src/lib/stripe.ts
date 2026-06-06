@@ -89,6 +89,40 @@ export async function createStripeCheckoutSession(opts: {
   return stripeRequest<StripeCheckoutSession>('/checkout/sessions', body);
 }
 
+/**
+ * Create a checkout session for a not-yet-registered customer, keyed by email
+ * (Stripe `customer_email`) rather than an existing customer id. Used by the
+ * Triad self-serve checkout. Requires STRIPE_SECRET_KEY and a configured price
+ * id; the caller is expected to 503 when the price id is unset.
+ */
+export async function createStripeCheckoutSessionForEmail(opts: {
+  customerEmail: string;
+  priceId: string;
+  successPath: string;
+  cancelPath: string;
+  mode?: 'subscription' | 'payment';
+  metadata?: Record<string, string>;
+}): Promise<StripeCheckoutSession> {
+  const mode = opts.mode ?? 'subscription';
+  const body = new URLSearchParams();
+  body.set('mode', mode);
+  body.set('customer_email', opts.customerEmail);
+  body.set('line_items[0][price]', opts.priceId);
+  body.set('line_items[0][quantity]', '1');
+  body.set('success_url', `${appUrl()}${opts.successPath}`);
+  body.set('cancel_url', `${appUrl()}${opts.cancelPath}`);
+  body.set('allow_promotion_codes', 'true');
+
+  for (const [key, value] of Object.entries(opts.metadata ?? {})) {
+    body.set(`metadata[${key}]`, value);
+    if (mode === 'subscription') {
+      body.set(`subscription_data[metadata][${key}]`, value);
+    }
+  }
+
+  return stripeRequest<StripeCheckoutSession>('/checkout/sessions', body);
+}
+
 export async function createStripePortalSession(customerId: string): Promise<StripePortalSession> {
   const body = new URLSearchParams();
   body.set('customer', customerId);
