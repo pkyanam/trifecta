@@ -144,3 +144,89 @@ DROP TRIGGER IF EXISTS set_cloud_accounts_updated_at ON cloud_accounts;
 CREATE TRIGGER set_cloud_accounts_updated_at
   BEFORE UPDATE ON cloud_accounts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- TRIAD GATEWAY  (separate service: ~/projects/trifecta-cloud-ai)
+-- Isolated in its own `triad` schema so it stays out of the Supabase auto REST
+-- API and never collides with the tables above. The gateway also creates these
+-- idempotently on boot; this block keeps them documented/managed here.
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE SCHEMA IF NOT EXISTS triad;
+
+-- Subscribers (one row per founder-access account).
+CREATE TABLE IF NOT EXISTS triad.accounts (
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email                  TEXT NOT NULL UNIQUE,
+  stripe_customer_id     TEXT UNIQUE,
+  stripe_subscription_id TEXT UNIQUE,
+  status                 TEXT NOT NULL DEFAULT 'active',  -- active | past_due | canceled | waitlisted
+  monthly_cap_usd        NUMERIC(12,6) NOT NULL DEFAULT 23.50,
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- API keys (only a sha256 hash + display prefix are stored; raw shown once).
+CREATE TABLE IF NOT EXISTS triad.api_keys (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id   UUID NOT NULL REFERENCES triad.accounts(id) ON DELETE CASCADE,
+  key_prefix   TEXT NOT NULL,
+  key_hash     TEXT NOT NULL UNIQUE,
+  last_used_at TIMESTAMPTZ,
+  revoked_at   TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS triad_api_keys_account_idx ON triad.api_keys(account_id);
+
+-- Usage allocation per billing cycle (the row the hard cap reads/updates).
+CREATE TABLE IF NOT EXISTS triad.usage_periods (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id    UUID NOT NULL REFERENCES triad.accounts(id) ON DELETE CASCADE,
+  period_start  TIMESTAMPTZ NOT NULL,
+  period_end    TIMESTAMPTZ NOT NULL,
+  used_usd      NUMERIC(12,6) NOT NULL DEFAULT 0,
+  request_count INTEGER NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (account_id, period_start)
+);
+CREATE INDEX IF NOT EXISTS triad_usage_periods_lookup_idx
+  ON triad.usage_periods(account_id, period_start);
+
+-- Append-only audit trail.
+CREATE TABLE IF NOT EXISTS triad.request_logs (
+  id            BIGSERIAL PRIMARY KEY,
+  account_id    UUID NOT NULL REFERENCES triad.accounts(id) ON DELETE CASCADE,
+  ts            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  surface       TEXT NOT NULL,           -- openai | anthropic
+  model         TEXT NOT NULL,
+  input_tokens  INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_read_tokens  INTEGER NOT NULL DEFAULT 0,
+  cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+  cost_usd      NUMERIC(12,6) NOT NULL DEFAULT 0,
+  status        INTEGER NOT NULL,
+  latency_ms    INTEGER,
+  error         TEXT,                    -- full upstream error (server-side only)
+  finish_reason TEXT,
+  tool_calls    INTEGER NOT NULL DEFAULT 0,
+  request_json  JSONB,                   -- full prompt (when AUDIT_PROMPTS on)
+  response_json JSONB                    -- full completion + tool calls
+);
+CREATE INDEX IF NOT EXISTS triad_request_logs_account_ts_idx
+  ON triad.request_logs(account_id, ts DESC);
+
+-- Price + routing table. Unpriced/disabled models are refused (can't meter).
+-- model_id = public alias clients send; upstream_model_id = Bedrock/Mantle id.
+CREATE TABLE IF NOT EXISTS triad.model_prices (
+  model_id          TEXT PRIMARY KEY,
+  upstream_model_id TEXT,
+  input_usd_per_1k  NUMERIC(12,8) NOT NULL,
+  output_usd_per_1k NUMERIC(12,8) NOT NULL,
+  cache_read_per_1k  NUMERIC(12,8),             -- ~0.1x input; null → no discount
+  cache_write_per_1k NUMERIC(12,8),             -- ~1.25x input (first-turn write)
+  supports_cache    BOOLEAN NOT NULL DEFAULT false,
+  display_name      TEXT,
+  region            TEXT,                       -- null → gateway default region
+  protocol          TEXT NOT NULL DEFAULT 'converse',  -- converse | responses
+  enabled           BOOLEAN NOT NULL DEFAULT true,
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
