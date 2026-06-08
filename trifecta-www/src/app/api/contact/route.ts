@@ -49,6 +49,14 @@ function reply(body: unknown, status: number, origin: string | null) {
   return NextResponse.json(body, { status, headers: corsHeaders(origin) });
 }
 
+async function readJson(res: Response): Promise<unknown> {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function OPTIONS(req: Request) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(req.headers.get('origin')) });
 }
@@ -95,6 +103,7 @@ export async function POST(req: Request) {
   }
 
   const text = `📬 new message from preetham.org\n\nfrom: ${name} <${email}>\n\n${message}`;
+  let pokeResponse: unknown = null;
 
   try {
     const res = await fetch(POKE_API_MESSAGE_ENDPOINT, {
@@ -108,12 +117,21 @@ export async function POST(req: Request) {
         contact: { name, email, message, source },
       }),
     });
+    pokeResponse = await readJson(res);
     if (!res.ok) {
       return reply({ ok: false, error: 'delivery failed' }, 502, origin);
+    }
+    if (
+      typeof pokeResponse !== 'object' ||
+      pokeResponse === null ||
+      !('success' in pokeResponse) ||
+      pokeResponse.success !== true
+    ) {
+      return reply({ ok: false, success: false, error: 'delivery not confirmed' }, 502, origin);
     }
   } catch {
     return reply({ ok: false, error: 'delivery failed' }, 502, origin);
   }
 
-  return reply({ ok: true }, 200, origin);
+  return reply({ ok: true, success: true }, 200, origin);
 }
