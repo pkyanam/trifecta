@@ -34,6 +34,18 @@ npm run dev      # http://localhost:3000
 
 Other scripts: `npm run build`, `npm run start`, `npm run lint`.
 
+## Contact relay
+
+`/api/contact` receives the Mintlify contact form from `preetham.org` and
+forwards it to Poke's API Message endpoint.
+
+Required Vercel environment variables:
+
+| Variable | Notes |
+|---|---|
+| `POKE_API_KEY` | V2 API key created in [Poke Kitchen](https://poke.com/kitchen). Legacy `pk_` keys from Settings → Advanced do not work with the new endpoint. |
+| `CONTACT_ALLOWED_ORIGINS` | Optional comma-separated allowlist. Defaults to `https://preetham.org,https://www.preetham.org`. |
+
 > [!NOTE]
 > This repo tracks a fast-moving Next.js — read the relevant guide in `node_modules/next/dist/docs/` before writing code, since APIs and conventions may differ from older releases. See [`AGENTS.md`](./AGENTS.md).
 
