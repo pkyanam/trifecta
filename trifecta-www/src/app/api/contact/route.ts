@@ -7,11 +7,11 @@ export const runtime = 'nodejs';
  *
  * The Mintlify contact form (preetham.org/contact) can't hold the Poke API key
  * (it would ship to the browser), so it POSTs here. This route holds the key
- * server-side and forwards a single message to Poke's inbound-sms webhook, which
- * lands in iMessage. Set POKE_API_KEY in the Vercel project env.
+ * server-side and forwards a single message to Poke's API Message endpoint.
+ * Set POKE_API_KEY to a V2 API key created in Poke Kitchen.
  */
 
-const POKE_WEBHOOK = 'https://poke.com/api/v1/inbound-sms/webhook';
+const POKE_API_MESSAGE_ENDPOINT = 'https://poke.com/api/v1/inbound/api-message';
 
 const ALLOWED_ORIGINS = (
   process.env.CONTACT_ALLOWED_ORIGINS || 'https://preetham.org,https://www.preetham.org'
@@ -85,6 +85,7 @@ export async function POST(req: Request) {
   const name = String(data.name ?? '').trim().slice(0, 100);
   const email = String(data.email ?? '').trim().slice(0, 200);
   const message = String(data.message ?? '').trim().slice(0, 4000);
+  const source = String(data.source ?? 'preetham.org/contact').trim().slice(0, 200);
 
   if (!name || !email || !message) {
     return reply({ ok: false, error: 'missing fields' }, 400, origin);
@@ -96,13 +97,16 @@ export async function POST(req: Request) {
   const text = `📬 new message from preetham.org\n\nfrom: ${name} <${email}>\n\n${message}`;
 
   try {
-    const res = await fetch(POKE_WEBHOOK, {
+    const res = await fetch(POKE_API_MESSAGE_ENDPOINT, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.POKE_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({
+        message: text,
+        contact: { name, email, message, source },
+      }),
     });
     if (!res.ok) {
       return reply({ ok: false, error: 'delivery failed' }, 502, origin);
