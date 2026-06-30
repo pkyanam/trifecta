@@ -984,6 +984,11 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
     isUrl: boolean;
   } | null>(null);
 
+  const resetCreatePairingDialogState = useCallback(() => {
+    setPairingLabel("");
+    setCreatedPairingValue(null);
+  }, []);
+
   const { copyToClipboard } = useCopyToClipboard<"code" | "url">({
     onCopy: (kind) => {
       toastManager.add({
@@ -1051,9 +1056,10 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open);
-          if (!open) {
-            setPairingLabel("");
-            setCreatedPairingValue(null);
+          if (open) {
+            resetCreatePairingDialogState();
+          } else {
+            resetCreatePairingDialogState();
           }
         }}
       >
@@ -1117,9 +1123,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
           <DialogFooter variant="bare">
             {createdPairingValue ? (
               <>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Done
-                </Button>
+                <DialogClose render={<Button variant="outline">Done</Button>} />
                 <Button
                   onClick={() =>
                     copyToClipboard(
@@ -1133,13 +1137,13 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
               </>
             ) : (
               <>
-                <Button
-                  variant="outline"
-                  disabled={isCreatingPairingLink}
-                  onClick={() => setDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
+                <DialogClose
+                  render={
+                    <Button variant="outline" disabled={isCreatingPairingLink}>
+                      Cancel
+                    </Button>
+                  }
+                />
                 <Button
                   disabled={isCreatingPairingLink}
                   onClick={() => void handleCreatePairingLink()}

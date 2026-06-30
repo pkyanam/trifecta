@@ -2,7 +2,7 @@
   "expo": {
     "name": "Trifecta",
     "slug": "trifecta-mobile",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "orientation": "portrait",
     "scheme": "trifecta",
     "userInterfaceStyle": "automatic",
@@ -12,7 +12,14 @@
       "bundleIdentifier": "com.belweave.trifecta",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": false,
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "NSLocalNetworkUsageDescription": "Trifecta connects to your desktop server on your local network or Tailscale.",
+        "UIApplicationSceneManifest": {
+          "UIApplicationSupportsMultipleScenes": false
+        }
       },
       "config": {
         "googleSignIn": {
@@ -69,7 +76,7 @@
       }
     },
     "updates": {
-      "url": "https://u.expo.dev/your-project-id-here"
+      "enabled": false
     },
     "privacy": "https://trifecta.belweave.ai/privacy",
     "terms": "https://trifecta.belweave.ai/terms-and-conditions"

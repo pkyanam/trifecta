@@ -873,6 +873,128 @@ describe("GeneralSettingsPanel observability", () => {
     await expect.element(page.getByText("Revoke others")).toBeInTheDocument();
   });
 
+  it("resets the create pairing dialog after Done so a new link can be issued", async () => {
+    window.desktopBridge = createDesktopBridgeStub({
+      serverExposureState: {
+        mode: "network-accessible",
+        endpointUrl: "http://192.168.1.44:3773",
+        advertisedHost: "192.168.1.44",
+        tailscaleServeEnabled: false,
+        tailscaleServePort: 443,
+      },
+    });
+    let pairingLinks: Array<AuthAccessSnapshot["pairingLinks"][number]> = [];
+    const clientSessions: Array<AuthAccessSnapshot["clientSessions"][number]> = [
+      makeClientSession({
+        sessionId: "session-owner",
+        subject: "desktop-bootstrap",
+        role: "owner",
+        method: "browser-session-cookie",
+        client: {
+          label: "This Mac",
+          deviceType: "desktop",
+          os: "macOS",
+          browser: "Electron",
+          ipAddress: "127.0.0.1",
+        },
+        issuedAt: "2036-04-07T00:00:00.000Z",
+        expiresAt: "2036-05-07T00:00:00.000Z",
+        connected: true,
+        current: true,
+      }),
+    ];
+    authAccessHarness.setSnapshot({
+      pairingLinks,
+      clientSessions,
+    });
+    let createCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        if (url.endsWith("/api/auth/pairing-token") && method === "POST") {
+          createCount += 1;
+          const pairingLink = makePairingLink({
+            id: `pairing-link-${createCount}`,
+            credential: `pairing-token-${createCount}`,
+            role: "client",
+            subject: "one-time-token",
+            createdAt: "2036-04-07T00:00:00.000Z",
+            expiresAt: "2036-04-10T00:05:00.000Z",
+          });
+          pairingLinks = [pairingLink];
+          authAccessHarness.setSnapshot({
+            pairingLinks,
+            clientSessions,
+          });
+          return new Response(
+            JSON.stringify({
+              id: pairingLink.id,
+              credential: pairingLink.credential,
+              expiresAt: pairingLink.expiresAt,
+            }),
+            {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            },
+          );
+        }
+
+        throw new Error(`Unhandled fetch ${method} ${url}`);
+      }),
+    );
+
+    setServerConfigSnapshot(createBaseServerConfig());
+
+    mounted = await render(
+      <AppAtomRegistryProvider>
+        <ConnectionsSettings />
+      </AppAtomRegistryProvider>,
+    );
+
+    await page.getByRole("button", { name: "Create link", exact: true }).click();
+    await page.getByRole("button", { name: "Create link", exact: true }).click();
+    const pairingLinkDialog = page.getByRole("dialog", { name: "Create pairing link" });
+    await expect
+      .element(
+        pairingLinkDialog.getByRole("img", {
+          name: "New pairing link — scan to open on another device",
+        }),
+      )
+      .toBeInTheDocument();
+    await pairingLinkDialog.getByRole("button", { name: "Done", exact: true }).click();
+    authAccessHarness.emitPairingLinkRemoved("pairing-link-1");
+    await expect
+      .element(page.getByRole("dialog", { name: "Create pairing link" }))
+      .not.toBeInTheDocument();
+    await page.getByRole("button", { name: "Create link", exact: true }).click();
+    const reopenedPairingLinkDialog = page.getByRole("dialog", { name: "Create pairing link" });
+    await expect
+      .element(
+        reopenedPairingLinkDialog.getByText(
+          "Generate a one-time link that another device can use to pair with this backend as an authorized client.",
+        ),
+      )
+      .toBeInTheDocument();
+    await expect
+      .element(
+        reopenedPairingLinkDialog.getByRole("img", {
+          name: "New pairing link — scan to open on another device",
+        }),
+      )
+      .not.toBeInTheDocument();
+    await reopenedPairingLinkDialog.getByRole("button", { name: "Create link", exact: true }).click();
+    await expect
+      .element(
+        reopenedPairingLinkDialog.getByRole("img", {
+          name: "New pairing link — scan to open on another device",
+        }),
+      )
+      .toBeInTheDocument();
+    expect(createCount).toBe(2);
+  });
+
   it("revokes all other paired clients from settings", async () => {
     window.desktopBridge = createDesktopBridgeStub({
       serverExposureState: {

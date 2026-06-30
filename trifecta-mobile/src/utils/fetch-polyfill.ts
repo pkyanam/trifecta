@@ -7,8 +7,9 @@ import "expo";
 // This file configures the runtime environment to increase compatibility with WinterCG.
 // https://wintercg.org/
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
-import { fetch } from "expo/fetch";
+import { fetch as expoFetch } from "expo/fetch";
 
 interface ExpoExtraRouterConfig {
   router?: {
@@ -73,10 +74,13 @@ function assertOrigin() {
 // Defer the assertion in release builds so the app doesn't crash instantly.
 if (__DEV__) assertOrigin();
 
-// Polyfill window.location in native runtimes.
-if (typeof window !== "undefined") {
-  // Polyfill native fetch to support relative URLs
+// On web, route relative URLs through expo/fetch + window.location.
+// On native, keep React Native's built-in fetch so ATS Info.plist settings apply
+// (expo/fetch's URLSession was rejecting cleartext HTTP to LAN/Tailscale servers).
+// This is achieved by setting EXPO_PUBLIC_USE_RN_FETCH=1 at build time, which
+// prevents expo's runtime.native.ts from installing expo/fetch as globalThis.fetch.
+if (Platform.OS === "web" && typeof window !== "undefined") {
   Object.defineProperty(globalThis, "fetch", {
-    value: wrapFetchWithWindowLocation(fetch),
+    value: wrapFetchWithWindowLocation(expoFetch),
   });
 }
