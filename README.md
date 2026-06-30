@@ -2,7 +2,7 @@
 
 > One interface for every AI coding agent — on every device you own.
 
-**Made by [Belweave](https://belweave.ai) · Built on [T3 Code](https://t3.gg) · [Discord](https://discord.gg/jn4EGJjrvv)**
+**Made by [Belweave](https://belweave.ai) · Built on [T3 Code](https://t3.codes)**
 
 ---
 
