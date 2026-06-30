@@ -1,3 +1,6 @@
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodeFSP from "node:fs/promises";
+
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -11,11 +14,136 @@ import {
 import { WorkspaceEntries } from "../Services/WorkspaceEntries.ts";
 import { WorkspacePaths } from "../Services/WorkspacePaths.ts";
 
+const PROJECT_READ_FILE_MAX_BYTES = 1024 * 1024;
+
 export const makeWorkspaceFileSystem = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const workspacePaths = yield* WorkspacePaths;
   const workspaceEntries = yield* WorkspaceEntries;
+
+  const readFile: WorkspaceFileSystemShape["readFile"] = Effect.fn("WorkspaceFileSystem.readFile")(
+    function* (input) {
+      const target = yield* workspacePaths.resolveRelativePathWithinRoot({
+        workspaceRoot: input.cwd,
+        relativePath: input.relativePath,
+      });
+
+      const realWorkspaceRoot = yield* Effect.tryPromise({
+        try: () => NodeFSP.realpath(input.cwd),
+        catch: (cause) =>
+          new WorkspaceFileSystemError({
+            cwd: input.cwd,
+            relativePath: input.relativePath,
+            operation: "workspaceFileSystem.realpathWorkspaceRoot",
+            detail: cause instanceof Error ? cause.message : String(cause),
+            cause,
+          }),
+      });
+      const realTargetPath = yield* Effect.tryPromise({
+        try: () => NodeFSP.realpath(target.absolutePath),
+        catch: (cause) =>
+          new WorkspaceFileSystemError({
+            cwd: input.cwd,
+            relativePath: input.relativePath,
+            operation: "workspaceFileSystem.realpathTarget",
+            detail: cause instanceof Error ? cause.message : String(cause),
+            cause,
+          }),
+      });
+      const relativeRealPath = path.relative(realWorkspaceRoot, realTargetPath);
+      if (
+        relativeRealPath.startsWith(`..${path.sep}`) ||
+        relativeRealPath === ".." ||
+        path.isAbsolute(relativeRealPath)
+      ) {
+        return yield* new WorkspaceFileSystemError({
+          cwd: input.cwd,
+          relativePath: input.relativePath,
+          operation: "workspaceFileSystem.readFile",
+          detail: `Workspace file '${input.relativePath}' resolves outside workspace root.`,
+        });
+      }
+
+      return yield* Effect.acquireUseRelease(
+        Effect.tryPromise({
+          try: () => NodeFSP.open(realTargetPath, "r"),
+          catch: (cause) =>
+            new WorkspaceFileSystemError({
+              cwd: input.cwd,
+              relativePath: input.relativePath,
+              operation: "workspaceFileSystem.open",
+              detail: cause instanceof Error ? cause.message : String(cause),
+              cause,
+            }),
+        }),
+        (handle) =>
+          Effect.gen(function* () {
+            const stat = yield* Effect.tryPromise({
+              try: () => handle.stat(),
+              catch: (cause) =>
+                new WorkspaceFileSystemError({
+                  cwd: input.cwd,
+                  relativePath: input.relativePath,
+                  operation: "workspaceFileSystem.stat",
+                  detail: cause instanceof Error ? cause.message : String(cause),
+                  cause,
+                }),
+            });
+            if (!stat.isFile()) {
+              return yield* new WorkspaceFileSystemError({
+                cwd: input.cwd,
+                relativePath: input.relativePath,
+                operation: "workspaceFileSystem.readFile",
+                detail: `Workspace path '${input.relativePath}' is not a file.`,
+              });
+            }
+
+            const bytesToRead = Math.min(stat.size, PROJECT_READ_FILE_MAX_BYTES);
+            const buffer = Buffer.alloc(bytesToRead);
+            const { bytesRead } = yield* Effect.tryPromise({
+              try: () => handle.read(buffer, 0, bytesToRead, 0),
+              catch: (cause) =>
+                new WorkspaceFileSystemError({
+                  cwd: input.cwd,
+                  relativePath: input.relativePath,
+                  operation: "workspaceFileSystem.read",
+                  detail: cause instanceof Error ? cause.message : String(cause),
+                  cause,
+                }),
+            });
+            const fileBytes = buffer.subarray(0, bytesRead);
+            if (fileBytes.includes(0)) {
+              return yield* new WorkspaceFileSystemError({
+                cwd: input.cwd,
+                relativePath: input.relativePath,
+                operation: "workspaceFileSystem.readFile",
+                detail: `Workspace file '${input.relativePath}' is binary and cannot be previewed as text.`,
+              });
+            }
+
+            return {
+              relativePath: target.relativePath,
+              contents: new TextDecoder("utf-8").decode(fileBytes),
+              byteLength: stat.size,
+              truncated: stat.size > PROJECT_READ_FILE_MAX_BYTES,
+            };
+          }),
+        (handle) =>
+          Effect.tryPromise({
+            try: () => handle.close(),
+            catch: (cause) =>
+              new WorkspaceFileSystemError({
+                cwd: input.cwd,
+                relativePath: input.relativePath,
+                operation: "workspaceFileSystem.close",
+                detail: cause instanceof Error ? cause.message : String(cause),
+                cause,
+              }),
+          }),
+      );
+    },
+  );
 
   const writeFile: WorkspaceFileSystemShape["writeFile"] = Effect.fn(
     "WorkspaceFileSystem.writeFile",
@@ -52,7 +180,7 @@ export const makeWorkspaceFileSystem = Effect.gen(function* () {
     yield* workspaceEntries.invalidate(input.cwd);
     return { relativePath: target.relativePath };
   });
-  return { writeFile } satisfies WorkspaceFileSystemShape;
+  return { readFile, writeFile } satisfies WorkspaceFileSystemShape;
 });
 
 export const WorkspaceFileSystemLive = Layer.effect(WorkspaceFileSystem, makeWorkspaceFileSystem);

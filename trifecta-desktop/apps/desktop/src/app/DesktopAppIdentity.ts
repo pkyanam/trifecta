@@ -114,7 +114,7 @@ const make = Effect.gen(function* () {
 
     if (environment.platform === "darwin") {
       const iconPaths = yield* assets.iconPaths;
-      yield* Option.match(iconPaths.png, {
+      yield* Option.match(iconPaths.icns, {
         onNone: () => Effect.void,
         onSome: electronApp.setDockIcon,
       });

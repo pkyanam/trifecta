@@ -198,6 +198,7 @@ CREATE TABLE IF NOT EXISTS triad.request_logs (
   ts            TIMESTAMPTZ NOT NULL DEFAULT now(),
   surface       TEXT NOT NULL,           -- openai | anthropic
   model         TEXT NOT NULL,
+  provider      TEXT,
   input_tokens  INTEGER NOT NULL DEFAULT 0,
   output_tokens INTEGER NOT NULL DEFAULT 0,
   cache_read_tokens  INTEGER NOT NULL DEFAULT 0,
@@ -226,7 +227,28 @@ CREATE TABLE IF NOT EXISTS triad.model_prices (
   supports_cache    BOOLEAN NOT NULL DEFAULT false,
   display_name      TEXT,
   region            TEXT,                       -- null → gateway default region
-  protocol          TEXT NOT NULL DEFAULT 'converse',  -- converse | responses
+  protocol          TEXT NOT NULL DEFAULT 'converse',  -- converse | responses | gemini
+  provider          TEXT NOT NULL DEFAULT 'bedrock',
+  model_tier        TEXT NOT NULL DEFAULT 'standard',
+  sponsored_daily_cap_usd NUMERIC,
   enabled           BOOLEAN NOT NULL DEFAULT true,
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Admin-only credit-pool visibility; not a routing dependency.
+CREATE TABLE IF NOT EXISTS triad.provider_budgets (
+  provider     TEXT PRIMARY KEY,
+  starting_usd NUMERIC NOT NULL,
+  spent_usd    NUMERIC NOT NULL DEFAULT 0,
+  expires_at   TIMESTAMPTZ,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Sponsored per-model daily cap counter.
+CREATE TABLE IF NOT EXISTS triad.sponsored_daily_spend (
+  account_id UUID NOT NULL REFERENCES triad.accounts(id) ON DELETE CASCADE,
+  model_id   TEXT NOT NULL,
+  day        DATE NOT NULL,
+  spent_usd  NUMERIC NOT NULL DEFAULT 0,
+  PRIMARY KEY (account_id, model_id, day)
 );

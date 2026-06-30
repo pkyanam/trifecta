@@ -31,6 +31,11 @@ let currentContext = "272k";
 let currentFast = false;
 const cancelledSessions = new Set<string>();
 
+const grokAcpModels: ReadonlyArray<AcpSchema.ModelInfo> = [
+  { modelId: "grok-build", name: "Grok Build" },
+  { modelId: "grok-mock-alt", name: "Grok Mock Alt" },
+];
+
 function logExit(reason: string): void {
   if (!exitLogPath) {
     return;
@@ -283,6 +288,22 @@ const program = Effect.gen(function* () {
       return {
         configOptions: configOptions(),
       };
+    }),
+  );
+
+  yield* agent.handleSetSessionModel((request) =>
+    Effect.gen(function* () {
+      if (!grokAcpModels.some((model) => model.modelId === request.modelId)) {
+        return yield* AcpError.AcpRequestError.invalidParams(
+          `Unknown mock model id: ${request.modelId}`,
+          {
+            method: "session/set_model",
+            params: request,
+          },
+        );
+      }
+      currentModelId = request.modelId;
+      return {};
     }),
   );
 

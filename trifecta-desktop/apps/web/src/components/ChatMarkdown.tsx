@@ -1,6 +1,6 @@
 import { DiffsHighlighter, getSharedHighlighter, SupportedLanguages } from "@pierre/diffs";
 import { CheckIcon, CopyIcon } from "lucide-react";
-import type { ServerProviderSkill } from "@belweave/contracts";
+import type { ScopedThreadRef, ServerProviderSkill } from "@belweave/contracts";
 import React, {
   Children,
   Suspense,
@@ -35,6 +35,7 @@ import {
 } from "../markdown-links";
 import { readLocalApi } from "../localApi";
 import { cn } from "../lib/utils";
+import { useRightPanelStore } from "../rightPanelStore";
 
 class CodeHighlightErrorBoundary extends React.Component<
   { fallback: ReactNode; children: ReactNode },
@@ -60,8 +61,11 @@ class CodeHighlightErrorBoundary extends React.Component<
 interface ChatMarkdownProps {
   text: string;
   cwd: string | undefined;
+  threadRef?: ScopedThreadRef | undefined;
+  onTaskListChange?: ((input: { markerOffset: number; checked: boolean }) => void) | undefined;
   isStreaming?: boolean;
   skills?: ReadonlyArray<Pick<ServerProviderSkill, "name" | "displayName">>;
+  className?: string;
 }
 
 const EMPTY_MARKDOWN_SKILLS: ReadonlyArray<Pick<ServerProviderSkill, "name" | "displayName">> = [];
@@ -74,6 +78,17 @@ const highlightedCodeCache = new LRUCache<string>(
   MAX_HIGHLIGHT_CACHE_MEMORY_BYTES,
 );
 const highlighterPromiseCache = new Map<string, Promise<DiffsHighlighter>>();
+
+function findTaskListMarkerOffset(markdown: string, listItemStart: number): number | null {
+  const firstLineEnd = markdown.indexOf("\n", listItemStart);
+  const firstLine = markdown.slice(
+    listItemStart,
+    firstLineEnd === -1 ? markdown.length : firstLineEnd,
+  );
+  const match = firstLine.match(/^(?:\s*(?:[-+*]|\d+[.)])\s+)(\[[ xX]\])/);
+  if (!match?.[1]) return null;
+  return listItemStart + firstLine.indexOf(match[1]);
+}
 
 function extractFenceLanguage(className: string | undefined): string {
   const match = className?.match(CODE_FENCE_LANGUAGE_REGEX);
@@ -281,8 +296,11 @@ interface MarkdownFileLinkProps {
   targetPath: string;
   displayPath: string;
   filePath: string;
+  workspaceRelativePath: string | null;
+  line?: number | undefined;
   label: string;
   theme: "light" | "dark";
+  threadRef?: ScopedThreadRef | undefined;
   className?: string | undefined;
 }
 
@@ -372,11 +390,14 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
   targetPath,
   displayPath,
   filePath,
+  workspaceRelativePath,
+  line,
   label,
   theme,
+  threadRef,
   className,
 }: MarkdownFileLinkProps) {
-  const handleOpen = useCallback(() => {
+  const handleOpenInEditor = useCallback(() => {
     const api = readLocalApi();
     if (!api) {
       toastManager.add({
@@ -396,6 +417,14 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
       );
     });
   }, [targetPath]);
+
+  const handleOpen = useCallback(() => {
+    if (threadRef && workspaceRelativePath) {
+      useRightPanelStore.getState().openFile(threadRef, workspaceRelativePath, line);
+      return;
+    }
+    handleOpenInEditor();
+  }, [handleOpenInEditor, line, threadRef, workspaceRelativePath]);
 
   const handleCopy = useCallback((value: string, title: string) => {
     if (typeof window === "undefined" || !navigator.clipboard?.writeText) {
@@ -508,6 +537,9 @@ function areMarkdownFileLinkPropsEqual(
     previous.filePath === next.filePath &&
     previous.label === next.label &&
     previous.theme === next.theme &&
+    previous.threadRef === next.threadRef &&
+    previous.workspaceRelativePath === next.workspaceRelativePath &&
+    previous.line === next.line &&
     previous.className === next.className
   );
 }
@@ -515,8 +547,11 @@ function areMarkdownFileLinkPropsEqual(
 function ChatMarkdown({
   text,
   cwd,
+  threadRef,
+  onTaskListChange,
   isStreaming = false,
   skills = EMPTY_MARKDOWN_SKILLS,
+  className,
 }: ChatMarkdownProps) {
   const { resolvedTheme } = useTheme();
   const diffThemeName = resolveDiffThemeName(resolvedTheme);
@@ -547,8 +582,44 @@ function ChatMarkdown({
       p({ node: _node, children, ...props }) {
         return <p {...props}>{renderSkillInlineMarkdownChildren(children, skills)}</p>;
       },
-      li({ node: _node, children, ...props }) {
-        return <li {...props}>{renderSkillInlineMarkdownChildren(children, skills)}</li>;
+      li({ node, children, ...props }) {
+        const listItemStart = node?.position?.start.offset;
+        const markerOffset =
+          typeof listItemStart === "number" ? findTaskListMarkerOffset(text, listItemStart) : null;
+        return (
+          <li {...props} data-task-marker-offset={markerOffset ?? undefined}>
+            {renderSkillInlineMarkdownChildren(children, skills)}
+          </li>
+        );
+      },
+      input({ node: _node, type, checked, disabled: _disabled, ...props }) {
+        if (type !== "checkbox" || !onTaskListChange) {
+          return (
+            <input
+              {...props}
+              type={type}
+              checked={checked}
+              disabled={_disabled}
+              readOnly={type === "checkbox"}
+            />
+          );
+        }
+        return (
+          <input
+            {...props}
+            type="checkbox"
+            name="markdown-task"
+            aria-label="Toggle task"
+            checked={checked}
+            onChange={(event) => {
+              const markerOffset = Number(
+                event.currentTarget.closest("li")?.dataset.taskMarkerOffset,
+              );
+              if (!Number.isSafeInteger(markerOffset)) return;
+              onTaskListChange({ markerOffset, checked: event.currentTarget.checked });
+            }}
+          />
+        );
       },
       a({ node: _node, href, ...props }) {
         const normalizedHref = href ? normalizeMarkdownLinkHrefKey(href) : "";
@@ -574,8 +645,11 @@ function ChatMarkdown({
             targetPath={fileLinkMeta.targetPath}
             displayPath={fileLinkMeta.displayPath}
             filePath={fileLinkMeta.filePath}
+            workspaceRelativePath={fileLinkMeta.workspaceRelativePath}
+            {...(fileLinkMeta.line !== undefined ? { line: fileLinkMeta.line } : {})}
             label={labelParts.join(" · ")}
             theme={resolvedTheme}
+            threadRef={threadRef}
             className={props.className}
           />
         );
@@ -607,13 +681,21 @@ function ChatMarkdown({
       fileLinkParentSuffixByPath,
       isStreaming,
       markdownFileLinkMetaByHref,
+      onTaskListChange,
       resolvedTheme,
       skills,
+      text,
+      threadRef,
     ],
   );
 
   return (
-    <div className="chat-markdown w-full min-w-0 text-sm leading-relaxed text-foreground/80">
+    <div
+      className={cn(
+        "chat-markdown w-full min-w-0 text-sm leading-relaxed text-foreground/80",
+        className,
+      )}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={markdownComponents}

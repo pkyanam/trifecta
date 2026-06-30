@@ -47,18 +47,6 @@ const resolveIconPath = Effect.fn("desktop.assets.resolveIconPath")(function* (
   never,
   FileSystem.FileSystem | DesktopEnvironment.DesktopEnvironment
 > {
-  const fileSystem = yield* FileSystem.FileSystem;
-  const environment = yield* DesktopEnvironment.DesktopEnvironment;
-  if (environment.isDevelopment && process.platform === "darwin" && ext === "png") {
-    const developmentDockIconPath = environment.developmentDockIconPath;
-    const developmentDockIconExists = yield* fileSystem
-      .exists(developmentDockIconPath)
-      .pipe(Effect.orElseSucceed(() => false));
-    if (developmentDockIconExists) {
-      return Option.some(developmentDockIconPath);
-    }
-  }
-
   return yield* resolveResourcePath(`icon.${ext}`);
 });
 
