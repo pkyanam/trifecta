@@ -9,6 +9,7 @@ export * from "./sshSession.ts";
 export * from "./provider.ts";
 export * from "./providerInstance.ts";
 export * from "./providerRuntime.ts";
+export * from "./mcp.ts";
 export * from "./model.ts";
 export * from "./keybindings.ts";
 export * from "./server.ts";

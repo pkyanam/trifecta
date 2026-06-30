@@ -17,11 +17,17 @@ import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Scope from "effect/Scope";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-import type { DevinSettings, ServerProvider, ServerProviderModel } from "@belweave/contracts";
+import type {
+  DevinSettings,
+  ServerProvider,
+  ServerProviderModel,
+  ServerProviderSlashCommand,
+} from "@belweave/contracts";
 import { ServerSettingsError } from "@belweave/contracts";
 
 import * as AcpClient from "effect-acp/client";
@@ -35,11 +41,15 @@ import {
   isCommandMissingCause,
   type ServerProviderDraft,
 } from "../providerSnapshot.ts";
+import { parseSessionUpdateEvent } from "../acp/AcpRuntimeModel.ts";
 import {
   decodeDevinInitializeResponse,
   decodeDevinNewSessionResponse,
 } from "../devin/DevinAcpWire.ts";
 import packageJson from "../../../package.json" with { type: "json" };
+
+/** How long to wait after `session/new` for Devin's `available_commands_update`. */
+const DEVIN_COMMANDS_SETTLE_MS = 400;
 
 const DEVIN_PRESENTATION = {
   displayName: "Devin",
@@ -56,6 +66,7 @@ function parseDevinVersionLine(output: string): string | undefined {
 
 export interface DevinProviderSnapshot {
   readonly models: ReadonlyArray<ServerProviderModel>;
+  readonly slashCommands: ReadonlyArray<ServerProviderSlashCommand>;
   readonly version: string | undefined;
 }
 
@@ -93,6 +104,28 @@ const probeDevinProvider = Effect.fn("probeDevinProvider")(function* (input: {
 
   return yield* Effect.gen(function* () {
     const acp = yield* AcpClient.AcpClient;
+
+    // Collect Devin's advertised slash commands, delivered via
+    // `available_commands_update` notifications shortly after `session/new`.
+    const slashCommandsRef = yield* Ref.make<ReadonlyArray<ServerProviderSlashCommand>>([]);
+    yield* acp.handleSessionUpdate((notification) =>
+      Effect.gen(function* () {
+        for (const event of parseSessionUpdateEvent(notification).events) {
+          if (event._tag !== "CommandsUpdated") continue;
+          const commands = event.commands.map((command): ServerProviderSlashCommand => {
+            const entry: {
+              name: string;
+              description?: string;
+              input?: { hint: string };
+            } = { name: command.name };
+            if (command.description) entry.description = command.description;
+            if (command.inputHint) entry.input = { hint: command.inputHint };
+            return entry;
+          });
+          yield* Ref.set(slashCommandsRef, commands);
+        }
+      }),
+    );
 
     const rawInit = yield* acp.raw
       .request(AGENT_METHODS.initialize, {
@@ -155,6 +188,10 @@ const probeDevinProvider = Effect.fn("probeDevinProvider")(function* (input: {
       capabilities: null,
     }));
 
+    // Give Devin a brief window to emit `available_commands_update`.
+    yield* Effect.sleep(Duration.millis(DEVIN_COMMANDS_SETTLE_MS));
+    const slashCommands = yield* Ref.get(slashCommandsRef);
+
     // Devin ACP hardcodes agentInfo.version to "0.0.0-dev".
     // Fall back to `devin version` via a short-lived subprocess for the real version.
     let version = initialized.agentInfo?.version ?? undefined;
@@ -191,7 +228,7 @@ const probeDevinProvider = Effect.fn("probeDevinProvider")(function* (input: {
       );
     }
 
-    return { models, version };
+    return { models, slashCommands, version };
   }).pipe(Effect.provide(acpLayer));
 });
 
@@ -316,6 +353,7 @@ export const checkDevinProviderStatus = Effect.fn("checkDevinProviderStatus")(fu
     enabled: devinSettings.enabled,
     checkedAt,
     models: snapshot.models,
+    slashCommands: snapshot.slashCommands,
     skills: [],
     probe: {
       installed: true,

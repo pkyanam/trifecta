@@ -41,12 +41,23 @@ export interface AcpSessionRuntimeOptions {
   readonly spawn: AcpSpawnInput;
   readonly cwd: string;
   readonly resumeSessionId?: string;
+  /**
+   * MCP servers to expose to the agent for this session. Forwarded verbatim to
+   * `session/new` (and `session/load` when resuming). Defaults to `[]`.
+   */
+  readonly mcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly clientCapabilities?: EffectAcpSchema.InitializeRequest["clientCapabilities"];
   readonly clientInfo: {
     readonly name: string;
     readonly version: string;
   };
-  readonly authMethodId: string;
+  /**
+   * Authentication method id to call `authenticate` with after `initialize`.
+   * When omitted, the `authenticate` step is skipped entirely — useful for
+   * agents (e.g. Devin) that rely on stored CLI credentials or env vars and
+   * would reject an explicit method that requires additional input.
+   */
+  readonly authMethodId?: string;
   readonly requestLogger?: (event: AcpSessionRequestLogEvent) => Effect.Effect<void, never>;
   readonly protocolLogging?: {
     readonly logIncoming?: boolean;
@@ -385,15 +396,31 @@ const makeAcpSessionRuntime = (
         acp.agent.initialize(initializePayload),
       );
 
-      const authenticatePayload = {
-        methodId: options.authMethodId,
-      } satisfies EffectAcpSchema.AuthenticateRequest;
+      if (options.authMethodId) {
+        const authenticatePayload = {
+          methodId: options.authMethodId,
+        } satisfies EffectAcpSchema.AuthenticateRequest;
 
-      yield* runLoggedRequest(
-        "authenticate",
-        authenticatePayload,
-        acp.agent.authenticate(authenticatePayload),
-      );
+        yield* runLoggedRequest(
+          "authenticate",
+          authenticatePayload,
+          acp.agent.authenticate(authenticatePayload),
+        );
+      }
+
+      // Filter MCP servers by the transports the agent advertised in
+      // `initialize`. Requesting an unsupported transport (e.g. an HTTP MCP
+      // server on a stdio-only agent like Devin) can fail `session/new`, so we
+      // drop entries the agent cannot honour rather than guessing per-agent.
+      const mcpCapabilities = initializeResult.agentCapabilities?.mcpCapabilities;
+      const httpSupported = mcpCapabilities?.http === true;
+      const sseSupported = mcpCapabilities?.sse === true;
+      const mcpServers = (options.mcpServers ?? []).filter((server) => {
+        if (!("type" in server)) return true; // stdio transport — always supported
+        if (server.type === "http") return httpSupported;
+        if (server.type === "sse") return sseSupported;
+        return true;
+      });
 
       let sessionId: string;
       let sessionSetupResult:
@@ -404,7 +431,7 @@ const makeAcpSessionRuntime = (
         const loadPayload = {
           sessionId: options.resumeSessionId,
           cwd: options.cwd,
-          mcpServers: [],
+          mcpServers,
         } satisfies EffectAcpSchema.LoadSessionRequest;
         const resumed = yield* runLoggedRequest(
           "session/load",
@@ -417,7 +444,7 @@ const makeAcpSessionRuntime = (
         } else {
           const createPayload = {
             cwd: options.cwd,
-            mcpServers: [],
+            mcpServers,
           } satisfies EffectAcpSchema.NewSessionRequest;
           const created = yield* runLoggedRequest(
             "session/new",
@@ -430,7 +457,7 @@ const makeAcpSessionRuntime = (
       } else {
         const createPayload = {
           cwd: options.cwd,
-          mcpServers: [],
+          mcpServers,
         } satisfies EffectAcpSchema.NewSessionRequest;
         const created = yield* runLoggedRequest(
           "session/new",

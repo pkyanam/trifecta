@@ -109,6 +109,12 @@ export interface CursorAdapterLiveOptions {
    * the latest snapshot so the closure isn't stale.
    */
   readonly resolveSettings?: Effect.Effect<CursorSettings>;
+  /**
+   * Resolver for the MCP servers exposed to each Cursor session. Yielded at the
+   * start of every session so registry edits apply to subsequent sessions
+   * without rebuilding the adapter. Defaults to "no MCP servers".
+   */
+  readonly resolveMcpServers?: Effect.Effect<ReadonlyArray<EffectAcpSchema.McpServer>>;
 }
 
 interface PendingApproval {
@@ -323,6 +329,7 @@ export function makeCursorAdapter(
         : undefined);
     const managedNativeEventLogger =
       options?.nativeEventLogger === undefined ? nativeEventLogger : undefined;
+    const resolveMcpServers = options?.resolveMcpServers ?? Effect.succeed([]);
 
     const sessions = new Map<ThreadId, CursorSessionContext>();
     const threadLocksRef = yield* SynchronizedRef.make(new Map<string, Semaphore.Semaphore>());
@@ -501,12 +508,14 @@ export function makeCursorAdapter(
           const effectiveCursorSettings = options?.resolveSettings
             ? yield* options.resolveSettings
             : cursorSettings;
+          const mcpServers = yield* resolveMcpServers;
 
           const acp = yield* makeCursorAcpRuntime({
             cursorSettings: effectiveCursorSettings,
             ...(options?.environment ? { environment: options.environment } : {}),
             childProcessSpawner,
             cwd,
+            mcpServers,
             ...(resumeSessionId ? { resumeSessionId } : {}),
             clientInfo: { name: "trifecta", version: "0.0.0" },
             ...acpNativeLoggers,

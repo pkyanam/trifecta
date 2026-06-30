@@ -34,6 +34,7 @@ import * as GitHubCli from "./sourceControl/GitHubCli.ts";
 import * as GitLabCli from "./sourceControl/GitLabCli.ts";
 import * as TextGeneration from "./textGeneration/TextGeneration.ts";
 import { ProviderInstanceRegistryHydrationLive } from "./provider/Layers/ProviderInstanceRegistryHydration.ts";
+import { McpNativeSyncLive } from "./provider/acp/mcpNativeSync.ts";
 import { TerminalManagerLive } from "./terminal/Layers/Manager.ts";
 import { SshAuditLogSqliteLive } from "./ssh/Layers/SshAuditLogSqlite.ts";
 import { SshCredentialsLive } from "./ssh/Layers/SshCredentialsLive.ts";
@@ -285,6 +286,11 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   // `providerInstances` hydration merges `settings.providers.<kind>`
   // with explicit `providerInstances` entries on boot.
   Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
+  // Mirrors the MCP server registry into each supported agent's native
+  // config file on boot and whenever `settings.mcpServers` changes. Side-
+  // effect-only daemon; deps (ServerSettingsService, ServerConfig,
+  // FileSystem, Path) are satisfied later in this same merged graph.
+  Layer.provideMerge(McpNativeSyncLive),
   // Shared native/canonical NDJSON writers used by both the per-instance
   // drivers (native stream, written from inside each `<X>Adapter`) and
   // `ProviderService` (canonical stream, written after event normalization).

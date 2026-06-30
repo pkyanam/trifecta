@@ -13,16 +13,22 @@
 import { DevinSettings, ProviderDriverKind, type ServerProvider } from "@belweave/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMaintenance.ts";
 
+import { ServerConfig } from "../../config.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
 import { makeDevinTextGeneration } from "../../textGeneration/DevinTextGeneration.ts";
+import { acpMcpServersFromSettings } from "../acp/mcpRegistry.ts";
 import { ProviderDriverError } from "../Errors.ts";
 import { makeDevinAdapter } from "../Layers/DevinAdapter.ts";
 import { checkDevinProviderStatus, makePendingDevinProvider } from "../Layers/DevinProvider.ts";
+import { ProviderEventLoggers } from "../Layers/ProviderEventLoggers.ts";
 import { makeManagedServerProvider } from "../makeManagedServerProvider.ts";
 import {
   defaultProviderContinuationIdentity,
@@ -53,7 +59,13 @@ const withInstanceIdentity =
     continuation: { groupKey: input.continuationGroupKey },
   });
 
-export type DevinDriverEnv = ChildProcessSpawner.ChildProcessSpawner;
+export type DevinDriverEnv =
+  | ChildProcessSpawner.ChildProcessSpawner
+  | FileSystem.FileSystem
+  | Path.Path
+  | ProviderEventLoggers
+  | ServerConfig
+  | ServerSettingsService;
 
 export const DevinDriver: ProviderDriver<DevinSettings, DevinDriverEnv> = {
   driverKind: DRIVER_KIND,
@@ -66,6 +78,8 @@ export const DevinDriver: ProviderDriver<DevinSettings, DevinDriverEnv> = {
   create: ({ instanceId, displayName, accentColor, environment, enabled, config }) =>
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const eventLoggers = yield* ProviderEventLoggers;
+      const serverSettings = yield* ServerSettingsService;
       const processEnv = mergeProviderInstanceEnvironment(environment);
       const continuationIdentity = defaultProviderContinuationIdentity({
         driverKind: DRIVER_KIND,
@@ -82,6 +96,8 @@ export const DevinDriver: ProviderDriver<DevinSettings, DevinDriverEnv> = {
       const adapter = yield* makeDevinAdapter(effectiveConfig, {
         instanceId,
         environment: processEnv,
+        ...(eventLoggers.native ? { nativeEventLogger: eventLoggers.native } : {}),
+        resolveMcpServers: acpMcpServersFromSettings(serverSettings.getSettings),
       });
 
       const textGeneration = yield* makeDevinTextGeneration(effectiveConfig, processEnv);

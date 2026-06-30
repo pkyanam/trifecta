@@ -83,6 +83,9 @@ export function applyServerSettingsPatch(
     ...(patch.providerInstances !== undefined
       ? { providerInstances: patch.providerInstances }
       : {}),
+    // The MCP registry is a list; the web UI always sends the full array, so
+    // replace it wholesale rather than index-merging.
+    ...(patch.mcpServers !== undefined ? { mcpServers: patch.mcpServers } : {}),
     ...(automaticGitFetchInterval !== undefined ? { automaticGitFetchInterval } : {}),
   };
   if (!selectionPatch) {

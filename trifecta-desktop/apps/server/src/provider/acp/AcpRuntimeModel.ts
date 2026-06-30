@@ -41,6 +41,18 @@ export interface AcpPermissionRequest {
   readonly toolCall?: AcpToolCallState;
 }
 
+export interface AcpAvailableCommand {
+  readonly name: string;
+  readonly description?: string;
+  readonly inputHint?: string;
+}
+
+export interface AcpUsageSnapshot {
+  readonly usedTokens: number;
+  readonly maxTokens?: number;
+  readonly cost?: number;
+}
+
 export type AcpParsedSessionEvent =
   | {
       readonly _tag: "ModeChanged";
@@ -68,6 +80,28 @@ export type AcpParsedSessionEvent =
       readonly _tag: "ContentDelta";
       readonly itemId?: string;
       readonly text: string;
+      readonly rawPayload: unknown;
+    }
+  | {
+      // Reasoning / thought stream. Kept separate from assistant text so the
+      // adapter can map it to the `reasoning_text` content stream kind.
+      readonly _tag: "ReasoningDelta";
+      readonly text: string;
+      readonly rawPayload: unknown;
+    }
+  | {
+      readonly _tag: "UsageUpdated";
+      readonly usage: AcpUsageSnapshot;
+      readonly rawPayload: unknown;
+    }
+  | {
+      readonly _tag: "CommandsUpdated";
+      readonly commands: ReadonlyArray<AcpAvailableCommand>;
+      readonly rawPayload: unknown;
+    }
+  | {
+      readonly _tag: "SessionInfoUpdated";
+      readonly title?: string;
       readonly rawPayload: unknown;
     };
 
@@ -472,6 +506,67 @@ export function parseSessionUpdateEvent(params: EffectAcpSchema.SessionNotificat
           rawPayload: params,
         });
       }
+      break;
+    }
+    case "agent_thought_chunk": {
+      if (upd.content.type === "text" && upd.content.text.length > 0) {
+        events.push({
+          _tag: "ReasoningDelta",
+          text: upd.content.text,
+          rawPayload: params,
+        });
+      }
+      break;
+    }
+    case "usage_update": {
+      const usedTokens = Number.isFinite(upd.used) ? Math.max(0, Math.trunc(upd.used)) : 0;
+      const maxTokens =
+        Number.isFinite(upd.size) && upd.size > 0 ? Math.trunc(upd.size) : undefined;
+      const cost =
+        upd.cost && typeof upd.cost.amount === "number" && Number.isFinite(upd.cost.amount)
+          ? upd.cost.amount
+          : undefined;
+      events.push({
+        _tag: "UsageUpdated",
+        usage: {
+          usedTokens,
+          ...(maxTokens !== undefined ? { maxTokens } : {}),
+          ...(cost !== undefined ? { cost } : {}),
+        },
+        rawPayload: params,
+      });
+      break;
+    }
+    case "available_commands_update": {
+      const commands = upd.availableCommands
+        .map((command): AcpAvailableCommand | undefined => {
+          const name = command.name.trim();
+          if (!name) {
+            return undefined;
+          }
+          const description = command.description?.trim() || undefined;
+          const inputHint = command.input?.hint?.trim() || undefined;
+          return {
+            name,
+            ...(description ? { description } : {}),
+            ...(inputHint ? { inputHint } : {}),
+          };
+        })
+        .filter((command): command is AcpAvailableCommand => command !== undefined);
+      events.push({
+        _tag: "CommandsUpdated",
+        commands,
+        rawPayload: params,
+      });
+      break;
+    }
+    case "session_info_update": {
+      const title = upd.title?.trim() || undefined;
+      events.push({
+        _tag: "SessionInfoUpdated",
+        ...(title ? { title } : {}),
+        rawPayload: params,
+      });
       break;
     }
     default:

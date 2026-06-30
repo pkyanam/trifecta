@@ -245,6 +245,62 @@ describe("AcpRuntimeModel", () => {
     ]);
   });
 
+  it("projects reasoning, usage, command and session-info updates", () => {
+    const reasoning = parseSessionUpdateEvent({
+      sessionId: "session-1",
+      update: {
+        sessionUpdate: "agent_thought_chunk",
+        content: { type: "text", text: "thinking…" },
+      },
+    } satisfies EffectAcpSchema.SessionNotification);
+    expect(reasoning.events[0]?._tag).toBe("ReasoningDelta");
+    expect(reasoning.events[0]).toMatchObject({ _tag: "ReasoningDelta", text: "thinking…" });
+
+    const usage = parseSessionUpdateEvent({
+      sessionId: "session-1",
+      update: {
+        sessionUpdate: "usage_update",
+        used: 1200,
+        size: 200000,
+        cost: { amount: 0.42, currency: "USD" },
+      },
+    } satisfies EffectAcpSchema.SessionNotification);
+    expect(usage.events[0]).toMatchObject({
+      _tag: "UsageUpdated",
+      usage: { usedTokens: 1200, maxTokens: 200000, cost: 0.42 },
+    });
+
+    const commands = parseSessionUpdateEvent({
+      sessionId: "session-1",
+      update: {
+        sessionUpdate: "available_commands_update",
+        availableCommands: [
+          { name: " compact ", description: " Force compaction ", input: { hint: "" } },
+          { name: "add-dir", description: "Add a dir", input: { hint: "<path>" } },
+        ],
+      },
+    } satisfies EffectAcpSchema.SessionNotification);
+    expect(commands.events[0]).toMatchObject({
+      _tag: "CommandsUpdated",
+      commands: [
+        { name: "compact", description: "Force compaction" },
+        { name: "add-dir", description: "Add a dir", inputHint: "<path>" },
+      ],
+    });
+
+    const info = parseSessionUpdateEvent({
+      sessionId: "session-1",
+      update: {
+        sessionUpdate: "session_info_update",
+        title: " Investigate flaky test ",
+      },
+    } satisfies EffectAcpSchema.SessionNotification);
+    expect(info.events[0]).toMatchObject({
+      _tag: "SessionInfoUpdated",
+      title: "Investigate flaky test",
+    });
+  });
+
   it("keeps permission request parsing compatible with loose extension payloads", () => {
     const request = parsePermissionRequest({
       sessionId: "session-1",

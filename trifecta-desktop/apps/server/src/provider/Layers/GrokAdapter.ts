@@ -91,6 +91,12 @@ export interface GrokAdapterLiveOptions {
   readonly nativeEventLogPath?: string;
   readonly nativeEventLogger?: EventNdjsonLogger;
   readonly instanceId?: typeof ProviderInstanceId.Type;
+  /**
+   * Resolver for the MCP servers exposed to each Grok session. Yielded at the
+   * start of every session so registry edits apply to subsequent sessions
+   * without rebuilding the adapter. Defaults to "no MCP servers".
+   */
+  readonly resolveMcpServers?: Effect.Effect<ReadonlyArray<EffectAcpSchema.McpServer>>;
 }
 
 interface PendingApproval {
@@ -178,6 +184,7 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
         : undefined);
     const managedNativeEventLogger =
       options?.nativeEventLogger === undefined ? nativeEventLogger : undefined;
+    const resolveMcpServers = options?.resolveMcpServers ?? Effect.succeed([]);
 
     const sessions = new Map<ThreadId, GrokSessionContext>();
     const threadLocksRef = yield* SynchronizedRef.make(new Map<string, Semaphore.Semaphore>());
@@ -338,6 +345,7 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
           );
           let ctx!: GrokSessionContext;
 
+          const mcpServers = yield* resolveMcpServers;
           const resumeSessionId = parseGrokResume(input.resumeCursor)?.sessionId;
           const acpNativeLoggers = makeAcpNativeLoggers({
             nativeEventLogger,
@@ -350,6 +358,7 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
             ...(options?.environment ? { environment: options.environment } : {}),
             childProcessSpawner,
             cwd,
+            mcpServers,
             ...(resumeSessionId ? { resumeSessionId } : {}),
             clientInfo: { name: "trifecta", version: "0.0.0" },
             ...acpNativeLoggers,

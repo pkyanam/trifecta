@@ -1,54 +1,48 @@
 /**
- * DevinAdapter — ACP stdio adapter for the Devin provider.
+ * DevinAdapter — Devin CLI (`devin acp`) via the shared {@link AcpSessionRuntime}.
  *
- * Each session spawns a dedicated `devin acp` subprocess. ACP `session/update`
- * notifications are mapped to canonical `ProviderRuntimeEvent`s and pushed onto
- * a shared queue consumed by `streamEvents`.
+ * Devin is a full ACP agent. This adapter migrates Devin onto the same shared
+ * runtime used by Cursor and Grok, giving it: session resume (`session/load`),
+ * native session modes (Code / Ask / Plan / Bypass), model selection via the
+ * `model` config option, image prompt attachments, reasoning + token-usage
+ * streaming, session rename, MCP server injection, and slash-command discovery.
  *
- * Permission requests bridge the ACP callback model to Trifecta's event/decision
- * flow: incoming `session/request_permission` pushes a `request.opened` event and
- * suspends until `respondToRequest` resolves the accompanying `Deferred`.
+ * Permission requests are bridged to Trifecta's event/decision flow. Under the
+ * `full-access` runtime mode the adapter both selects Devin's `bypass` session
+ * mode (so the agent stops prompting) and auto-approves any residual permission
+ * request as a safety net.
  *
  * @module provider/Layers/DevinAdapter
  */
-import * as Clock from "effect/Clock";
-import * as Context from "effect/Context";
+import {
+  ApprovalRequestId,
+  type DevinSettings,
+  EventId,
+  type ProviderApprovalDecision,
+  type ProviderRuntimeEvent,
+  type ProviderSession,
+  ProviderDriverKind,
+  ProviderInstanceId,
+  RuntimeRequestId,
+  type ThreadId,
+  TurnId,
+} from "@belweave/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
-import * as Layer from "effect/Layer";
-import * as Queue from "effect/Queue";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import * as PubSub from "effect/PubSub";
 import * as Random from "effect/Random";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcessSpawner } from "effect/unstable/process";
+import type * as EffectAcpSchema from "effect-acp/schema";
 
-import {
-  type ApprovalRequestId,
-  type CanonicalItemType,
-  type DevinSettings,
-  type ProviderApprovalDecision,
-  type ProviderRuntimeEvent,
-  type ProviderSession,
-  type ProviderSendTurnInput,
-  type ProviderUserInputAnswers,
-  type ThreadId,
-  type TurnId,
-  ApprovalRequestId as ApprovalRequestIdSchema,
-  EventId,
-  ProviderDriverKind,
-  ProviderInstanceId,
-  RuntimeItemId,
-  RuntimeRequestId,
-  TurnId as TurnIdSchema,
-} from "@belweave/contracts";
-
-import * as AcpClient from "effect-acp/client";
-import type * as AcpSchema from "effect-acp/schema";
-import { AGENT_METHODS } from "effect-acp/schema";
-
+import { resolveAttachmentPath } from "../../attachmentStore.ts";
+import { ServerConfig } from "../../config.ts";
 import {
   ProviderAdapterProcessError,
   ProviderAdapterRequestError,
@@ -56,216 +50,140 @@ import {
   ProviderAdapterValidationError,
   type ProviderAdapterError,
 } from "../Errors.ts";
+import { acpPermissionOutcome, mapAcpToAdapterError } from "../acp/AcpAdapterSupport.ts";
+import { type AcpSessionRuntimeShape } from "../acp/AcpSessionRuntime.ts";
 import {
-  decodeDevinInitializeResponse,
-  decodeDevinNewSessionResponse,
-} from "../devin/DevinAcpWire.ts";
+  makeAcpAssistantItemEvent,
+  makeAcpContentDeltaEvent,
+  makeAcpPlanUpdatedEvent,
+  makeAcpReasoningDeltaEvent,
+  makeAcpRequestOpenedEvent,
+  makeAcpRequestResolvedEvent,
+  makeAcpSessionInfoUpdatedEvent,
+  makeAcpToolCallEvent,
+  makeAcpUsageUpdatedEvent,
+} from "../acp/AcpCoreRuntimeEvents.ts";
+import { type AcpAvailableCommand, parsePermissionRequest } from "../acp/AcpRuntimeModel.ts";
+import { makeAcpNativeLoggers } from "../acp/AcpNativeLogging.ts";
+import {
+  currentDevinModelIdFromSessionSetup,
+  makeDevinAcpRuntime,
+  resolveDevinSessionModeId,
+} from "../acp/DevinAcpSupport.ts";
 import type { ProviderAdapterShape, ProviderThreadSnapshot } from "../Services/ProviderAdapter.ts";
+import { type EventNdjsonLogger } from "./EventNdjsonLogger.ts";
 
 const PROVIDER = ProviderDriverKind.make("devinAgent");
-
-/** `session/set_model` via transport `raw.request`: avoids RpcClient success/error decoding that can defect on Devin. */
-function bestEffortDevinSetSessionModel(
-  client: AcpClient.AcpClientShape,
-  sessionId: string,
-  modelId: string,
-): Effect.Effect<void, never> {
-  return client.raw
-    .request(AGENT_METHODS.session_set_model, {
-      sessionId,
-      modelId,
-    })
-    .pipe(Effect.ignoreCause);
-}
+const DEVIN_RESUME_VERSION = 1 as const;
 
 export interface DevinAdapterOptions {
   readonly instanceId?: ProviderInstanceId;
   readonly environment?: NodeJS.ProcessEnv;
+  readonly nativeEventLogger?: EventNdjsonLogger;
+  /**
+   * Resolver for the MCP servers exposed to each Devin session. Yielded at the
+   * start of every session so registry edits apply to subsequent sessions
+   * without rebuilding the adapter. Defaults to "no MCP servers".
+   */
+  readonly resolveMcpServers?: Effect.Effect<ReadonlyArray<EffectAcpSchema.McpServer>>;
 }
 
-interface DevinAdapterSession {
+interface PendingApproval {
+  readonly decision: Deferred.Deferred<ProviderApprovalDecision>;
+}
+
+interface DevinSessionContext {
   readonly threadId: ThreadId;
-  readonly sessionId: string;
+  session: ProviderSession;
   readonly scope: Scope.Closeable;
-  readonly client: AcpClient.AcpClientShape;
-  readonly providerInstanceId: ProviderInstanceId;
-  readonly pendingRequests: Map<
-    ApprovalRequestId,
-    Deferred.Deferred<ProviderApprovalDecision, never>
-  >;
-  currentTurnId: TurnId | undefined;
-  activeTurnFiber: Fiber.Fiber<void, never> | undefined;
+  readonly acp: AcpSessionRuntimeShape;
+  notificationFiber: Fiber.Fiber<void, never> | undefined;
+  readonly pendingApprovals: Map<ApprovalRequestId, PendingApproval>;
+  readonly turns: Array<{ id: TurnId; items: Array<unknown> }>;
+  lastPlanFingerprint: string | undefined;
+  activeTurnId: TurnId | undefined;
+  currentModeId: string | undefined;
+  availableCommands: ReadonlyArray<AcpAvailableCommand>;
   stopped: boolean;
 }
 
-const makeEventId = Effect.gen(function* () {
-  const ms = yield* Clock.currentTimeMillis;
-  const uuid = yield* Random.nextUUIDv4;
-  return EventId.make(`devin-${ms}-${uuid.slice(0, 8)}`);
-});
-
-const makeIsoNow = Effect.map(DateTime.now, DateTime.formatIso);
-
-const makeEventBase = Effect.fn("makeEventBase")(function* (
-  session: DevinAdapterSession,
-  turnId?: TurnId,
-  itemId?: string,
-  requestId?: string,
-): Effect.fn.Return<Omit<ProviderRuntimeEvent, "type" | "payload">> {
-  const eventId = yield* makeEventId;
-  const createdAt = yield* makeIsoNow;
-  return {
-    eventId,
-    provider: PROVIDER,
-    providerInstanceId: session.providerInstanceId,
-    threadId: session.threadId,
-    createdAt,
-    ...(turnId ? { turnId } : {}),
-    ...(itemId ? { itemId: RuntimeItemId.make(itemId) } : {}),
-    ...(requestId ? { requestId: RuntimeRequestId.make(requestId) } : {}),
-  };
-});
-
-function toolCallKindToItemType(kind: string | undefined): CanonicalItemType {
-  switch (kind) {
-    case "read":
-      return "file_change";
-    case "edit":
-      return "file_change";
-    case "execute":
-      return "command_execution";
-    case "fetch":
-      return "web_search";
-    case "think":
-      return "reasoning";
-    default:
-      return "dynamic_tool_call";
-  }
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function mapAcpUpdate(
-  notification: AcpSchema.SessionNotification,
-  session: DevinAdapterSession,
-  queue: Queue.Queue<ProviderRuntimeEvent>,
+function parseDevinResume(raw: unknown): { sessionId: string } | undefined {
+  if (!isRecord(raw)) return undefined;
+  if (raw.schemaVersion !== DEVIN_RESUME_VERSION) return undefined;
+  if (typeof raw.sessionId !== "string" || !raw.sessionId.trim()) return undefined;
+  return { sessionId: raw.sessionId.trim() };
+}
+
+function selectAutoApprovedPermissionOption(
+  request: EffectAcpSchema.RequestPermissionRequest,
+): string | undefined {
+  const allowAlways = request.options.find((option) => option.kind === "allow_always");
+  if (typeof allowAlways?.optionId === "string" && allowAlways.optionId.trim()) {
+    return allowAlways.optionId.trim();
+  }
+  const allowOnce = request.options.find((option) => option.kind === "allow_once");
+  if (typeof allowOnce?.optionId === "string" && allowOnce.optionId.trim()) {
+    return allowOnce.optionId.trim();
+  }
+  return undefined;
+}
+
+function settlePendingApprovalsAsCancelled(
+  pendingApprovals: ReadonlyMap<ApprovalRequestId, PendingApproval>,
 ): Effect.Effect<void> {
-  const turnId = session.currentTurnId;
-  const update = notification.update;
+  return Effect.forEach(
+    Array.from(pendingApprovals.values()),
+    (pending) => Deferred.succeed(pending.decision, "cancel").pipe(Effect.ignore),
+    { discard: true },
+  );
+}
 
-  if (update.sessionUpdate === "agent_message_chunk") {
-    const content = update.content;
-    if (content.type !== "text" || !content.text) return Effect.void;
-    return Effect.gen(function* () {
-      const base = yield* makeEventBase(session, turnId);
-      yield* Queue.offer(queue, {
-        ...base,
-        type: "content.delta",
-        payload: {
-          streamKind: "assistant_text",
-          delta: content.text,
-        },
-      });
+/** Align Devin's native session mode with the requested runtime/interaction mode. */
+function applyDevinModeSelection(
+  ctx: DevinSessionContext,
+  input: {
+    readonly runtimeMode: ProviderSession["runtimeMode"];
+    readonly interactionMode?: "default" | "plan" | undefined;
+  },
+): Effect.Effect<void> {
+  return Effect.gen(function* () {
+    const modeState = yield* ctx.acp.getModeState;
+    const targetModeId = resolveDevinSessionModeId({
+      runtimeMode: input.runtimeMode,
+      interactionMode: input.interactionMode,
+      availableModeIds: modeState?.availableModes.map((mode) => mode.id) ?? [],
     });
-  }
+    if (!targetModeId || targetModeId === ctx.currentModeId) {
+      return;
+    }
+    yield* Effect.ignore(ctx.acp.setMode(targetModeId));
+    ctx.currentModeId = targetModeId;
+  });
+}
 
-  if (update.sessionUpdate === "agent_thought_chunk") {
-    const content = update.content;
-    if (content.type !== "text" || !content.text) return Effect.void;
-    return Effect.gen(function* () {
-      const base = yield* makeEventBase(session, turnId);
-      yield* Queue.offer(queue, {
-        ...base,
-        type: "content.delta",
-        payload: {
-          streamKind: "reasoning_text",
-          delta: content.text,
-        },
-      });
-    });
-  }
-
-  if (update.sessionUpdate === "tool_call") {
-    const itemId = update.toolCallId;
-    const itemType = toolCallKindToItemType(update.kind ?? undefined);
-    return Effect.gen(function* () {
-      const base = yield* makeEventBase(session, turnId, itemId);
-      yield* Queue.offer(queue, {
-        ...base,
-        type: "item.started",
-        payload: {
-          itemType,
-          status: "inProgress" as const,
-          ...(update.title ? { title: update.title } : {}),
-        },
-      });
-    });
-  }
-
-  if (update.sessionUpdate === "tool_call_update") {
-    const itemId = update.toolCallId;
-    const status = update.status;
-    if (status !== "completed" && status !== "failed") return Effect.void;
-    const itemType = toolCallKindToItemType(update.kind ?? undefined);
-    return Effect.gen(function* () {
-      const base = yield* makeEventBase(session, turnId, itemId);
-      yield* Queue.offer(queue, {
-        ...base,
-        type: "item.completed",
-        payload: {
-          itemType,
-          status: "completed" as const,
-          ...(update.title ? { detail: update.title } : {}),
-        },
-      });
-    });
-  }
-
-  if (update.sessionUpdate === "plan") {
-    return Effect.gen(function* () {
-      const base = yield* makeEventBase(session, turnId);
-      yield* Queue.offer(queue, {
-        ...base,
-        type: "turn.plan.updated",
-        payload: {
-          plan: update.entries.map((entry) => ({
-            step: entry.content,
-            status: "pending" as const,
-          })),
-        },
-      });
-    });
-  }
-
-  if (update.sessionUpdate === "session_info_update" && update.title) {
-    return Effect.gen(function* () {
-      const base = yield* makeEventBase(session, turnId);
-      yield* Queue.offer(queue, {
-        ...base,
-        type: "thread.metadata.updated",
-        payload: {
-          name: update.title ?? undefined,
-        },
-      });
-    });
-  }
-
-  if (update.sessionUpdate === "usage_update") {
-    return Effect.gen(function* () {
-      const base = yield* makeEventBase(session, turnId);
-      yield* Queue.offer(queue, {
-        ...base,
-        type: "thread.token-usage.updated",
-        payload: {
-          usage: {
-            usedTokens: update.used,
-            maxTokens: update.size,
-            compactsAutomatically: false,
-          },
-        },
-      });
-    });
-  }
-
-  return Effect.void;
+/** Apply a requested model selection to a Devin session (best effort). */
+function applyDevinModelSelection(
+  ctx: DevinSessionContext,
+  requestedModelId: string | undefined,
+): Effect.Effect<string | undefined, ProviderAdapterError> {
+  return Effect.gen(function* () {
+    const current = ctx.session.model;
+    if (!requestedModelId || requestedModelId === current) {
+      return current;
+    }
+    yield* ctx.acp
+      .setModel(requestedModelId)
+      .pipe(
+        Effect.mapError((cause) =>
+          mapAcpToAdapterError(PROVIDER, ctx.threadId, "session/set_model", cause),
+        ),
+      );
+    return requestedModelId;
+  });
 }
 
 export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
@@ -273,40 +191,85 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
   options?: DevinAdapterOptions,
 ) {
   const boundInstanceId = options?.instanceId ?? ProviderInstanceId.make("devinAgent");
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  const runtimeEventQueue = yield* Queue.unbounded<ProviderRuntimeEvent>();
-  const sessions = new Map<ThreadId, DevinAdapterSession>();
-  const binaryPath = devinConfig.binaryPath || "devin";
+  const fileSystem = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const serverConfig = yield* Effect.service(ServerConfig);
+  const nativeEventLogger = options?.nativeEventLogger;
   const processEnv = options?.environment ?? process.env;
+  const resolveMcpServers = options?.resolveMcpServers ?? Effect.succeed([]);
 
-  const requireSession = Effect.fn("requireSession")(function* (threadId: ThreadId) {
-    const session = sessions.get(threadId);
-    if (!session || session.stopped) {
-      return yield* new ProviderAdapterSessionNotFoundError({
+  const sessions = new Map<ThreadId, DevinSessionContext>();
+  const runtimeEventPubSub = yield* PubSub.unbounded<ProviderRuntimeEvent>();
+
+  const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
+  const nextEventId = Effect.map(Random.nextUUIDv4, (id) => EventId.make(id));
+  const makeEventStamp = () => Effect.all({ eventId: nextEventId, createdAt: nowIso });
+
+  const offerRuntimeEvent = (event: ProviderRuntimeEvent) =>
+    PubSub.publish(runtimeEventPubSub, event).pipe(Effect.asVoid);
+
+  const requireSession = (
+    threadId: ThreadId,
+  ): Effect.Effect<DevinSessionContext, ProviderAdapterSessionNotFoundError> => {
+    const ctx = sessions.get(threadId);
+    if (!ctx || ctx.stopped) {
+      return Effect.fail(new ProviderAdapterSessionNotFoundError({ provider: PROVIDER, threadId }));
+    }
+    return Effect.succeed(ctx);
+  };
+
+  const emitPlanUpdate = (
+    ctx: DevinSessionContext,
+    payload: {
+      readonly explanation?: string | null;
+      readonly plan: ReadonlyArray<{
+        readonly step: string;
+        readonly status: "pending" | "inProgress" | "completed";
+      }>;
+    },
+    rawPayload: unknown,
+  ) =>
+    Effect.gen(function* () {
+      const fingerprint = `${ctx.activeTurnId ?? "no-turn"}:${payload.explanation ?? ""}:${payload.plan
+        .map((entry) => `${entry.status}|${entry.step}`)
+        .join("\n")}`;
+      if (ctx.lastPlanFingerprint === fingerprint) {
+        return;
+      }
+      ctx.lastPlanFingerprint = fingerprint;
+      yield* offerRuntimeEvent(
+        makeAcpPlanUpdatedEvent({
+          stamp: yield* makeEventStamp(),
+          provider: PROVIDER,
+          threadId: ctx.threadId,
+          turnId: ctx.activeTurnId,
+          payload,
+          source: "acp.jsonrpc",
+          method: "session/update",
+          rawPayload,
+        }),
+      );
+    });
+
+  const stopSessionInternal = (ctx: DevinSessionContext) =>
+    Effect.gen(function* () {
+      if (ctx.stopped) return;
+      ctx.stopped = true;
+      yield* settlePendingApprovalsAsCancelled(ctx.pendingApprovals);
+      if (ctx.notificationFiber) {
+        yield* Fiber.interrupt(ctx.notificationFiber);
+      }
+      yield* Effect.ignore(Scope.close(ctx.scope, Exit.void));
+      sessions.delete(ctx.threadId);
+      yield* offerRuntimeEvent({
+        type: "session.exited",
+        ...(yield* makeEventStamp()),
         provider: PROVIDER,
-        threadId,
+        threadId: ctx.threadId,
+        payload: { exitKind: "graceful" },
       });
-    }
-    return session;
-  });
-
-  const stopSessionInternal = Effect.fn("stopSessionInternal")(function* (
-    session: DevinAdapterSession,
-  ) {
-    if (session.stopped) return;
-    session.stopped = true;
-    sessions.delete(session.threadId);
-    if (session.activeTurnFiber) {
-      yield* Fiber.interrupt(session.activeTurnFiber).pipe(Effect.ignore);
-    }
-    yield* Scope.close(session.scope, Exit.void).pipe(Effect.ignore);
-    const base = yield* makeEventBase(session);
-    yield* Queue.offer(runtimeEventQueue, {
-      ...base,
-      type: "session.exited",
-      payload: { reason: "Session stopped" },
-    }).pipe(Effect.ignore);
-  });
+    });
 
   const startSession: ProviderAdapterShape<ProviderAdapterError>["startSession"] = (input) =>
     Effect.scoped(
@@ -319,471 +282,496 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
           });
         }
 
+        const cwd = path.resolve(input.cwd?.trim() || process.cwd());
+        const modelSelection =
+          input.modelSelection?.instanceId === boundInstanceId ? input.modelSelection : undefined;
+
         const existing = sessions.get(input.threadId);
         if (existing && !existing.stopped) {
-          yield* Effect.suspend(() => stopSessionInternal(existing));
+          yield* stopSessionInternal(existing);
         }
 
+        const pendingApprovals = new Map<ApprovalRequestId, PendingApproval>();
         const sessionScope = yield* Scope.make("sequential");
         let sessionScopeTransferred = false;
         yield* Effect.addFinalizer(() =>
           sessionScopeTransferred ? Effect.void : Scope.close(sessionScope, Exit.void),
         );
+        let ctx!: DevinSessionContext;
 
-        const command = ChildProcess.make(binaryPath, ["acp"], {
-          cwd: input.cwd ?? process.cwd(),
-          env: processEnv,
-          shell: process.platform === "win32",
+        const mcpServers = yield* resolveMcpServers;
+        const resumeSessionId = parseDevinResume(input.resumeCursor)?.sessionId;
+        const acpNativeLoggers = makeAcpNativeLoggers({
+          nativeEventLogger,
+          provider: PROVIDER,
+          threadId: input.threadId,
         });
 
-        const handle = yield* spawner.spawn(command).pipe(
+        const acp = yield* makeDevinAcpRuntime({
+          devinSettings: devinConfig,
+          environment: processEnv,
+          childProcessSpawner,
+          cwd,
+          mcpServers,
+          ...(resumeSessionId ? { resumeSessionId } : {}),
+          clientInfo: { name: "trifecta", version: "0.0.0" },
+          ...acpNativeLoggers,
+        }).pipe(
           Effect.provideService(Scope.Scope, sessionScope),
           Effect.mapError(
             (cause) =>
               new ProviderAdapterProcessError({
                 provider: PROVIDER,
                 threadId: input.threadId,
-                detail: `Failed to spawn devin acp: ${cause.message}`,
+                detail: cause.message,
                 cause,
               }),
           ),
         );
 
-        const acpLayer = AcpClient.layerChildProcess(handle);
-        const acpContext = yield* Layer.build(acpLayer).pipe(
-          Effect.provideService(Scope.Scope, sessionScope),
-          Effect.mapError(
-            (cause) =>
-              new ProviderAdapterProcessError({
-                provider: PROVIDER,
-                threadId: input.threadId,
-                detail: `Failed to build ACP client: ${String(cause)}`,
-                cause: cause as Error,
-              }),
-          ),
-        );
-        const acpClient = Context.get(acpContext, AcpClient.AcpClient);
-
-        const rawInitialize = yield* acpClient.raw
-          .request(AGENT_METHODS.initialize, {
-            protocolVersion: 1 as const,
-            clientCapabilities: {
-              fs: { readTextFile: false, writeTextFile: false },
-              terminal: false,
-            },
-            clientInfo: { name: "trifecta-desktop", version: "1.0.0" },
-          })
-          .pipe(
-            Effect.mapError(
-              (cause) =>
-                new ProviderAdapterProcessError({
+        const started = yield* Effect.gen(function* () {
+          yield* acp.handleRequestPermission((params) =>
+            Effect.gen(function* () {
+              if (input.runtimeMode === "full-access") {
+                const autoApprovedOptionId = selectAutoApprovedPermissionOption(params);
+                if (autoApprovedOptionId !== undefined) {
+                  return {
+                    outcome: { outcome: "selected" as const, optionId: autoApprovedOptionId },
+                  };
+                }
+              }
+              const permissionRequest = parsePermissionRequest(params);
+              const requestId = ApprovalRequestId.make(crypto.randomUUID());
+              const runtimeRequestId = RuntimeRequestId.make(requestId);
+              const decision = yield* Deferred.make<ProviderApprovalDecision>();
+              pendingApprovals.set(requestId, { decision });
+              yield* offerRuntimeEvent(
+                makeAcpRequestOpenedEvent({
+                  stamp: yield* makeEventStamp(),
                   provider: PROVIDER,
                   threadId: input.threadId,
-                  detail: `ACP initialize transport failed: ${cause.message ?? String(cause)}`,
-                  cause: new Error(String(cause)),
+                  turnId: ctx?.activeTurnId,
+                  requestId: runtimeRequestId,
+                  permissionRequest,
+                  detail: permissionRequest.detail ?? "Devin requested permission",
+                  args: params,
+                  source: "acp.jsonrpc",
+                  method: "session/request_permission",
+                  rawPayload: params,
                 }),
-            ),
-          );
-
-        yield* decodeDevinInitializeResponse(rawInitialize).pipe(
-          Effect.mapError(
-            (e) =>
-              new ProviderAdapterProcessError({
-                provider: PROVIDER,
-                threadId: input.threadId,
-                detail: `ACP initialize response decode failed: ${e.message}`,
-                cause: new Error(e.message),
-              }),
-          ),
-        );
-
-        const createPayload = {
-          cwd: input.cwd ?? process.cwd(),
-          mcpServers: [],
-        } satisfies AcpSchema.NewSessionRequest;
-
-        const rawSession = yield* acpClient.raw
-          .request(AGENT_METHODS.session_new, createPayload)
-          .pipe(
-            Effect.mapError(
-              (cause) =>
-                new ProviderAdapterProcessError({
+              );
+              const resolved = yield* Deferred.await(decision);
+              pendingApprovals.delete(requestId);
+              yield* offerRuntimeEvent(
+                makeAcpRequestResolvedEvent({
+                  stamp: yield* makeEventStamp(),
                   provider: PROVIDER,
                   threadId: input.threadId,
-                  detail: `ACP session/new transport failed: ${cause.message ?? String(cause)}`,
-                  cause: new Error(String(cause)),
+                  turnId: ctx?.activeTurnId,
+                  requestId: runtimeRequestId,
+                  permissionRequest,
+                  decision: resolved,
                 }),
-            ),
+              );
+              return {
+                outcome:
+                  resolved === "cancel"
+                    ? ({ outcome: "cancelled" } as const)
+                    : { outcome: "selected" as const, optionId: acpPermissionOutcome(resolved) },
+              };
+            }),
           );
-
-        const sessionResponse = yield* decodeDevinNewSessionResponse(rawSession).pipe(
-          Effect.mapError(
-            (e) =>
-              new ProviderAdapterProcessError({
-                provider: PROVIDER,
-                threadId: input.threadId,
-                detail: `ACP session/new response decode failed: ${e.message}`,
-                cause: new Error(e.message),
-              }),
+          return yield* acp.start();
+        }).pipe(
+          Effect.mapError((error) =>
+            mapAcpToAdapterError(PROVIDER, input.threadId, "session/start", error),
           ),
         );
 
-        const session: DevinAdapterSession = {
-          threadId: input.threadId,
-          sessionId: sessionResponse.sessionId,
-          scope: sessionScope,
-          client: acpClient,
+        const initialModeState = yield* acp.getModeState;
+        const startModelId =
+          modelSelection?.model ?? currentDevinModelIdFromSessionSetup(started.sessionSetupResult);
+
+        const now = yield* nowIso;
+        const session: ProviderSession = {
+          provider: PROVIDER,
           providerInstanceId: boundInstanceId,
-          pendingRequests: new Map(),
-          currentTurnId: undefined,
-          activeTurnFiber: undefined,
+          status: "ready",
+          runtimeMode: input.runtimeMode,
+          cwd,
+          ...(startModelId ? { model: startModelId } : {}),
+          threadId: input.threadId,
+          resumeCursor: {
+            schemaVersion: DEVIN_RESUME_VERSION,
+            sessionId: started.sessionId,
+          },
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        ctx = {
+          threadId: input.threadId,
+          session,
+          scope: sessionScope,
+          acp,
+          notificationFiber: undefined,
+          pendingApprovals,
+          turns: [],
+          lastPlanFingerprint: undefined,
+          activeTurnId: undefined,
+          currentModeId: initialModeState?.currentModeId,
+          availableCommands: [],
           stopped: false,
         };
 
-        // Register session update handler (once, routes by session.currentTurnId)
-        yield* acpClient.handleSessionUpdate((notification) =>
-          mapAcpUpdate(notification, session, runtimeEventQueue),
-        );
-
-        // Bridge permission requests to Trifecta's event/decision flow
-        yield* acpClient.handleRequestPermission((request) =>
-          Effect.gen(function* () {
-            const ms = yield* Clock.currentTimeMillis;
-            const uuid = yield* Random.nextUUIDv4;
-            const reqId = ApprovalRequestIdSchema.make(`devin-req-${ms}-${uuid.slice(0, 8)}`);
-            const deferred = yield* Deferred.make<ProviderApprovalDecision, never>();
-            session.pendingRequests.set(reqId, deferred);
-
-            const permTitle = request.toolCall?.title ?? undefined;
-            const base = yield* makeEventBase(session, session.currentTurnId, undefined, reqId);
-            yield* Queue.offer(runtimeEventQueue, {
-              ...base,
-              requestId: RuntimeRequestId.make(reqId),
-              type: "request.opened",
-              payload: {
-                requestType: "command_execution_approval" as const,
-                ...(permTitle ? { detail: permTitle } : {}),
-              },
-            });
-
-            const decision = yield* Deferred.await(deferred);
-            session.pendingRequests.delete(reqId);
-
-            if (decision === "cancel") {
-              return {
-                outcome: { outcome: "cancelled" as const },
-              } satisfies AcpSchema.RequestPermissionResponse;
-            }
-
-            // Find the matching option from the request's options list
-            const wantAlways = decision === "acceptForSession";
-            const wantReject = decision === "decline";
-            const targetKind = wantReject
-              ? wantAlways
-                ? "reject_always"
-                : "reject_once"
-              : wantAlways
-                ? "allow_always"
-                : "allow_once";
-            const matchingOption =
-              request.options.find((o) => o.kind === targetKind) ??
-              request.options.find((o) =>
-                wantReject ? o.kind.startsWith("reject") : o.kind.startsWith("allow"),
-              ) ??
-              request.options[0];
-
-            if (!matchingOption) {
-              return {
-                outcome: { outcome: "cancelled" as const },
-              } satisfies AcpSchema.RequestPermissionResponse;
-            }
-
-            return {
-              outcome: { outcome: "selected" as const, optionId: matchingOption.optionId },
-            } satisfies AcpSchema.RequestPermissionResponse;
-          }),
-        );
-
-        // Apply model selection if provided
-        if (input.modelSelection?.model) {
-          yield* bestEffortDevinSetSessionModel(
-            acpClient,
-            session.sessionId,
-            input.modelSelection.model,
-          );
+        // Apply the requested model selection up-front (best effort).
+        if (modelSelection?.model) {
+          const boundModelId = yield* applyDevinModelSelection(ctx, modelSelection.model);
+          ctx.session = { ...ctx.session, ...(boundModelId ? { model: boundModelId } : {}) };
         }
+        // Align Devin's native session mode with the requested runtime mode.
+        yield* applyDevinModeSelection(ctx, { runtimeMode: input.runtimeMode });
 
-        sessions.set(input.threadId, session);
+        const nf = yield* Stream.runDrain(
+          Stream.mapEffect(acp.getEvents(), (event) =>
+            Effect.gen(function* () {
+              switch (event._tag) {
+                case "ModeChanged":
+                  ctx.currentModeId = event.modeId;
+                  return;
+                case "CommandsUpdated":
+                  ctx.availableCommands = event.commands;
+                  return;
+                case "AssistantItemStarted":
+                  yield* offerRuntimeEvent(
+                    makeAcpAssistantItemEvent({
+                      stamp: yield* makeEventStamp(),
+                      provider: PROVIDER,
+                      threadId: ctx.threadId,
+                      turnId: ctx.activeTurnId,
+                      itemId: event.itemId,
+                      lifecycle: "item.started",
+                    }),
+                  );
+                  return;
+                case "AssistantItemCompleted":
+                  yield* offerRuntimeEvent(
+                    makeAcpAssistantItemEvent({
+                      stamp: yield* makeEventStamp(),
+                      provider: PROVIDER,
+                      threadId: ctx.threadId,
+                      turnId: ctx.activeTurnId,
+                      itemId: event.itemId,
+                      lifecycle: "item.completed",
+                    }),
+                  );
+                  return;
+                case "PlanUpdated":
+                  yield* emitPlanUpdate(ctx, event.payload, event.rawPayload);
+                  return;
+                case "ToolCallUpdated":
+                  yield* offerRuntimeEvent(
+                    makeAcpToolCallEvent({
+                      stamp: yield* makeEventStamp(),
+                      provider: PROVIDER,
+                      threadId: ctx.threadId,
+                      turnId: ctx.activeTurnId,
+                      toolCall: event.toolCall,
+                      rawPayload: event.rawPayload,
+                    }),
+                  );
+                  return;
+                case "ContentDelta":
+                  yield* offerRuntimeEvent(
+                    makeAcpContentDeltaEvent({
+                      stamp: yield* makeEventStamp(),
+                      provider: PROVIDER,
+                      threadId: ctx.threadId,
+                      turnId: ctx.activeTurnId,
+                      ...(event.itemId ? { itemId: event.itemId } : {}),
+                      text: event.text,
+                      rawPayload: event.rawPayload,
+                    }),
+                  );
+                  return;
+                case "ReasoningDelta":
+                  yield* offerRuntimeEvent(
+                    makeAcpReasoningDeltaEvent({
+                      stamp: yield* makeEventStamp(),
+                      provider: PROVIDER,
+                      threadId: ctx.threadId,
+                      turnId: ctx.activeTurnId,
+                      text: event.text,
+                      rawPayload: event.rawPayload,
+                    }),
+                  );
+                  return;
+                case "UsageUpdated":
+                  yield* offerRuntimeEvent(
+                    makeAcpUsageUpdatedEvent({
+                      stamp: yield* makeEventStamp(),
+                      provider: PROVIDER,
+                      threadId: ctx.threadId,
+                      turnId: ctx.activeTurnId,
+                      usage: event.usage,
+                      rawPayload: event.rawPayload,
+                    }),
+                  );
+                  return;
+                case "SessionInfoUpdated":
+                  if (event.title) {
+                    yield* offerRuntimeEvent(
+                      makeAcpSessionInfoUpdatedEvent({
+                        stamp: yield* makeEventStamp(),
+                        provider: PROVIDER,
+                        threadId: ctx.threadId,
+                        turnId: ctx.activeTurnId,
+                        title: event.title,
+                        rawPayload: event.rawPayload,
+                      }),
+                    );
+                  }
+                  return;
+              }
+            }),
+          ),
+        ).pipe(Effect.forkChild);
+
+        ctx.notificationFiber = nf;
+        sessions.set(input.threadId, ctx);
         sessionScopeTransferred = true;
 
-        const startedBase = yield* makeEventBase(session);
-        yield* Queue.offer(runtimeEventQueue, {
-          ...startedBase,
+        yield* offerRuntimeEvent({
           type: "session.started",
-          payload: {},
+          ...(yield* makeEventStamp()),
+          provider: PROVIDER,
+          threadId: input.threadId,
+          payload: { resume: started.initializeResult },
+        });
+        yield* offerRuntimeEvent({
+          type: "session.state.changed",
+          ...(yield* makeEventStamp()),
+          provider: PROVIDER,
+          threadId: input.threadId,
+          payload: { state: "ready", reason: "Devin ACP session ready" },
+        });
+        yield* offerRuntimeEvent({
+          type: "thread.started",
+          ...(yield* makeEventStamp()),
+          provider: PROVIDER,
+          threadId: input.threadId,
+          payload: { providerThreadId: started.sessionId },
         });
 
-        const now = yield* makeIsoNow;
-        return {
-          provider: PROVIDER,
-          providerInstanceId: boundInstanceId,
-          status: "ready" as const,
-          runtimeMode: input.runtimeMode ?? "full-access",
-          threadId: input.threadId,
-          createdAt: now,
-          updatedAt: now,
-        } satisfies ProviderSession;
-      }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)),
+        return ctx.session;
+      }),
     );
 
-  const sendTurn: ProviderAdapterShape<ProviderAdapterError>["sendTurn"] = Effect.fn("sendTurn")(
-    function* (input: ProviderSendTurnInput) {
-      const session = yield* requireSession(input.threadId);
-      const ms = yield* Clock.currentTimeMillis;
-      const uuid = yield* Random.nextUUIDv4;
-      const turnId = TurnIdSchema.make(`devin-turn-${ms}-${uuid.slice(0, 8)}`);
-      session.currentTurnId = turnId;
+  const sendTurn: ProviderAdapterShape<ProviderAdapterError>["sendTurn"] = (input) =>
+    Effect.gen(function* () {
+      const ctx = yield* requireSession(input.threadId);
+      const turnId = TurnId.make(crypto.randomUUID());
+      const modelSelection =
+        input.modelSelection?.instanceId === boundInstanceId ? input.modelSelection : undefined;
 
-      const startedBase = yield* makeEventBase(session, turnId);
-      yield* Queue.offer(runtimeEventQueue, {
-        ...startedBase,
-        type: "turn.started",
-        payload: {},
+      // Apply model + mode selection before prompting.
+      const boundModelId = yield* applyDevinModelSelection(ctx, modelSelection?.model);
+      yield* applyDevinModeSelection(ctx, {
+        runtimeMode: ctx.session.runtimeMode,
+        interactionMode: input.interactionMode,
       });
 
-      // Apply model switch if requested
-      if (input.modelSelection?.model) {
-        yield* bestEffortDevinSetSessionModel(
-          session.client,
-          session.sessionId,
-          input.modelSelection.model,
-        );
+      ctx.activeTurnId = turnId;
+      ctx.lastPlanFingerprint = undefined;
+      ctx.session = {
+        ...ctx.session,
+        activeTurnId: turnId,
+        updatedAt: yield* nowIso,
+        ...(boundModelId ? { model: boundModelId } : {}),
+      };
+
+      yield* offerRuntimeEvent({
+        type: "turn.started",
+        ...(yield* makeEventStamp()),
+        provider: PROVIDER,
+        threadId: input.threadId,
+        turnId,
+        payload: boundModelId ? { model: boundModelId } : {},
+      });
+
+      const promptParts: Array<EffectAcpSchema.ContentBlock> = [];
+      if (input.input?.trim()) {
+        promptParts.push({ type: "text", text: input.input.trim() });
       }
-
-      const promptContent: ReadonlyArray<AcpSchema.ContentBlock> = input.input
-        ? [{ type: "text" as const, text: input.input }]
-        : [];
-
-      const turnEffect = Effect.gen(function* () {
-        const result = yield* session.client.agent
-          .prompt({
-            sessionId: session.sessionId,
-            prompt: promptContent,
-          })
-          .pipe(
+      if (input.attachments && input.attachments.length > 0) {
+        for (const attachment of input.attachments) {
+          const attachmentPath = resolveAttachmentPath({
+            attachmentsDir: serverConfig.attachmentsDir,
+            attachment,
+          });
+          if (!attachmentPath) {
+            return yield* new ProviderAdapterRequestError({
+              provider: PROVIDER,
+              method: "session/prompt",
+              detail: `Invalid attachment id '${attachment.id}'.`,
+            });
+          }
+          const bytes = yield* fileSystem.readFile(attachmentPath).pipe(
             Effect.mapError(
               (cause) =>
                 new ProviderAdapterRequestError({
                   provider: PROVIDER,
                   method: "session/prompt",
-                  detail: cause.message ?? String(cause),
-                  cause: new Error(String(cause)),
+                  detail: cause.message,
+                  cause,
                 }),
-            ),
-            Effect.catchDefect((defect: unknown) =>
-              Effect.fail(
-                new ProviderAdapterRequestError({
-                  provider: PROVIDER,
-                  method: "session/prompt",
-                  detail: defect instanceof Error ? defect.message : String(defect),
-                  cause: defect instanceof Error ? defect : new Error(String(defect)),
-                }),
-              ),
             ),
           );
+          promptParts.push({
+            type: "image",
+            data: Buffer.from(bytes).toString("base64"),
+            mimeType: attachment.mimeType,
+          });
+        }
+      }
 
-        const turnState =
-          result.stopReason === "end_turn"
-            ? ("completed" as const)
-            : result.stopReason === "cancelled"
-              ? ("cancelled" as const)
-              : ("completed" as const);
-
-        const completedBase = yield* makeEventBase(session, turnId);
-        yield* Queue.offer(runtimeEventQueue, {
-          ...completedBase,
-          type: "turn.completed",
-          payload: { state: turnState },
+      if (promptParts.length === 0) {
+        return yield* new ProviderAdapterValidationError({
+          provider: PROVIDER,
+          operation: "sendTurn",
+          issue: "Turn requires non-empty text or attachments.",
         });
-      }).pipe(
-        Effect.mapError((err: ProviderAdapterError) =>
-          Effect.gen(function* () {
-            const errBase = yield* makeEventBase(session, turnId);
-            yield* Queue.offer(runtimeEventQueue, {
-              ...errBase,
-              type: "runtime.error",
-              payload: {
-                message: err.message ?? "Devin ACP turn error",
-                class: "provider_error" as const,
-              },
-            });
-          }),
-        ),
-        Effect.ignoreCause,
-        Effect.forkDetach,
-      );
+      }
 
-      const turnFiber = yield* turnEffect;
-      session.activeTurnFiber = turnFiber as Fiber.Fiber<void, never>;
+      const result = yield* ctx.acp
+        .prompt({ prompt: promptParts })
+        .pipe(
+          Effect.mapError((error) =>
+            mapAcpToAdapterError(PROVIDER, input.threadId, "session/prompt", error),
+          ),
+        );
 
-      return {
+      ctx.turns.push({ id: turnId, items: [{ prompt: promptParts, result }] });
+      ctx.session = { ...ctx.session, activeTurnId: turnId, updatedAt: yield* nowIso };
+
+      yield* offerRuntimeEvent({
+        type: "turn.completed",
+        ...(yield* makeEventStamp()),
+        provider: PROVIDER,
         threadId: input.threadId,
         turnId,
-      };
-    },
-  );
+        payload: {
+          state: result.stopReason === "cancelled" ? "cancelled" : "completed",
+          stopReason: result.stopReason ?? null,
+        },
+      });
 
-  const interruptTurn: ProviderAdapterShape<ProviderAdapterError>["interruptTurn"] = (
-    threadId,
-    _turnId,
-  ) =>
-    requireSession(threadId).pipe(
-      Effect.flatMap((session) =>
-        Effect.gen(function* () {
-          yield* session.client.agent
-            .cancel({ sessionId: session.sessionId })
-            .pipe(Effect.ignoreCause);
-          if (session.activeTurnFiber) {
-            yield* Fiber.interrupt(session.activeTurnFiber).pipe(Effect.ignoreCause);
-            session.activeTurnFiber = undefined;
-          }
-        }),
-      ),
-      Effect.mapError((cause) =>
-        cause._tag === "ProviderAdapterSessionNotFoundError"
-          ? cause
-          : new ProviderAdapterRequestError({
-              provider: PROVIDER,
-              method: "session/cancel",
-              detail: cause.message,
-              cause,
-            }),
-      ),
-    );
+      return { threadId: input.threadId, turnId, resumeCursor: ctx.session.resumeCursor };
+    });
+
+  const interruptTurn: ProviderAdapterShape<ProviderAdapterError>["interruptTurn"] = (threadId) =>
+    Effect.gen(function* () {
+      const ctx = yield* requireSession(threadId);
+      yield* settlePendingApprovalsAsCancelled(ctx.pendingApprovals);
+      yield* Effect.ignore(
+        ctx.acp.cancel.pipe(
+          Effect.mapError((error) =>
+            mapAcpToAdapterError(PROVIDER, threadId, "session/cancel", error),
+          ),
+        ),
+      );
+    });
 
   const respondToRequest: ProviderAdapterShape<ProviderAdapterError>["respondToRequest"] = (
     threadId,
     requestId,
     decision,
   ) =>
-    requireSession(threadId).pipe(
-      Effect.flatMap((session) =>
-        Effect.suspend(() => {
-          const deferred = session.pendingRequests.get(requestId);
-          if (!deferred) return Effect.void;
-          return Deferred.complete(deferred, Effect.succeed(decision));
-        }),
-      ),
-      Effect.mapError((cause) =>
-        cause._tag === "ProviderAdapterSessionNotFoundError"
-          ? cause
-          : new ProviderAdapterRequestError({
-              provider: PROVIDER,
-              method: "respondToRequest",
-              detail: cause.message,
-              cause,
-            }),
-      ),
-    );
-
-  const respondToUserInput: ProviderAdapterShape<ProviderAdapterError>["respondToUserInput"] = (
-    _threadId,
-    _requestId,
-    _answers: ProviderUserInputAnswers,
-  ) => Effect.void;
+    Effect.gen(function* () {
+      const ctx = yield* requireSession(threadId);
+      const pending = ctx.pendingApprovals.get(requestId);
+      if (!pending) {
+        return yield* new ProviderAdapterRequestError({
+          provider: PROVIDER,
+          method: "session/request_permission",
+          detail: `Unknown pending approval request: ${requestId}`,
+        });
+      }
+      yield* Deferred.succeed(pending.decision, decision);
+    });
 
   const stopSession: ProviderAdapterShape<ProviderAdapterError>["stopSession"] = (threadId) =>
     Effect.gen(function* () {
-      const session = sessions.get(threadId);
-      if (!session) return;
-      yield* stopSessionInternal(session);
+      const ctx = sessions.get(threadId);
+      if (!ctx) return;
+      yield* stopSessionInternal(ctx);
     });
 
   const listSessions: ProviderAdapterShape<ProviderAdapterError>["listSessions"] = () =>
-    Effect.gen(function* () {
-      const now = yield* makeIsoNow;
-      return Array.from(sessions.values())
-        .filter((s) => !s.stopped)
-        .map((s) => ({
-          provider: PROVIDER,
-          providerInstanceId: s.providerInstanceId,
-          status: "ready" as const,
-          runtimeMode: "full-access" as const,
-          threadId: s.threadId,
-          ...(s.currentTurnId ? { activeTurnId: s.currentTurnId } : {}),
-          createdAt: now,
-          updatedAt: now,
-        }));
+    Effect.sync(() => {
+      const result: ProviderSession[] = [];
+      for (const ctx of sessions.values()) {
+        if (!ctx.stopped) result.push({ ...ctx.session });
+      }
+      return result;
     });
 
   const hasSession: ProviderAdapterShape<ProviderAdapterError>["hasSession"] = (threadId) =>
-    Effect.succeed(Boolean(sessions.get(threadId) && !sessions.get(threadId)?.stopped));
+    Effect.sync(() => {
+      const ctx = sessions.get(threadId);
+      return ctx !== undefined && !ctx.stopped;
+    });
 
   const readThread: ProviderAdapterShape<ProviderAdapterError>["readThread"] = (threadId) =>
     requireSession(threadId).pipe(
       Effect.map(
-        (session) => ({ threadId: session.threadId, turns: [] }) satisfies ProviderThreadSnapshot,
-      ),
-      Effect.mapError((cause) =>
-        cause._tag === "ProviderAdapterSessionNotFoundError"
-          ? cause
-          : new ProviderAdapterRequestError({
-              provider: PROVIDER,
-              method: "readThread",
-              detail: cause.message,
-              cause,
-            }),
+        (ctx) => ({ threadId: ctx.threadId, turns: ctx.turns }) satisfies ProviderThreadSnapshot,
       ),
     );
 
   const rollbackThread: ProviderAdapterShape<ProviderAdapterError>["rollbackThread"] = (
     threadId,
-    _numTurns,
+    numTurns,
   ) =>
-    requireSession(threadId).pipe(
-      Effect.map(
-        (session) => ({ threadId: session.threadId, turns: [] }) satisfies ProviderThreadSnapshot,
-      ),
-      Effect.mapError((cause) =>
-        cause._tag === "ProviderAdapterSessionNotFoundError"
-          ? cause
-          : new ProviderAdapterRequestError({
-              provider: PROVIDER,
-              method: "rollbackThread",
-              detail: cause.message,
-              cause,
-            }),
-      ),
-    );
+    Effect.gen(function* () {
+      const ctx = yield* requireSession(threadId);
+      if (!Number.isInteger(numTurns) || numTurns < 1) {
+        return yield* new ProviderAdapterValidationError({
+          provider: PROVIDER,
+          operation: "rollbackThread",
+          issue: "numTurns must be an integer >= 1.",
+        });
+      }
+      const nextLength = Math.max(0, ctx.turns.length - numTurns);
+      ctx.turns.splice(nextLength);
+      return { threadId, turns: ctx.turns } satisfies ProviderThreadSnapshot;
+    });
 
   const stopAll: ProviderAdapterShape<ProviderAdapterError>["stopAll"] = () =>
-    Effect.forEach(Array.from(sessions.values()), stopSessionInternal, {
-      concurrency: 1,
-      discard: true,
-    }).pipe(Effect.asVoid);
+    Effect.forEach(Array.from(sessions.values()), stopSessionInternal, { discard: true });
 
   yield* Effect.acquireRelease(Effect.void, () =>
-    stopAll().pipe(Effect.andThen(Queue.shutdown(runtimeEventQueue)), Effect.ignore),
+    Effect.forEach(Array.from(sessions.values()), stopSessionInternal, { discard: true }).pipe(
+      Effect.andThen(PubSub.shutdown(runtimeEventPubSub)),
+      Effect.ignore,
+    ),
   );
 
   return {
     provider: PROVIDER,
-    capabilities: {
-      sessionModelSwitch: "in-session",
-    },
+    capabilities: { sessionModelSwitch: "in-session" },
     startSession,
     sendTurn,
     interruptTurn,
     respondToRequest,
-    respondToUserInput,
+    // Devin has no structured user-input (elicitation) extension; no-op.
+    respondToUserInput: () => Effect.void,
     stopSession,
     listSessions,
     hasSession,
     readThread,
     rollbackThread,
     stopAll,
-    get streamEvents() {
-      return Stream.fromQueue(runtimeEventQueue);
-    },
+    streamEvents: Stream.fromPubSub(runtimeEventPubSub),
   } satisfies ProviderAdapterShape<ProviderAdapterError>;
 });
