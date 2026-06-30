@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+// @effect-diagnostics nodeBuiltinImport:off
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
