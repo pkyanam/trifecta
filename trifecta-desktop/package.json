@@ -43,7 +43,7 @@
     "build": "turbo run build",
     "build:marketing": "turbo run build --filter=@belweave/marketing",
     "build:tesla": "turbo run build --filter=@belweave/tesla",
-    "build:desktop": "node scripts/generate-desktop-icons.mjs && turbo run build --filter=@belweave/desktop --filter=@belweave/trifecta",
+    "build:desktop": "node scripts/generate-desktop-icons.mjs && bunx turbo run build --filter=@belweave/desktop --filter=@belweave/trifecta",
     "typecheck": "turbo run typecheck",
     "lint": "oxlint --report-unused-disable-directives",
     "test": "turbo run test",
