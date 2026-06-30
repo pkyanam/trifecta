@@ -739,6 +739,16 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const bundledClientEntry = path.join(distDirs.serverDist, "client/index.html");
 
   if (!options.skipBuild) {
+    yield* Effect.log("[desktop-artifact] Regenerating desktop icons...");
+    yield* runCommand(
+      ChildProcess.make({
+        cwd: repoRoot,
+        ...commandOutputOptions(options.verbose),
+        // Windows needs shell mode to resolve .cmd shims (e.g. bun.cmd).
+        shell: process.platform === "win32",
+      })`bun run generate:desktop-icons`,
+    );
+
     yield* Effect.log("[desktop-artifact] Building desktop/server/web artifacts...");
     yield* runCommand(
       ChildProcess.make({
