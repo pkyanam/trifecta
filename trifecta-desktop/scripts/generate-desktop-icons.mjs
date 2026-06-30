@@ -13,11 +13,14 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import sharp from "sharp";
+
 import { BRAND_ASSET_PATHS } from "./lib/brand-assets.ts";
+import { applyMacMask } from "./lib/macos-icon-mask.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
-const MASK_SCRIPT = join(__dirname, "lib", "macos-icon-mask.py");
+const IS_MACOS = process.platform === "darwin";
 const DESKTOP_RESOURCES_DIR = join(REPO_ROOT, "apps", "desktop", "resources");
 
 const BRANDS = {
@@ -68,11 +71,27 @@ function runChecked(command, args) {
   execFileSync(command, args, { stdio: "inherit" });
 }
 
-function applyMacMask(sourcePng, targetPng) {
-  runChecked("python3", [MASK_SCRIPT, sourcePng, targetPng]);
+async function writeIconPng(sourcePng, targetPng, size) {
+  // sharp is cross-platform; sips is macOS-only. Prefer sips on macOS to keep
+  // byte-for-byte parity with previously shipped icons, fall back to sharp
+  // everywhere else.
+  if (IS_MACOS) {
+    runChecked("sips", ["-z", String(size), String(size), sourcePng, "--out", targetPng]);
+    return;
+  }
+  await sharp(sourcePng)
+    .resize(size, size, { fit: "fill", kernel: "lanczos3" })
+    .png()
+    .toFile(targetPng);
 }
 
 function generateIcns(maskedPng, targetIcns) {
+  if (!IS_MACOS) {
+    // iconutil/sips are macOS-only; .icns is only consumed by macOS builds.
+    // Non-mac runners stage icons via build-desktop-artifact's platform logic.
+    return;
+  }
+
   const iconsetRoot = mkdtempSync(join(REPO_ROOT, ".tmp-iconset-"));
   const iconsetDir = join(iconsetRoot, "icon.iconset");
   mkdirSync(iconsetDir, { recursive: true });
@@ -119,7 +138,7 @@ function writeStamp(brand, sourcePng) {
   );
 }
 
-function main() {
+async function main() {
   const { brand } = parseArgs(process.argv.slice(2));
   const { macIconPng, windowsIconIco } = BRANDS[brand];
   const sourcePng = join(REPO_ROOT, macIconPng);
@@ -139,23 +158,24 @@ function main() {
   const iconIcns = join(DESKTOP_RESOURCES_DIR, "icon.icns");
   const iconIco = join(DESKTOP_RESOURCES_DIR, "icon.ico");
 
-  applyMacMask(sourcePng, maskedSourcePng);
+  await applyMacMask(sourcePng, maskedSourcePng);
   copyFileSync(maskedSourcePng, sourcePng);
   generateIcns(maskedSourcePng, iconIcns);
 
-  runChecked("sips", ["-z", "512", "512", maskedSourcePng, "--out", iconPng]);
+  await writeIconPng(maskedSourcePng, iconPng, 512);
   copyFileSync(sourceIco, iconIco);
   rmSync(maskedSourcePng, { force: true });
   writeStamp(brand, sourcePng);
 
-  process.stdout.write(
-    [
-      `Generated desktop icons from ${macIconPng}`,
-      `  ${iconIcns}`,
-      `  ${iconPng}`,
-      `  ${iconIco}`,
-    ].join("\n") + "\n",
-  );
+  const generated = [`Generated desktop icons from ${macIconPng}`];
+  if (IS_MACOS) {
+    generated.push(`  ${iconIcns}`);
+  }
+  generated.push(`  ${iconPng}`, `  ${iconIco}`);
+  process.stdout.write(generated.join("\n") + "\n");
 }
 
-main();
+main().catch((error) => {
+  process.stderr.write(`${error?.stack ?? error}\n`);
+  process.exit(1);
+});

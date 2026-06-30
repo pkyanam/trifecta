@@ -1,15 +1,13 @@
 #!/usr/bin/env node
 
 // @effect-diagnostics nodeBuiltinImport:off
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import rootPackageJson from "../package.json" with { type: "json" };
 import desktopPackageJson from "../apps/desktop/package.json" with { type: "json" };
 import serverPackageJson from "../apps/server/package.json" with { type: "json" };
 
 import { BRAND_ASSET_PATHS } from "./lib/brand-assets.ts";
 import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
+import { applyMacMask } from "./lib/macos-icon-mask.mjs";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
@@ -397,15 +395,8 @@ function generateMacIconSet(
   });
 }
 
-const buildScriptDir = dirname(fileURLToPath(import.meta.url));
-const macIconMaskScript = join(buildScriptDir, "lib", "macos-icon-mask.py");
-
-function applyMacIconMask(sourcePng: string, maskedPng: string, verbose: boolean) {
-  return runCommand(
-    ChildProcess.make({
-      ...commandOutputOptions(verbose),
-    })`python3 ${macIconMaskScript} ${sourcePng} ${maskedPng}`,
-  );
+function applyMacIconMask(sourcePng: string, maskedPng: string) {
+  return Effect.promise(() => applyMacMask(sourcePng, maskedPng));
 }
 
 function stageMacIcons(stageResourcesDir: string, sourcePng: string, verbose: boolean) {
@@ -426,7 +417,7 @@ function stageMacIcons(stageResourcesDir: string, sourcePng: string, verbose: bo
     const iconPngPath = path.join(stageResourcesDir, "icon.png");
     const iconIcnsPath = path.join(stageResourcesDir, "icon.icns");
 
-    yield* applyMacIconMask(sourcePng, maskedSourcePng, verbose);
+    yield* applyMacIconMask(sourcePng, maskedSourcePng);
 
     yield* runCommand(
       ChildProcess.make({
