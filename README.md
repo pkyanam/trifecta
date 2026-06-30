@@ -13,7 +13,7 @@
 
 ## What is Trifecta?
 
-Trifecta is a cross-platform AI coding agent platform. You bring your own agents (Codex, Claude Code, OpenCode, Gemini, Cursor, Devin, and more) — Trifecta wraps them all behind a single, consistent interface and streams structured events to any connected client in real time.
+Trifecta is a cross-platform AI coding agent platform. You bring your own agents (Codex, Claude Code, OpenCode, Gemini, Grok, Cursor, Devin, and more) — Trifecta wraps them all behind a single, consistent interface and streams structured events to any connected client in real time.
 
 **The problem it solves:** Modern developers juggle several AI coding agents simultaneously, each with its own CLI, authentication system, and UI. Trifecta eliminates that context switching with a unified session model, shared Git/SSH tooling, and clients that reach every device you work from — desktop, browser, iOS, Android, and your editor.
 
@@ -28,7 +28,7 @@ Trifecta is a cross-platform AI coding agent platform. You bring your own agents
                stdio:  JSON-RPC / ACP
                             ▼
   Agents      Codex · Claude · OpenCode · Gemini · Antigravity
-              Cursor · Hermes · Devin · ACP Registry
+              Cursor · Grok · Hermes · Devin · ACP Registry
 ```
 
 ---
@@ -70,6 +70,7 @@ The core of the platform. A single Turborepo + Bun monorepo containing the Node.
 | **Gemini** | Headless CLI | `npm i -g @google/gemini-cli` |
 | **Antigravity** | Python SDK / CLI | `google-antigravity` SDK or `agy` CLI |
 | **Cursor** | ACP (stdio) | bundled `cursor-agent` _(Early Access)_ |
+| **Grok** | ACP (stdio) | `curl -fsSL https://x.ai/cli/install.sh \| bash` · `grok login` |
 | **Hermes** | ACP (stdio) | `hermes setup` |
 | **Devin** | ACP (stdio) | `devin acp` |
 | **ACP Registry** | ACP (stdio) | any [ACP](https://agentclientprotocol.com)-compatible agent |
@@ -103,7 +104,7 @@ Trifecta is **bring-your-own-agent** — it drives agents you already have insta
 ### Features
 
 **Agent orchestration**
-- Unified session model across all nine providers — create, resume, and switch threads without leaving the UI
+- Unified session model across all ten providers — create, resume, and switch threads without leaving the UI
 - Per-provider instance configuration: display name, binary path, `CODEX_HOME` / `Claude HOME`, environment variables, sensitive secrets
 - Multiple accounts per provider (e.g., separate work and personal Codex or Claude setups)
 - Full Access mode (autonomous) and Supervised mode (approval-gated) per session
