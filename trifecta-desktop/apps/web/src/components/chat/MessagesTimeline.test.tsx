@@ -122,6 +122,12 @@ function buildUserTimelineEntry(text: string) {
 }
 
 describe("MessagesTimeline", () => {
+  // The first `await import("./MessagesTimeline")` pays the full module
+  // transform/load cost, which can exceed the default 5s timeout on slow CI
+  // runners. Raise the per-test timeout for the whole file so it is robust
+  // regardless of which test runs first.
+  vi.setConfig({ testTimeout: 20_000 });
+
   it("renders collapse controls for long user messages", async () => {
     const { MessagesTimeline } = await import("./MessagesTimeline");
     const markup = renderToStaticMarkup(
