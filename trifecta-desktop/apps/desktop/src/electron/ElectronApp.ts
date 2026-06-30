@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodeFs from "node:fs";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -102,7 +104,17 @@ const make = ElectronApp.of({
     }),
   setDockIcon: (iconPath) =>
     Effect.sync(() => {
-      Electron.app.dock?.setIcon(iconPath);
+      const dock = Electron.app.dock;
+      if (!dock) return;
+      // dock.setIcon(path) delegates to nativeImage.createFromPath, which reads
+      // via native macOS APIs that cannot see inside an asar archive (asar is a
+      // virtual filesystem only Node's patched fs can read). Read the bytes
+      // through fs and build the NativeImage from the buffer so icons bundled
+      // inside app.asar (e.g. apps/desktop/prod-resources/icon.icns) load.
+      const image = Electron.nativeImage.createFromBuffer(NodeFs.readFileSync(iconPath));
+      if (!image.isEmpty()) {
+        dock.setIcon(image);
+      }
     }),
   appendCommandLineSwitch: (switchName, value) =>
     Effect.sync(() => {

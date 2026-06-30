@@ -28,6 +28,7 @@ import { cn } from "~/lib/utils";
 import { readLocalApi } from "../localApi";
 import { resolvePathLinkTarget } from "../terminal-links";
 import { parseDiffRouteSearch, stripDiffSearchParams } from "../diffRouteSearch";
+import { selectThreadDiffPanelSelection, useDiffPanelStore } from "../diffPanelStore";
 import { useTheme } from "../hooks/useTheme";
 import { buildPatchCacheKey } from "../lib/diffRendering";
 import { resolveDiffThemeName } from "../lib/diffRendering";
@@ -179,11 +180,13 @@ function getDiffCollapseIconClassName(fileDiff: FileDiffMetadata): string {
 
 interface DiffPanelProps {
   mode?: DiffPanelMode;
+  threadRef?: ReturnType<typeof resolveThreadRouteRef>;
 }
 
 export { DiffWorkerPoolProvider } from "./DiffWorkerPoolProvider";
 
-export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
+export default function DiffPanel({ mode = "inline", threadRef: threadRefProp }: DiffPanelProps) {
+  const usesEmbeddedSelection = mode === "embedded";
   const navigate = useNavigate();
   const { resolvedTheme } = useTheme();
   const settings = useSettings();
@@ -198,12 +201,16 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
   const previousDiffOpenRef = useRef(false);
   const [canScrollTurnStripLeft, setCanScrollTurnStripLeft] = useState(false);
   const [canScrollTurnStripRight, setCanScrollTurnStripRight] = useState(false);
-  const routeThreadRef = useParams({
+  const routeThreadRefFromParams = useParams({
     strict: false,
     select: (params) => resolveThreadRouteRef(params),
   });
+  const routeThreadRef = threadRefProp ?? routeThreadRefFromParams;
   const diffSearch = useSearch({ strict: false, select: (search) => parseDiffRouteSearch(search) });
-  const diffOpen = diffSearch.diff === "1";
+  const embeddedDiffSelection = useDiffPanelStore((state) =>
+    selectThreadDiffPanelSelection(state.byThreadKey, routeThreadRef),
+  );
+  const diffOpen = usesEmbeddedSelection ? true : diffSearch.diff === "1";
   const activeThreadId = routeThreadRef?.threadId ?? null;
   const activeThread = useStore(
     useMemo(() => createThreadSelectorByRef(routeThreadRef), [routeThreadRef]),
@@ -240,8 +247,28 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
     [inferredCheckpointTurnCountByTurnId, turnDiffSummaries],
   );
 
-  const selectedTurnId = diffSearch.diffTurnId ?? null;
-  const selectedFilePath = selectedTurnId !== null ? (diffSearch.diffFilePath ?? null) : null;
+  useEffect(() => {
+    if (!usesEmbeddedSelection || !routeThreadRef || embeddedDiffSelection.kind !== "turn") {
+      return;
+    }
+    useDiffPanelStore.getState().reconcileTurnSelection(
+      routeThreadRef,
+      orderedTurnDiffSummaries.map((summary) => summary.turnId),
+    );
+  }, [embeddedDiffSelection, orderedTurnDiffSummaries, routeThreadRef, usesEmbeddedSelection]);
+
+  const selectedTurnId = usesEmbeddedSelection
+    ? embeddedDiffSelection.kind === "turn"
+      ? embeddedDiffSelection.turnId
+      : null
+    : (diffSearch.diffTurnId ?? null);
+  const selectedFilePath = usesEmbeddedSelection
+    ? embeddedDiffSelection.kind === "turn"
+      ? embeddedDiffSelection.filePath
+      : null
+    : selectedTurnId !== null
+      ? (diffSearch.diffFilePath ?? null)
+      : null;
   const selectedTurn =
     selectedTurnId === null
       ? undefined
@@ -391,7 +418,11 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
   }, []);
 
   const selectTurn = (turnId: TurnId) => {
-    if (!activeThread) return;
+    if (!activeThread || !routeThreadRef) return;
+    if (usesEmbeddedSelection) {
+      useDiffPanelStore.getState().selectTurn(routeThreadRef, turnId);
+      return;
+    }
     void navigate({
       to: "/$environmentId/$threadId",
       params: buildThreadRouteParams(scopeThreadRef(activeThread.environmentId, activeThread.id)),
@@ -402,7 +433,11 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
     });
   };
   const selectWholeConversation = () => {
-    if (!activeThread) return;
+    if (!activeThread || !routeThreadRef) return;
+    if (usesEmbeddedSelection) {
+      useDiffPanelStore.getState().selectGitScope(routeThreadRef, "branch");
+      return;
+    }
     void navigate({
       to: "/$environmentId/$threadId",
       params: buildThreadRouteParams(scopeThreadRef(activeThread.environmentId, activeThread.id)),

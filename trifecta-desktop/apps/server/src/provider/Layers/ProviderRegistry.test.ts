@@ -1394,6 +1394,7 @@ it.layer(
               "cursor",
               "devinAgent",
               "gemini",
+              "grok",
               "hermesAgent",
               "opencode",
             ].toSorted(),

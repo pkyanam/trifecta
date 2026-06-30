@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import rootPackageJson from "../package.json" with { type: "json" };
 import desktopPackageJson from "../apps/desktop/package.json" with { type: "json" };
 import serverPackageJson from "../apps/server/package.json" with { type: "json" };
@@ -393,6 +396,17 @@ function generateMacIconSet(
   });
 }
 
+const buildScriptDir = dirname(fileURLToPath(import.meta.url));
+const macIconMaskScript = join(buildScriptDir, "lib", "macos-icon-mask.py");
+
+function applyMacIconMask(sourcePng: string, maskedPng: string, verbose: boolean) {
+  return runCommand(
+    ChildProcess.make({
+      ...commandOutputOptions(verbose),
+    })`python3 ${macIconMaskScript} ${sourcePng} ${maskedPng}`,
+  );
+}
+
 function stageMacIcons(stageResourcesDir: string, sourcePng: string, verbose: boolean) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -407,16 +421,19 @@ function stageMacIcons(stageResourcesDir: string, sourcePng: string, verbose: bo
       prefix: "trifecta-icon-build-",
     });
 
+    const maskedSourcePng = path.join(tmpRoot, "icon-masked.png");
     const iconPngPath = path.join(stageResourcesDir, "icon.png");
     const iconIcnsPath = path.join(stageResourcesDir, "icon.icns");
+
+    yield* applyMacIconMask(sourcePng, maskedSourcePng, verbose);
 
     yield* runCommand(
       ChildProcess.make({
         ...commandOutputOptions(verbose),
-      })`sips -z 512 512 ${sourcePng} --out ${iconPngPath}`,
+      })`sips -z 512 512 ${maskedSourcePng} --out ${iconPngPath}`,
     );
 
-    yield* generateMacIconSet(sourcePng, iconIcnsPath, tmpRoot, path, verbose);
+    yield* generateMacIconSet(maskedSourcePng, iconIcnsPath, tmpRoot, path, verbose);
   });
 }
 

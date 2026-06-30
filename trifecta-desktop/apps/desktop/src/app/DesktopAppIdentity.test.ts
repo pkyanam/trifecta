@@ -62,12 +62,12 @@ const makeElectronAppLayer = (calls: ElectronAppCalls) =>
     on: () => Effect.void,
   } satisfies ElectronApp.ElectronAppShape);
 
-const makeAssetsLayer = (png: Option.Option<string>) =>
+const makeAssetsLayer = (icns: Option.Option<string>) =>
   Layer.succeed(DesktopAssets.DesktopAssets, {
     iconPaths: Effect.succeed({
       ico: Option.none(),
-      icns: Option.none(),
-      png,
+      icns,
+      png: Option.none(),
     }),
     resolveResourcePath: () => Effect.succeed(Option.none()),
   } satisfies DesktopAssets.DesktopAssetsShape);
@@ -103,7 +103,7 @@ const withIdentity = <A, E, R>(
     readonly environment?: TestEnvironmentInput;
     readonly legacyPathExists?: boolean;
     readonly packageJson?: string;
-    readonly pngIconPath?: Option.Option<string>;
+    readonly icnsIconPath?: Option.Option<string>;
   } = {},
 ) => {
   const calls: ElectronAppCalls = input.calls ?? {
@@ -126,7 +126,7 @@ const withIdentity = <A, E, R>(
               Effect.succeed(input.packageJson ?? '{"belweaveCommitHash":"abcdef1234567890"}'),
           }),
         ),
-        Layer.provideMerge(makeAssetsLayer(input.pngIconPath ?? Option.none())),
+        Layer.provideMerge(makeAssetsLayer(input.icnsIconPath ?? Option.none())),
         Layer.provideMerge(makeElectronAppLayer(calls)),
         Layer.provideMerge(makeEnvironmentLayer(input.environment)),
       ),
@@ -163,7 +163,7 @@ describe("DesktopAppIdentity", () => {
         assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "Trifecta (Alpha)");
         assert.equal(calls.setAboutPanelOptions[0]?.applicationVersion, "1.2.3");
         assert.equal(calls.setAboutPanelOptions[0]?.version, "0123456789ab");
-        assert.deepEqual(calls.setDockIcon, ["/icon.png"]);
+        assert.deepEqual(calls.setDockIcon, ["/icon.icns"]);
       }),
       {
         calls,
@@ -172,7 +172,7 @@ describe("DesktopAppIdentity", () => {
             BELWEAVE_COMMIT_HASH: "0123456789abcdef",
           },
         },
-        pngIconPath: Option.some("/icon.png"),
+        icnsIconPath: Option.some("/icon.icns"),
       },
     );
   });
