@@ -30,6 +30,9 @@ function formatConfigOptionValue(value: string | boolean): string {
   return JSON.stringify(value);
 }
 
+/** Cap on the agent stderr tail retained for diagnostics. */
+const MAX_STDERR_TAIL_CHARS = 4_000;
+
 export interface AcpSpawnInput {
   readonly command: string;
   readonly args: ReadonlyArray<string>;
@@ -104,6 +107,12 @@ export interface AcpSessionRuntimeShape {
   readonly getEvents: () => Stream.Stream<AcpParsedSessionEvent, never>;
   readonly getModeState: Effect.Effect<AcpSessionModeState | undefined>;
   readonly getConfigOptions: Effect.Effect<ReadonlyArray<EffectAcpSchema.SessionConfigOption>>;
+  /**
+   * The most recent agent stderr output (capped tail). Useful for surfacing
+   * *why* an agent stalled or exited when a turn is force-terminated. Ported
+   * from Triangle's `runAcpSession` stderr capture (ADR 0013/0014).
+   */
+  readonly recentStderr: Effect.Effect<string>;
   readonly prompt: (
     payload: Omit<EffectAcpSchema.PromptRequest, "sessionId">,
   ) => Effect.Effect<EffectAcpSchema.PromptResponse, EffectAcpErrors.AcpError>;
@@ -233,6 +242,20 @@ const makeAcpSessionRuntime = (
             }),
         ),
       );
+
+    // Capture a rolling tail of the agent's stderr. `layerChildProcess` only
+    // wires stdout/stdin, so stderr is otherwise unconsumed; draining it both
+    // prevents backpressure and lets us explain *why* an agent stalled/exited.
+    const stderrDecoder = new TextDecoder();
+    const stderrTailRef = yield* Ref.make("");
+    yield* Stream.runForEach(child.stderr, (chunk: Uint8Array) =>
+      Ref.update(stderrTailRef, (previous) => {
+        const next = previous + stderrDecoder.decode(chunk, { stream: true });
+        return next.length > MAX_STDERR_TAIL_CHARS
+          ? next.slice(next.length - MAX_STDERR_TAIL_CHARS)
+          : next;
+      }),
+    ).pipe(Effect.ignore, Effect.forkIn(runtimeScope));
 
     const acpContext = yield* Layer.build(
       EffectAcpClient.layerChildProcess(child, {
@@ -532,6 +555,7 @@ const makeAcpSessionRuntime = (
       getEvents: () => Stream.fromQueue(eventQueue),
       getModeState: Ref.get(modeStateRef),
       getConfigOptions: Ref.get(configOptionsRef),
+      recentStderr: Ref.get(stderrTailRef),
       prompt: (payload) =>
         getStartedState.pipe(
           Effect.flatMap((started) => {

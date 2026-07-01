@@ -27,6 +27,7 @@ import {
   type ThreadId,
   TurnId,
 } from "@belweave/contracts";
+import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -64,6 +65,13 @@ import {
   makeAcpUsageUpdatedEvent,
 } from "../acp/AcpCoreRuntimeEvents.ts";
 import { type AcpAvailableCommand, parsePermissionRequest } from "../acp/AcpRuntimeModel.ts";
+import {
+  type AcpActiveTurn,
+  type AcpTurnGuardDeps,
+  type AcpTurnGuardOptions,
+  acpRequestInterrupt,
+  runAcpWatchedPrompt,
+} from "../acp/AcpTurnGuard.ts";
 import { makeAcpNativeLoggers } from "../acp/AcpNativeLogging.ts";
 import {
   currentDevinModelIdFromSessionSetup,
@@ -76,6 +84,20 @@ import { type EventNdjsonLogger } from "./EventNdjsonLogger.ts";
 const PROVIDER = ProviderDriverKind.make("devinAgent");
 const DEVIN_RESUME_VERSION = 1 as const;
 
+/**
+ * Turn-lifecycle safeguards. A Devin turn is driven by a blocking `session/prompt`
+ * JSON-RPC request that only resolves when Devin responds. If Devin's harness
+ * wedges while its subprocess stays alive, the request never resolves — the UI
+ * is stuck "Working" and a soft `session/cancel` is ignored. These bounds are
+ * enforced by the shared {@link runAcpWatchedPrompt} watchdog; the values here
+ * are overrides (primarily for tests).
+ */
+export interface DevinTurnTimeoutOptions {
+  readonly idleTimeoutMs?: number;
+  readonly interruptGraceMs?: number;
+  readonly watchdogTickMs?: number;
+}
+
 export interface DevinAdapterOptions {
   readonly instanceId?: ProviderInstanceId;
   readonly environment?: NodeJS.ProcessEnv;
@@ -86,6 +108,8 @@ export interface DevinAdapterOptions {
    * without rebuilding the adapter. Defaults to "no MCP servers".
    */
   readonly resolveMcpServers?: Effect.Effect<ReadonlyArray<EffectAcpSchema.McpServer>>;
+  /** Overrides for turn watchdog/interrupt timing (primarily for tests). */
+  readonly turnTimeouts?: DevinTurnTimeoutOptions;
 }
 
 interface PendingApproval {
@@ -102,6 +126,7 @@ interface DevinSessionContext {
   readonly turns: Array<{ id: TurnId; items: Array<unknown> }>;
   lastPlanFingerprint: string | undefined;
   activeTurnId: TurnId | undefined;
+  activeTurn: AcpActiveTurn | undefined;
   currentModeId: string | undefined;
   availableCommands: ReadonlyArray<AcpAvailableCommand>;
   stopped: boolean;
@@ -199,6 +224,18 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
   const processEnv = options?.environment ?? process.env;
   const resolveMcpServers = options?.resolveMcpServers ?? Effect.succeed([]);
 
+  const turnGuardOptions: AcpTurnGuardOptions = {
+    ...(options?.turnTimeouts?.idleTimeoutMs !== undefined
+      ? { idleTimeoutMs: options.turnTimeouts.idleTimeoutMs }
+      : {}),
+    ...(options?.turnTimeouts?.interruptGraceMs !== undefined
+      ? { interruptGraceMs: options.turnTimeouts.interruptGraceMs }
+      : {}),
+    ...(options?.turnTimeouts?.watchdogTickMs !== undefined
+      ? { watchdogTickMs: options.turnTimeouts.watchdogTickMs }
+      : {}),
+  };
+
   const sessions = new Map<ThreadId, DevinSessionContext>();
   const runtimeEventPubSub = yield* PubSub.unbounded<ProviderRuntimeEvent>();
 
@@ -252,10 +289,14 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
       );
     });
 
-  const stopSessionInternal = (ctx: DevinSessionContext) =>
+  const stopSessionInternal = (
+    ctx: DevinSessionContext,
+    exit?: { readonly reason?: string; readonly recoverable?: boolean },
+  ) =>
     Effect.gen(function* () {
       if (ctx.stopped) return;
       ctx.stopped = true;
+      ctx.activeTurn = undefined;
       yield* settlePendingApprovalsAsCancelled(ctx.pendingApprovals);
       if (ctx.notificationFiber) {
         yield* Fiber.interrupt(ctx.notificationFiber);
@@ -267,7 +308,11 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
         ...(yield* makeEventStamp()),
         provider: PROVIDER,
         threadId: ctx.threadId,
-        payload: { exitKind: "graceful" },
+        payload: {
+          exitKind: "graceful",
+          ...(exit?.reason ? { reason: exit.reason } : {}),
+          ...(exit?.recoverable !== undefined ? { recoverable: exit.recoverable } : {}),
+        },
       });
     });
 
@@ -419,6 +464,7 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
           turns: [],
           lastPlanFingerprint: undefined,
           activeTurnId: undefined,
+          activeTurn: undefined,
           currentModeId: initialModeState?.currentModeId,
           availableCommands: [],
           stopped: false,
@@ -435,6 +481,11 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
         const nf = yield* Stream.runDrain(
           Stream.mapEffect(acp.getEvents(), (event) =>
             Effect.gen(function* () {
+              // Any streamed event is a sign of life for the active turn; reset
+              // the idle watchdog so only genuinely stalled turns are reaped.
+              if (ctx.activeTurn) {
+                ctx.activeTurn.lastActivityAt = yield* Clock.currentTimeMillis;
+              }
               switch (event._tag) {
                 case "ModeChanged":
                   ctx.currentModeId = event.modeId;
@@ -643,29 +694,70 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
         });
       }
 
-      const result = yield* ctx.acp
-        .prompt({ prompt: promptParts })
-        .pipe(
-          Effect.mapError((error) =>
-            mapAcpToAdapterError(PROVIDER, input.threadId, "session/prompt", error),
-          ),
-        );
+      const activeTurn: AcpActiveTurn = {
+        turnId,
+        lastActivityAt: yield* Clock.currentTimeMillis,
+        interruptRequestedAt: undefined,
+      };
+      ctx.activeTurn = activeTurn;
 
-      ctx.turns.push({ id: turnId, items: [{ prompt: promptParts, result }] });
-      ctx.session = { ...ctx.session, activeTurnId: turnId, updatedAt: yield* nowIso };
-
-      yield* offerRuntimeEvent({
-        type: "turn.completed",
-        ...(yield* makeEventStamp()),
+      // Race the blocking `session/prompt` against a per-turn watchdog (shared
+      // with the other ACP adapters). The watchdog wins if (a) the user
+      // interrupted and Devin didn't honour the soft `session/cancel` within
+      // the grace window, or (b) the turn went idle past the timeout. On a
+      // forced end the helper emits the terminating `turn.completed` (and, for
+      // timeouts, a diagnostic `runtime.error`) and tears the session down.
+      const guardDeps: AcpTurnGuardDeps = {
         provider: PROVIDER,
         threadId: input.threadId,
         turnId,
-        payload: {
-          state: result.stopReason === "cancelled" ? "cancelled" : "completed",
-          stopReason: result.stopReason ?? null,
-        },
-      });
+        acp: ctx.acp,
+        activeTurn,
+        isPaused: () => ctx.pendingApprovals.size > 0,
+        options: turnGuardOptions,
+        offerRuntimeEvent,
+        makeEventStamp,
+        stopSession: (exit) =>
+          stopSessionInternal(ctx, {
+            reason: exit.reason,
+            recoverable: exit.recoverable,
+          }),
+        mapPromptError: (error) =>
+          mapAcpToAdapterError(PROVIDER, input.threadId, "session/prompt", error),
+      };
 
+      const outcome = yield* runAcpWatchedPrompt(guardDeps, promptParts).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (ctx.activeTurn === activeTurn) {
+              ctx.activeTurn = undefined;
+              ctx.activeTurnId = undefined;
+            }
+          }),
+        ),
+      );
+
+      ctx.session = { ...ctx.session, activeTurnId: undefined, updatedAt: yield* nowIso };
+
+      if (outcome.kind === "natural") {
+        const result = outcome.response;
+        ctx.turns.push({ id: turnId, items: [{ prompt: promptParts, result }] });
+        yield* offerRuntimeEvent({
+          type: "turn.completed",
+          ...(yield* makeEventStamp()),
+          provider: PROVIDER,
+          threadId: input.threadId,
+          turnId,
+          payload: {
+            state: result.stopReason === "cancelled" ? "cancelled" : "completed",
+            stopReason: result.stopReason ?? null,
+          },
+        });
+        return { threadId: input.threadId, turnId, resumeCursor: ctx.session.resumeCursor };
+      }
+
+      // Forced end: the shared guard already emitted `turn.completed` (and, for
+      // timeouts, a diagnostic `runtime.error`) and tore the session down.
       return { threadId: input.threadId, turnId, resumeCursor: ctx.session.resumeCursor };
     });
 
@@ -673,13 +765,39 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
     Effect.gen(function* () {
       const ctx = yield* requireSession(threadId);
       yield* settlePendingApprovalsAsCancelled(ctx.pendingApprovals);
-      yield* Effect.ignore(
-        ctx.acp.cancel.pipe(
-          Effect.mapError((error) =>
+      // Soft cancel first (best effort). The per-turn watchdog force-terminates
+      // the session if Devin doesn't honour it within the grace window, so the
+      // stop button always recovers the turn even when Devin's harness is wedged.
+      if (ctx.activeTurn) {
+        yield* acpRequestInterrupt({
+          provider: PROVIDER,
+          threadId,
+          turnId: ctx.activeTurn.turnId,
+          acp: ctx.acp,
+          activeTurn: ctx.activeTurn,
+          isPaused: () => ctx.pendingApprovals.size > 0,
+          options: turnGuardOptions,
+          offerRuntimeEvent,
+          makeEventStamp,
+          stopSession: (exit) =>
+            stopSessionInternal(ctx, {
+              reason: exit.reason,
+              recoverable: exit.recoverable,
+            }),
+          mapPromptError: (error) =>
             mapAcpToAdapterError(PROVIDER, threadId, "session/cancel", error),
+        });
+      } else {
+        // No active turn in this process — best-effort soft cancel so a
+        // concurrent turn (if any) observes it.
+        yield* Effect.ignore(
+          ctx.acp.cancel.pipe(
+            Effect.mapError((error) =>
+              mapAcpToAdapterError(PROVIDER, threadId, "session/cancel", error),
+            ),
           ),
-        ),
-      );
+        );
+      }
     });
 
   const respondToRequest: ProviderAdapterShape<ProviderAdapterError>["respondToRequest"] = (
@@ -748,13 +866,14 @@ export const makeDevinAdapter = Effect.fn("makeDevinAdapter")(function* (
     });
 
   const stopAll: ProviderAdapterShape<ProviderAdapterError>["stopAll"] = () =>
-    Effect.forEach(Array.from(sessions.values()), stopSessionInternal, { discard: true });
+    Effect.forEach(Array.from(sessions.values()), (ctx) => stopSessionInternal(ctx), {
+      discard: true,
+    });
 
   yield* Effect.acquireRelease(Effect.void, () =>
-    Effect.forEach(Array.from(sessions.values()), stopSessionInternal, { discard: true }).pipe(
-      Effect.andThen(PubSub.shutdown(runtimeEventPubSub)),
-      Effect.ignore,
-    ),
+    Effect.forEach(Array.from(sessions.values()), (ctx) => stopSessionInternal(ctx), {
+      discard: true,
+    }).pipe(Effect.andThen(PubSub.shutdown(runtimeEventPubSub)), Effect.ignore),
   );
 
   return {

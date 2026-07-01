@@ -942,6 +942,18 @@ export const makeAntigravitySdkAdapter = Effect.fn("makeAntigravitySdkAdapter")(
             yield* Fiber.interrupt(session.activeTurnFiber).pipe(Effect.ignoreCause);
             session.activeTurnFiber = undefined;
           }
+          // Emit a terminating turn.completed so the orchestration layer
+          // reconciles the thread out of the "running" state even when the
+          // agent's prompt fiber was interrupted before it could emit one.
+          if (session.currentTurnId) {
+            const completedBase = yield* makeEventBase(session, session.currentTurnId);
+            yield* Queue.offer(runtimeEventQueue, {
+              ...completedBase,
+              type: "turn.completed",
+              payload: { state: "interrupted" },
+            });
+            session.currentTurnId = undefined;
+          }
         }),
       ),
     );

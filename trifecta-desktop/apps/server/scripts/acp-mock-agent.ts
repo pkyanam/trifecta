@@ -21,6 +21,13 @@ const emitAskQuestion = process.env.BELWEAVE_ACP_EMIT_ASK_QUESTION === "1";
 const failSetConfigOption = process.env.BELWEAVE_ACP_FAIL_SET_CONFIG_OPTION === "1";
 const exitOnSetConfigOption = process.env.BELWEAVE_ACP_EXIT_ON_SET_CONFIG_OPTION === "1";
 const promptResponseText = process.env.BELWEAVE_ACP_PROMPT_RESPONSE_TEXT;
+// Simulate a wedged harness: the prompt request never resolves and `session/cancel`
+// is ignored (used to exercise the idle watchdog + force-after-grace teardown).
+const hangPrompt = process.env.BELWEAVE_ACP_HANG_PROMPT === "1";
+// Simulate a harness that hangs but *does* honour `session/cancel`, resolving the
+// in-flight prompt with `stopReason: "cancelled"` (the graceful soft-cancel path).
+const hangUntilCancel = process.env.BELWEAVE_ACP_HANG_UNTIL_CANCEL === "1";
+const stderrPreamble = process.env.BELWEAVE_ACP_STDERR_PREAMBLE;
 const sessionId = "mock-session-1";
 
 let currentModeId = "ask";
@@ -56,6 +63,12 @@ process.once("SIGINT", () => {
 process.once("exit", (code) => {
   logExit(`exit:${code}`);
 });
+
+// Optional stderr preamble, used to verify the runtime captures a stderr tail
+// for diagnostics when a turn is force-terminated.
+if (stderrPreamble) {
+  process.stderr.write(`${stderrPreamble}\n`);
+}
 
 function configOptions(): ReadonlyArray<AcpSchema.SessionConfigOption> {
   if (parameterizedModelPicker) {
@@ -316,6 +329,20 @@ const program = Effect.gen(function* () {
   yield* agent.handlePrompt((request) =>
     Effect.gen(function* () {
       const requestedSessionId = String(request.sessionId ?? sessionId);
+
+      if (hangUntilCancel) {
+        // Hang until a `session/cancel` notification arrives, then resolve the
+        // in-flight prompt as cancelled (the graceful soft-cancel path).
+        while (!cancelledSessions.delete(requestedSessionId)) {
+          yield* Effect.sleep("25 millis");
+        }
+        return { stopReason: "cancelled" };
+      }
+
+      if (hangPrompt) {
+        // Never resolve and ignore cancellation — a fully wedged harness.
+        return yield* Effect.never;
+      }
 
       if (emitInterleavedAssistantToolCalls) {
         const toolCallId = "tool-call-1";

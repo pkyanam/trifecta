@@ -1,4 +1,9 @@
-import type { OrchestrationEvent, OrchestrationReadModel, ThreadId } from "@belweave/contracts";
+import type {
+  OrchestrationEvent,
+  OrchestrationLatestTurn,
+  OrchestrationReadModel,
+  ThreadId,
+} from "@belweave/contracts";
 import {
   OrchestrationCheckpointSummary,
   OrchestrationMessage,
@@ -36,6 +41,34 @@ function checkpointStatusToLatestTurnState(status: "ready" | "missing" | "error"
   if (status === "error") return "error" as const;
   if (status === "missing") return "interrupted" as const;
   return "completed" as const;
+}
+
+/**
+ * Settle a `latestTurn` that is still marked `running` once its session no
+ * longer has an active turn. A turn cannot logically be "running" when the
+ * session reports no `activeTurnId`, so this enforces that invariant.
+ *
+ * Critically, the UI's "Working…" indicator stays on until `completedAt` is
+ * set (see `isLatestTurnSettled`). The normal happy path sets it via the
+ * checkpoint `thread.turn-diff-completed` event, but that only fires when a
+ * real `turn.completed` runtime event arrives. For an interrupted or
+ * "glitched" turn (the in-flight fiber ended without emitting completion, or
+ * there was no live session at all), no such event ever comes — so without
+ * this the thread is stuck "Working" forever even after the session is
+ * reconciled. A later `thread.turn-diff-completed` (if one does arrive) still
+ * refines the state and timestamp.
+ */
+function settleStuckRunningTurn(
+  latestTurn: OrchestrationLatestTurn | null,
+  sessionStatus: OrchestrationSession["status"],
+  occurredAt: string,
+): OrchestrationLatestTurn | null {
+  if (!latestTurn || latestTurn.state !== "running" || latestTurn.completedAt !== null) {
+    return latestTurn;
+  }
+  const state =
+    sessionStatus === "error" ? "error" : sessionStatus === "stopped" ? "interrupted" : "completed";
+  return { ...latestTurn, state, completedAt: occurredAt };
 }
 
 function updateThread(
@@ -461,7 +494,7 @@ export function projectEvent(
                         ? thread.latestTurn.assistantMessageId
                         : null,
                   }
-                : thread.latestTurn,
+                : settleStuckRunningTurn(thread.latestTurn, session.status, event.occurredAt),
             updatedAt: event.occurredAt,
           }),
         };

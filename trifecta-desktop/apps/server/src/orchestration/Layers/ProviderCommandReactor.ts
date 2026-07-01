@@ -15,6 +15,7 @@ import {
 import { isTemporaryWorktreeBranch, WORKTREE_BRANCH_PREFIX } from "@belweave/shared/git";
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
@@ -789,6 +790,38 @@ const make = Effect.gen(function* () {
       .pipe(Effect.catchCause(recoverTurnStartFailure), Effect.forkScoped);
   });
 
+  /**
+   * Force a thread out of the "running"/active-turn state after an interrupt
+   * (or on startup for orphaned turns). Idempotent: no-op when the thread has
+   * no session or is already settled.
+   */
+  const reconcileInterruptedTurn = Effect.fnUntraced(function* (
+    threadId: ThreadId,
+    createdAt: string,
+  ) {
+    const thread = yield* resolveThread(threadId);
+    const session = thread?.session;
+    if (!session || session.status === "stopped") {
+      return;
+    }
+    const isRunning = session.status === "running";
+    const hasActiveTurn = session.activeTurnId != null;
+    const hasRunningLatestTurn = thread?.latestTurn?.state === "running";
+    if (!isRunning && !hasActiveTurn && !hasRunningLatestTurn) {
+      return;
+    }
+    yield* setThreadSession({
+      threadId,
+      session: {
+        ...session,
+        status: "ready",
+        activeTurnId: null,
+        updatedAt: createdAt,
+      },
+      createdAt,
+    });
+  });
+
   const processTurnInterruptRequested = Effect.fn("processTurnInterruptRequested")(function* (
     event: Extract<ProviderIntentEvent, { type: "thread.turn-interrupt-requested" }>,
   ) {
@@ -808,8 +841,29 @@ const make = Effect.gen(function* () {
       });
     }
 
-    // Orchestration turn ids are not provider turn ids, so interrupt by session.
-    yield* providerService.interruptTurn({ threadId: event.payload.threadId });
+    // Ask the provider to interrupt (best-effort). A healthy live turn stops
+    // via soft-cancel + the adapter watchdog (which will kill a wedged
+    // subprocess within the grace window). We deliberately do NOT depend on a
+    // terminating `turn.completed` arriving, because a glitched/orphaned turn
+    // (fiber gone, or a session created before a code update) may never emit
+    // one — that is exactly the "stuck Working for hours" case.
+    yield* providerService.interruptTurn({ threadId: event.payload.threadId }).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("provider.turn.interrupt.failed", {
+          threadId: event.payload.threadId,
+          cause: Cause.pretty(cause),
+        }),
+      ),
+    );
+
+    // Authoritatively reconcile the projection so the stop button reliably
+    // takes effect: clear the active turn and drop out of "running". This
+    // deterministically clears BOTH signals the UI keys off — the red stop
+    // button (`session.status === "running"`) and the "Working…" indicator
+    // (`latestTurn.completedAt`, which the projector settles on this event).
+    // The soft-cancel + watchdog above still tear down the actual subprocess;
+    // a later `turn.completed` from a healthy turn is idempotent here.
+    yield* reconcileInterruptedTurn(event.payload.threadId, event.payload.createdAt);
   });
 
   const processApprovalResponseRequested = Effect.fn("processApprovalResponseRequested")(function* (
@@ -989,6 +1043,46 @@ const make = Effect.gen(function* () {
 
   const worker = yield* makeDrainableWorker(processDomainEventSafely);
 
+  // On boot there are no live adapter sessions, so any thread the projection
+  // still shows as "running" (or with an active/running turn) is an orphaned,
+  // unrecoverable turn left over from a previous process — e.g. the app was
+  // quit or crashed mid-turn. Reconcile them so they don't show "Working"
+  // forever. This self-heals stuck sessions on restart without the user having
+  // to press stop.
+  const reconcileOrphanedTurnsOnStartup = Effect.fnUntraced(function* () {
+    const snapshot = yield* projectionSnapshotQuery.getSnapshot().pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("provider.startup-reconcile.snapshot-failed", {
+          cause: Cause.pretty(cause),
+        }).pipe(Effect.as(undefined)),
+      ),
+    );
+    if (!snapshot) {
+      return;
+    }
+    const now = DateTime.formatIso(yield* DateTime.now);
+    for (const thread of snapshot.threads) {
+      const session = thread.session;
+      const orphaned =
+        session != null &&
+        session.status !== "stopped" &&
+        (session.status === "running" ||
+          session.activeTurnId != null ||
+          thread.latestTurn?.state === "running");
+      if (!orphaned) {
+        continue;
+      }
+      yield* reconcileInterruptedTurn(thread.id, now).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("provider.startup-reconcile.failed", {
+            threadId: thread.id,
+            cause: Cause.pretty(cause),
+          }),
+        ),
+      );
+    }
+  });
+
   const start: ProviderCommandReactorShape["start"] = Effect.fn("start")(function* () {
     const processEvent = Effect.fn("processEvent")(function* (event: OrchestrationEvent) {
       if (
@@ -1006,6 +1100,10 @@ const make = Effect.gen(function* () {
     yield* Effect.forkScoped(
       Stream.runForEach(orchestrationEngine.streamDomainEvents, processEvent),
     );
+
+    // Self-heal orphaned "running" turns from a previous process. Forked so a
+    // slow/large projection scan never blocks reactor startup.
+    yield* Effect.forkScoped(reconcileOrphanedTurnsOnStartup());
   });
 
   return {

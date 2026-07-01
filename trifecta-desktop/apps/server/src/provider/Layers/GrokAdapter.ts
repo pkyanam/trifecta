@@ -24,6 +24,7 @@ import {
   type ThreadId,
   TurnId,
 } from "@belweave/contracts";
+import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -52,6 +53,13 @@ import {
 } from "../Errors.ts";
 import { acpPermissionOutcome, mapAcpToAdapterError } from "../acp/AcpAdapterSupport.ts";
 import { type AcpSessionRuntimeShape } from "../acp/AcpSessionRuntime.ts";
+import {
+  type AcpActiveTurn,
+  type AcpTurnGuardDeps,
+  type AcpTurnGuardOptions,
+  acpRequestInterrupt,
+  runAcpWatchedPrompt,
+} from "../acp/AcpTurnGuard.ts";
 import {
   makeAcpAssistantItemEvent,
   makeAcpContentDeltaEvent,
@@ -97,6 +105,8 @@ export interface GrokAdapterLiveOptions {
    * without rebuilding the adapter. Defaults to "no MCP servers".
    */
   readonly resolveMcpServers?: Effect.Effect<ReadonlyArray<EffectAcpSchema.McpServer>>;
+  /** Overrides for turn watchdog/interrupt timing (primarily for tests). */
+  readonly turnTimeouts?: AcpTurnGuardOptions;
 }
 
 interface PendingApproval {
@@ -118,6 +128,7 @@ interface GrokSessionContext {
   readonly turns: Array<{ id: TurnId; items: Array<unknown> }>;
   lastPlanFingerprint: string | undefined;
   activeTurnId: TurnId | undefined;
+  activeTurn: AcpActiveTurn | undefined;
   stopped: boolean;
 }
 
@@ -289,7 +300,10 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
       return Effect.succeed(ctx);
     };
 
-    const stopSessionInternal = (ctx: GrokSessionContext) =>
+    const stopSessionInternal = (
+      ctx: GrokSessionContext,
+      exit?: { readonly reason: string; readonly recoverable: boolean },
+    ) =>
       Effect.gen(function* () {
         if (ctx.stopped) return;
         ctx.stopped = true;
@@ -305,7 +319,9 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
           ...(yield* makeEventStamp()),
           provider: PROVIDER,
           threadId: ctx.threadId,
-          payload: { exitKind: "graceful" },
+          payload: exit
+            ? { reason: exit.reason, recoverable: exit.recoverable, exitKind: "error" }
+            : { exitKind: "graceful" },
         });
       });
 
@@ -532,6 +548,7 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
             turns: [],
             lastPlanFingerprint: undefined,
             activeTurnId: undefined,
+            activeTurn: undefined,
             stopped: false,
           };
 
@@ -733,35 +750,70 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
           });
         }
 
-        const result = yield* ctx.acp
-          .prompt({
-            prompt: promptParts,
-          })
-          .pipe(
-            Effect.mapError((error) =>
-              mapAcpToAdapterError(PROVIDER, input.threadId, "session/prompt", error),
-            ),
-          );
-
-        ctx.turns.push({ id: turnId, items: [{ prompt: promptParts, result }] });
-        ctx.session = {
-          ...ctx.session,
-          activeTurnId: turnId,
-          updatedAt: yield* nowIso,
-          ...(displayModel ? { model: displayModel } : {}),
+        const activeTurn: AcpActiveTurn = {
+          turnId,
+          lastActivityAt: yield* Clock.currentTimeMillis,
+          interruptRequestedAt: undefined,
         };
+        ctx.activeTurn = activeTurn;
 
-        yield* offerRuntimeEvent({
-          type: "turn.completed",
-          ...(yield* makeEventStamp()),
+        const guardDeps: AcpTurnGuardDeps = {
           provider: PROVIDER,
           threadId: input.threadId,
           turnId,
-          payload: {
-            state: result.stopReason === "cancelled" ? "cancelled" : "completed",
-            stopReason: result.stopReason ?? null,
-          },
-        });
+          acp: ctx.acp,
+          activeTurn,
+          isPaused: () => ctx.pendingApprovals.size > 0 || ctx.pendingUserInputs.size > 0,
+          options: options?.turnTimeouts ?? {},
+          offerRuntimeEvent,
+          makeEventStamp,
+          stopSession: (exit) =>
+            stopSessionInternal(ctx, {
+              reason: exit.reason,
+              recoverable: exit.recoverable,
+            }),
+          mapPromptError: (error) =>
+            mapAcpToAdapterError(PROVIDER, input.threadId, "session/prompt", error),
+        };
+
+        const outcome = yield* runAcpWatchedPrompt(guardDeps, promptParts).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              if (ctx.activeTurn === activeTurn) {
+                ctx.activeTurn = undefined;
+                ctx.activeTurnId = undefined;
+              }
+            }),
+          ),
+        );
+
+        ctx.session = { ...ctx.session, activeTurnId: undefined, updatedAt: yield* nowIso };
+
+        if (outcome.kind === "natural") {
+          const result = outcome.response;
+          ctx.turns.push({ id: turnId, items: [{ prompt: promptParts, result }] });
+          ctx.session = {
+            ...ctx.session,
+            activeTurnId: turnId,
+            updatedAt: yield* nowIso,
+            ...(displayModel ? { model: displayModel } : {}),
+          };
+
+          yield* offerRuntimeEvent({
+            type: "turn.completed",
+            ...(yield* makeEventStamp()),
+            provider: PROVIDER,
+            threadId: input.threadId,
+            turnId,
+            payload: {
+              state: result.stopReason === "cancelled" ? "cancelled" : "completed",
+              stopReason: result.stopReason ?? null,
+            },
+          });
+        }
+
+        // Forced end: the shared guard already emitted `turn.completed` (and,
+        // for timeouts, a diagnostic `runtime.error`) and tore the session down.
 
         return {
           threadId: input.threadId,
@@ -775,13 +827,37 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
         const ctx = yield* requireSession(threadId);
         yield* settlePendingApprovalsAsCancelled(ctx.pendingApprovals);
         yield* settlePendingUserInputsAsEmptyAnswers(ctx.pendingUserInputs);
-        yield* Effect.ignore(
-          ctx.acp.cancel.pipe(
-            Effect.mapError((error) =>
+        // Soft cancel first (best effort). The per-turn watchdog force-terminates
+        // the session if Grok doesn't honour it within the grace window, so the
+        // stop button always recovers the turn even when Grok's harness is wedged.
+        if (ctx.activeTurn) {
+          yield* acpRequestInterrupt({
+            provider: PROVIDER,
+            threadId,
+            turnId: ctx.activeTurn.turnId,
+            acp: ctx.acp,
+            activeTurn: ctx.activeTurn,
+            isPaused: () => ctx.pendingApprovals.size > 0 || ctx.pendingUserInputs.size > 0,
+            options: options?.turnTimeouts ?? {},
+            offerRuntimeEvent,
+            makeEventStamp,
+            stopSession: (exit) =>
+              stopSessionInternal(ctx, {
+                reason: exit.reason,
+                recoverable: exit.recoverable,
+              }),
+            mapPromptError: (error) =>
               mapAcpToAdapterError(PROVIDER, threadId, "session/cancel", error),
+          });
+        } else {
+          yield* Effect.ignore(
+            ctx.acp.cancel.pipe(
+              Effect.mapError((error) =>
+                mapAcpToAdapterError(PROVIDER, threadId, "session/cancel", error),
+              ),
             ),
-          ),
-        );
+          );
+        }
       });
 
     const respondToRequest: GrokAdapterShape["respondToRequest"] = (
@@ -860,10 +936,10 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
       });
 
     const stopAll: GrokAdapterShape["stopAll"] = () =>
-      Effect.forEach(sessions.values(), stopSessionInternal, { discard: true });
+      Effect.forEach(sessions.values(), (ctx) => stopSessionInternal(ctx), { discard: true });
 
     yield* Effect.addFinalizer(() =>
-      Effect.forEach(sessions.values(), stopSessionInternal, { discard: true }).pipe(
+      Effect.forEach(sessions.values(), (ctx) => stopSessionInternal(ctx), { discard: true }).pipe(
         Effect.tap(() => PubSub.shutdown(runtimeEventPubSub)),
         Effect.tap(() => managedNativeEventLogger?.close() ?? Effect.void),
       ),

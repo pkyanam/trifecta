@@ -715,22 +715,47 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
       });
       let metricProvider = "unknown";
       return yield* Effect.gen(function* () {
+        // Interrupts must NOT recover a session — if there's no live adapter
+        // session (e.g. after an app restart), there's nothing to interrupt at
+        // the adapter level. The caller (ProviderCommandReactor) is responsible
+        // for authoritatively terminating the turn in that case.
         const routed = yield* resolveRoutableSession({
           threadId: input.threadId,
           operation: "ProviderService.interruptTurn",
-          allowRecovery: true,
+          allowRecovery: false,
         });
         metricProvider = routed.adapter.provider;
+
+        // Determine whether the adapter actually has a live in-flight turn.
+        // The adapter clears `session.activeTurnId` in its turn-fiber teardown
+        // (`ensuring`), so a set value reliably means the turn fiber — and thus
+        // its watchdog — is still alive and WILL emit a terminating
+        // `turn.completed`. A live session whose `activeTurnId` is already
+        // cleared is a "glitched" turn: the fiber ended without emitting
+        // completion, so the caller must reconcile the stuck projection.
+        let interruptedActiveTurn = false;
+        if (routed.isActive) {
+          const sessions = yield* routed.adapter.listSessions();
+          const session = sessions.find((s) => s.threadId === routed.threadId);
+          interruptedActiveTurn = session?.activeTurnId != null;
+          // Soft-cancel regardless (harmless if there's no in-flight turn).
+          yield* routed.adapter.interruptTurn(routed.threadId, input.turnId);
+        }
+
         yield* Effect.annotateCurrentSpan({
           "provider.operation": "interrupt-turn",
           "provider.kind": routed.adapter.provider,
           "provider.thread_id": input.threadId,
           "provider.turn_id": input.turnId,
+          "provider.has_live_session": routed.isActive,
+          "provider.interrupted_active_turn": interruptedActiveTurn,
         });
-        yield* routed.adapter.interruptTurn(routed.threadId, input.turnId);
         yield* analytics.record("provider.turn.interrupted", {
           provider: routed.adapter.provider,
+          hadLiveSession: routed.isActive,
+          interruptedActiveTurn,
         });
+        return { hadLiveSession: routed.isActive, interruptedActiveTurn } as const;
       }).pipe(
         withMetrics({
           counter: providerTurnsTotal,

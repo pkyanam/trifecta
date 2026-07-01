@@ -5,7 +5,7 @@ import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { assert, it } from "@effect/vitest";
+import { assert, describe, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -1312,5 +1312,126 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
         yield* adapter.stopSession(threadId);
       }).pipe(Effect.provide(customAdapterLayer));
     },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Turn lifecycle (watchdog + forceful interrupt) — uses the shared AcpTurnGuard.
+// These mirror the DevinAdapter turn-lifecycle tests but exercise the
+// CursorAdapter wiring of the shared helper. They run on the live clock
+// because the watchdog relies on real time advancing.
+// ---------------------------------------------------------------------------
+
+const CursorTurnLifecycleTestServices = ServerConfig.layerTest(process.cwd(), {
+  prefix: "belweave-cursor-turn-lifecycle-test-",
+}).pipe(Layer.provideMerge(NodeServices.layer));
+
+const collectTurnLifecycleEvents = (
+  adapter: { readonly streamEvents: Stream.Stream<ProviderRuntimeEvent, never> },
+  sink: Array<ProviderRuntimeEvent>,
+) =>
+  Stream.runForEach(adapter.streamEvents, (event) =>
+    Effect.sync(() => {
+      sink.push(event);
+    }),
+  ).pipe(Effect.forkChild);
+
+const waitForTurnLifecycleEvent = (
+  events: ReadonlyArray<ProviderRuntimeEvent>,
+  predicate: (event: ProviderRuntimeEvent) => boolean,
+  label: string,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      if (events.some(predicate)) return;
+      yield* Effect.sleep("10 millis");
+    }
+    return yield* Effect.die(new Error(`Timed out waiting for event: ${label}`));
+  });
+
+describe("CursorAdapter turn lifecycle (shared AcpTurnGuard)", () => {
+  it.live("force-ends and tears down a turn that goes idle past the watchdog timeout", () =>
+    Effect.gen(function* () {
+      const wrapperPath = yield* Effect.promise(() =>
+        makeMockAgentWrapper({
+          BELWEAVE_ACP_HANG_PROMPT: "1",
+          BELWEAVE_ACP_STDERR_PREAMBLE: "cursor-harness-panic",
+        }),
+      );
+      const cursorConfig = decodeCursorSettings({ binaryPath: wrapperPath });
+      const adapter = yield* makeCursorAdapter(cursorConfig, {
+        resolveSettings: Effect.succeed(cursorConfig),
+        turnTimeouts: { idleTimeoutMs: 150, watchdogTickMs: 20, interruptGraceMs: 60_000 },
+      });
+      const threadId = ThreadId.make("cursor-idle-timeout");
+      const events: Array<ProviderRuntimeEvent> = [];
+      yield* collectTurnLifecycleEvents(adapter, events);
+
+      yield* adapter.startSession({
+        threadId,
+        provider: ProviderDriverKind.make("cursor"),
+        cwd: process.cwd(),
+        runtimeMode: "full-access",
+        modelSelection: { instanceId: ProviderInstanceId.make("cursor"), model: "default" },
+      });
+
+      // sendTurn blocks until the idle watchdog force-ends the turn.
+      yield* adapter.sendTurn({ threadId, input: "work forever", attachments: [] });
+
+      const runtimeError = events.find((e) => e.type === "runtime.error");
+      assert.isDefined(runtimeError);
+      if (runtimeError?.type === "runtime.error") {
+        assert.match(runtimeError.payload.message, /no activity/i);
+        assert.include(runtimeError.payload.message, "cursor-harness-panic");
+      }
+
+      const completed = events.find((e) => e.type === "turn.completed");
+      assert.isDefined(completed);
+      if (completed?.type === "turn.completed") {
+        assert.equal(completed.payload.state, "failed");
+      }
+      assert.isDefined(events.find((e) => e.type === "session.exited"));
+      assert.isFalse(yield* adapter.hasSession(threadId));
+    }).pipe(Effect.scoped, Effect.provide(CursorTurnLifecycleTestServices)),
+  );
+
+  it.live("force-ends and tears down when Cursor ignores the interrupt past the grace window", () =>
+    Effect.gen(function* () {
+      const wrapperPath = yield* Effect.promise(() =>
+        makeMockAgentWrapper({ BELWEAVE_ACP_HANG_PROMPT: "1" }),
+      );
+      const cursorConfig = decodeCursorSettings({ binaryPath: wrapperPath });
+      const adapter = yield* makeCursorAdapter(cursorConfig, {
+        resolveSettings: Effect.succeed(cursorConfig),
+        turnTimeouts: { idleTimeoutMs: 60_000, watchdogTickMs: 20, interruptGraceMs: 100 },
+      });
+      const threadId = ThreadId.make("cursor-force-interrupt");
+      const events: Array<ProviderRuntimeEvent> = [];
+      yield* collectTurnLifecycleEvents(adapter, events);
+
+      yield* adapter.startSession({
+        threadId,
+        provider: ProviderDriverKind.make("cursor"),
+        cwd: process.cwd(),
+        runtimeMode: "full-access",
+        modelSelection: { instanceId: ProviderInstanceId.make("cursor"), model: "default" },
+      });
+
+      const turnFiber = yield* adapter
+        .sendTurn({ threadId, input: "ignore my cancel", attachments: [] })
+        .pipe(Effect.forkChild);
+
+      yield* waitForTurnLifecycleEvent(events, (e) => e.type === "turn.started", "turn.started");
+      yield* adapter.interruptTurn(threadId);
+
+      yield* Fiber.join(turnFiber);
+
+      const completed = events.find((e) => e.type === "turn.completed");
+      assert.isDefined(completed);
+      if (completed?.type === "turn.completed") {
+        assert.equal(completed.payload.state, "interrupted");
+      }
+      assert.isDefined(events.find((e) => e.type === "session.exited"));
+    }).pipe(Effect.scoped, Effect.provide(CursorTurnLifecycleTestServices)),
   );
 });

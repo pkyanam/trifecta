@@ -53,10 +53,22 @@ export interface ProviderServiceShape {
 
   /**
    * Interrupt a running provider turn.
+   *
+   * - `hadLiveSession`: an in-memory adapter session was bound to the thread.
+   * - `interruptedActiveTurn`: the adapter had a live in-flight turn that was
+   *   asked to stop. When this is `true` a terminating `turn.completed` WILL be
+   *   emitted (by the adapter's watchdog or fiber-interrupt path), so the caller
+   *   must NOT touch the projection. When `false` (no live session, or a live
+   *   session whose turn fiber already ended without emitting `turn.completed`
+   *   — a "glitched" turn), no terminating event will arrive and the caller is
+   *   responsible for authoritatively reconciling the stuck turn.
    */
   readonly interruptTurn: (
     input: ProviderInterruptTurnInput,
-  ) => Effect.Effect<void, ProviderServiceError>;
+  ) => Effect.Effect<
+    { readonly hadLiveSession: boolean; readonly interruptedActiveTurn: boolean },
+    ProviderServiceError
+  >;
 
   /**
    * Respond to a provider approval request.

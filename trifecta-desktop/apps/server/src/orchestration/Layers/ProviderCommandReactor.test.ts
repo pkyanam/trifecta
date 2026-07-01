@@ -50,7 +50,10 @@ import {
   providerErrorLabelFromInstanceHint,
   ProviderCommandReactorLive,
 } from "./ProviderCommandReactor.ts";
-import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
+import {
+  OrchestrationEngineService,
+  type OrchestrationEngineShape,
+} from "../Services/OrchestrationEngine.ts";
 import { ProviderCommandReactor } from "../Services/ProviderCommandReactor.ts";
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -142,6 +145,7 @@ describe("ProviderCommandReactor", () => {
     readonly baseDir?: string;
     readonly threadModelSelection?: ModelSelection;
     readonly sessionModelSwitch?: "unsupported" | "in-session";
+    readonly seedBeforeStart?: (engine: OrchestrationEngineShape) => Promise<void>;
   }) {
     const now = "2026-01-01T00:00:00.000Z";
     const baseDir = input?.baseDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "belweave-reactor-"));
@@ -217,7 +221,9 @@ describe("ProviderCommandReactor", () => {
         turnId: asTurnId("turn-1"),
       }),
     );
-    const interruptTurn = vi.fn((_: unknown) => Effect.void);
+    const interruptTurn = vi.fn((_: unknown) =>
+      Effect.succeed({ hadLiveSession: true, interruptedActiveTurn: true }),
+    );
     const respondToRequest = vi.fn<ProviderServiceShape["respondToRequest"]>(() => Effect.void);
     const respondToUserInput = vi.fn<ProviderServiceShape["respondToUserInput"]>(() => Effect.void);
     const stopSession = vi.fn((input: unknown) =>
@@ -365,6 +371,9 @@ describe("ProviderCommandReactor", () => {
     const snapshotQuery = await runtime.runPromise(Effect.service(ProjectionSnapshotQuery));
     const reactor = await runtime.runPromise(Effect.service(ProviderCommandReactor));
     scope = await Effect.runPromise(Scope.make("sequential"));
+    if (input?.seedBeforeStart) {
+      await input.seedBeforeStart(engine);
+    }
     await Effect.runPromise(reactor.start().pipe(Scope.provide(scope)));
     const drain = () => Effect.runPromise(reactor.drain);
 
@@ -1548,6 +1557,258 @@ describe("ProviderCommandReactor", () => {
     expect(harness.interruptTurn.mock.calls[0]?.[0]).toEqual({
       threadId: "thread-1",
     });
+
+    // Stop must reliably take effect: the reactor authoritatively reconciles
+    // the projection out of "running" and clears the active turn (this drives
+    // both the red stop button off and settles the "Working" indicator), while
+    // the provider's soft-cancel + watchdog tear down the actual subprocess.
+    await waitFor(async () => {
+      const readModel = await harness.readModel();
+      const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-1"));
+      return thread?.session?.status === "ready" && thread?.session?.activeTurnId === null;
+    });
+    const readModel = await harness.readModel();
+    const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-1"));
+    expect(thread?.session?.status).toBe("ready");
+    expect(thread?.session?.activeTurnId).toBeNull();
+  });
+
+  it("authoritatively terminates a stuck turn when the provider has no live session", async () => {
+    const harness = await createHarness();
+    const now = "2026-01-01T00:00:00.000Z";
+
+    const modelSelection = createModelSelection(ProviderInstanceId.make("codex"), "o4-mini");
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "project.create",
+        commandId: CommandId.make("cmd-project-create-stuck"),
+        projectId: asProjectId("project-stuck"),
+        title: "Stuck Project",
+        workspaceRoot: "/tmp/stuck-project",
+        defaultModelSelection: modelSelection,
+        createdAt: now,
+      }),
+    );
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("cmd-thread-create-stuck"),
+        threadId: ThreadId.make("thread-stuck"),
+        projectId: asProjectId("project-stuck"),
+        title: "Stuck Thread",
+        modelSelection,
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "approval-required",
+        branch: null,
+        worktreePath: null,
+        createdAt: now,
+      }),
+    );
+
+    // Simulate a session that is "running" with an active turn — this is the
+    // state left behind after an app restart (the persisted projection says
+    // "running" but there's no live adapter session in memory).
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.session.set",
+        commandId: CommandId.make("cmd-session-set-stuck"),
+        threadId: ThreadId.make("thread-stuck"),
+        session: {
+          threadId: ThreadId.make("thread-stuck"),
+          status: "running",
+          providerName: "codex",
+          runtimeMode: "approval-required",
+          activeTurnId: asTurnId("turn-stuck"),
+          lastError: null,
+          updatedAt: now,
+        },
+        createdAt: now,
+      }),
+    );
+
+    // Simulate the post-restart scenario: no live adapter session exists, so
+    // interruptTurn reports no live session / no active turn and emits no
+    // runtime events.
+    harness.interruptTurn.mockReturnValue(
+      Effect.succeed({ hadLiveSession: false, interruptedActiveTurn: false }),
+    );
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.turn.interrupt",
+        commandId: CommandId.make("cmd-turn-interrupt-stuck"),
+        threadId: ThreadId.make("thread-stuck"),
+        turnId: asTurnId("turn-stuck"),
+        createdAt: now,
+      }),
+    );
+
+    // The reactor should call interruptTurn (which no-ops), then detect the
+    // turn is still active and authoritatively terminate it by dispatching
+    // a thread.session.set with status "ready" and activeTurnId null.
+    await waitFor(() => harness.interruptTurn.mock.calls.length === 1);
+
+    // Wait for the projection to reflect the authoritative termination.
+    await waitFor(async () => {
+      const readModel = await harness.readModel();
+      const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-stuck"));
+      return thread?.session?.status === "ready" && thread?.session?.activeTurnId === null;
+    });
+
+    const readModel = await harness.readModel();
+    const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-stuck"));
+    expect(thread?.session?.status).toBe("ready");
+    expect(thread?.session?.activeTurnId).toBeNull();
+  });
+
+  it("reconciles a glitched turn when a live session has no in-flight turn", async () => {
+    const harness = await createHarness();
+    const now = "2026-01-01T00:00:00.000Z";
+
+    const modelSelection = createModelSelection(ProviderInstanceId.make("codex"), "o4-mini");
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "project.create",
+        commandId: CommandId.make("cmd-project-create-glitch"),
+        projectId: asProjectId("project-glitch"),
+        title: "Glitch Project",
+        workspaceRoot: "/tmp/glitch-project",
+        defaultModelSelection: modelSelection,
+        createdAt: now,
+      }),
+    );
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("cmd-thread-create-glitch"),
+        threadId: ThreadId.make("thread-glitch"),
+        projectId: asProjectId("project-glitch"),
+        title: "Glitch Thread",
+        modelSelection,
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "approval-required",
+        branch: null,
+        worktreePath: null,
+        createdAt: now,
+      }),
+    );
+
+    // Projection says "running" with an active turn, but the in-memory turn
+    // fiber already ended without emitting `turn.completed` (a glitched turn
+    // stuck for hours). The adapter still has a live session, so
+    // hadLiveSession=true, but there's no in-flight turn to interrupt.
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.session.set",
+        commandId: CommandId.make("cmd-session-set-glitch"),
+        threadId: ThreadId.make("thread-glitch"),
+        session: {
+          threadId: ThreadId.make("thread-glitch"),
+          status: "running",
+          providerName: "codex",
+          runtimeMode: "approval-required",
+          activeTurnId: asTurnId("turn-glitch"),
+          lastError: null,
+          updatedAt: now,
+        },
+        createdAt: now,
+      }),
+    );
+
+    harness.interruptTurn.mockReturnValue(
+      Effect.succeed({ hadLiveSession: true, interruptedActiveTurn: false }),
+    );
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.turn.interrupt",
+        commandId: CommandId.make("cmd-turn-interrupt-glitch"),
+        threadId: ThreadId.make("thread-glitch"),
+        turnId: asTurnId("turn-glitch"),
+        createdAt: now,
+      }),
+    );
+
+    await waitFor(() => harness.interruptTurn.mock.calls.length === 1);
+    await waitFor(async () => {
+      const readModel = await harness.readModel();
+      const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-glitch"));
+      return thread?.session?.status === "ready" && thread?.session?.activeTurnId === null;
+    });
+
+    const readModel = await harness.readModel();
+    const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-glitch"));
+    expect(thread?.session?.status).toBe("ready");
+    expect(thread?.session?.activeTurnId).toBeNull();
+  });
+
+  it("auto-heals orphaned running turns on startup (no live session survives a restart)", async () => {
+    const now = "2026-01-01T00:00:00.000Z";
+    const modelSelection = createModelSelection(ProviderInstanceId.make("codex"), "o4-mini");
+
+    // Seed a thread whose projection was left "running" with an active turn by
+    // a previous process (the app quit/crashed mid-turn). On the fresh process
+    // there is no live adapter session, so the reactor should settle it at
+    // startup without any user interaction.
+    const harness = await createHarness({
+      seedBeforeStart: async (engine) => {
+        await Effect.runPromise(
+          engine.dispatch({
+            type: "project.create",
+            commandId: CommandId.make("cmd-project-create-orphan"),
+            projectId: asProjectId("project-orphan"),
+            title: "Orphan Project",
+            workspaceRoot: "/tmp/orphan-project",
+            defaultModelSelection: modelSelection,
+            createdAt: now,
+          }),
+        );
+        await Effect.runPromise(
+          engine.dispatch({
+            type: "thread.create",
+            commandId: CommandId.make("cmd-thread-create-orphan"),
+            threadId: ThreadId.make("thread-orphan"),
+            projectId: asProjectId("project-orphan"),
+            title: "Orphan Thread",
+            modelSelection,
+            interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+            runtimeMode: "approval-required",
+            branch: null,
+            worktreePath: null,
+            createdAt: now,
+          }),
+        );
+        await Effect.runPromise(
+          engine.dispatch({
+            type: "thread.session.set",
+            commandId: CommandId.make("cmd-session-set-orphan"),
+            threadId: ThreadId.make("thread-orphan"),
+            session: {
+              threadId: ThreadId.make("thread-orphan"),
+              status: "running",
+              providerName: "codex",
+              runtimeMode: "approval-required",
+              activeTurnId: asTurnId("turn-orphan"),
+              lastError: null,
+              updatedAt: now,
+            },
+            createdAt: now,
+          }),
+        );
+      },
+    });
+
+    await waitFor(async () => {
+      const readModel = await harness.readModel();
+      const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-orphan"));
+      return thread?.session?.status === "ready" && thread?.session?.activeTurnId === null;
+    });
+
+    const readModel = await harness.readModel();
+    const thread = readModel.threads.find((entry) => entry.id === ThreadId.make("thread-orphan"));
+    expect(thread?.session?.status).toBe("ready");
+    expect(thread?.session?.activeTurnId).toBeNull();
   });
 
   it("starts a fresh session when only projected session state exists", async () => {
