@@ -143,9 +143,9 @@ jobs:
             echo "tag=v$version" >> "$GITHUB_OUTPUT"
             echo "name=Trifecta v$version" >> "$GITHUB_OUTPUT"
             echo "cli_dist_tag=latest" >> "$GITHUB_OUTPUT"
-            # Stable-channel builds may carry a semver prerelease suffix while
-            # the product is in alpha. They must still back GitHub's Latest
-            # endpoint because electron-updater uses it for the stable track.
+            # Stable-channel builds may carry a semver prerelease suffix, but
+            # they must still back GitHub's Latest endpoint because
+            # electron-updater uses it for the stable track.
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             echo "make_latest=true" >> "$GITHUB_OUTPUT"
           fi
