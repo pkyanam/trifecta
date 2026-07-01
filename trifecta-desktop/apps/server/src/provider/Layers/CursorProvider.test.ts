@@ -24,7 +24,12 @@ import {
   parseCursorVersionDate,
   resolveCursorAcpBaseModelId,
   resolveCursorAcpConfigUpdates,
+  resolveCursorProbeCwd,
 } from "./CursorProvider.ts";
+// @effect-diagnostics-next-line nodeBuiltinImport:off
+import * as NodeFs from "node:fs";
+// @effect-diagnostics-next-line nodeBuiltinImport:off
+import * as NodePath from "node:path";
 
 const runNode = <A, E>(
   effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>,
@@ -847,5 +852,28 @@ describe("resolveCursorAcpConfigUpdates", () => {
       { configId: "effort", value: "max" },
       { configId: "thinking", value: "false" },
     ]);
+  });
+});
+
+describe("resolveCursorProbeCwd", () => {
+  it("returns an existing directory that is never the process cwd (home)", () => {
+    const probeCwd = resolveCursorProbeCwd();
+
+    // Must not be the backend process cwd ($HOME in the packaged app): running
+    // `cursor-agent acp` there makes its bundled ripgrep crawl
+    // ~/Library/Containers/*, tripping the macOS "access data from other apps"
+    // (kTCCServiceSystemPolicyAppData) prompt on every launch.
+    expect(probeCwd).not.toBe(process.cwd());
+    expect(NodeFs.existsSync(probeCwd)).toBe(true);
+    expect(NodeFs.statSync(probeCwd).isDirectory()).toBe(true);
+  });
+
+  it("is stable across calls and lives outside the home directory", () => {
+    const first = resolveCursorProbeCwd();
+    const second = resolveCursorProbeCwd();
+
+    expect(second).toBe(first);
+    expect(first.startsWith(NodePath.join(NodeOS.tmpdir()))).toBe(true);
+    expect(first.startsWith(NodeOS.homedir())).toBe(false);
   });
 });

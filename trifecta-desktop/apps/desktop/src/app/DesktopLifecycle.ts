@@ -68,6 +68,8 @@ export class DesktopLifecycle extends Context.Service<DesktopLifecycle, DesktopL
 const { logInfo: logLifecycleInfo, logError: logLifecycleError } =
   DesktopObservability.makeComponentLogger("desktop-lifecycle");
 
+const QUIT_CONFIRM_WINDOW_MS = 2500;
+
 function addScopedListener<Args extends ReadonlyArray<unknown>>(
   target: unknown,
   eventName: string,
@@ -102,6 +104,9 @@ function handleBeforeQuit(
   runEffect: <A, E>(effect: Effect.Effect<A, E, DesktopLifecycleRuntimeServices>) => Promise<A>,
   allowQuit: () => boolean,
   markQuitAllowed: () => void,
+  lastQuitAttempt: () => number,
+  setLastQuitAttempt: (value: number) => void,
+  desktopWindow: DesktopWindow.DesktopWindowShape,
 ): void {
   if (allowQuit()) {
     void runEffect(
@@ -114,23 +119,39 @@ function handleBeforeQuit(
     return;
   }
 
-  event.preventDefault();
-  void runEffect(
-    Effect.gen(function* () {
-      const state = yield* DesktopState.DesktopState;
-      yield* Ref.set(state.quitting, true);
-      yield* logLifecycleInfo("before-quit received");
-      yield* requestDesktopShutdownAndWait();
-    }).pipe(Effect.withSpan("desktop.lifecycle.beforeQuit")),
-  ).finally(() => {
-    markQuitAllowed();
+  const now = performance.now();
+  if (lastQuitAttempt() > 0 && now - lastQuitAttempt() < QUIT_CONFIRM_WINDOW_MS) {
+    // Confirmed quit: run shutdown and then re-request quit.
+    event.preventDefault();
+    setLastQuitAttempt(now);
     void runEffect(
       Effect.gen(function* () {
-        const electronApp = yield* ElectronApp.ElectronApp;
-        yield* electronApp.quit;
-      }).pipe(Effect.withSpan("desktop.lifecycle.quitAfterShutdown")),
-    );
-  });
+        const state = yield* DesktopState.DesktopState;
+        yield* Ref.set(state.quitting, true);
+        yield* logLifecycleInfo("before-quit confirmed");
+        yield* requestDesktopShutdownAndWait();
+      }).pipe(Effect.withSpan("desktop.lifecycle.beforeQuit")),
+    ).finally(() => {
+      markQuitAllowed();
+      void runEffect(
+        Effect.gen(function* () {
+          const electronApp = yield* ElectronApp.ElectronApp;
+          yield* electronApp.quit;
+        }).pipe(Effect.withSpan("desktop.lifecycle.quitAfterShutdown")),
+      );
+    });
+    return;
+  }
+
+  // First quit attempt: show the confirmation overlay and prevent quit.
+  event.preventDefault();
+  setLastQuitAttempt(now);
+  void runEffect(
+    Effect.gen(function* () {
+      yield* logLifecycleInfo("before-quit pending confirmation");
+      yield* desktopWindow.dispatchMenuAction("quit");
+    }).pipe(Effect.withSpan("desktop.lifecycle.beforeQuitPending")),
+  );
 }
 
 function quitFromSignal(
@@ -190,6 +211,7 @@ export const layer = Layer.succeed(
       const context = yield* Effect.context<DesktopLifecycleRuntimeServices>();
       const runEffect = Effect.runPromiseWith(context);
       let quitAllowed = false;
+      let lastQuitAttempt = 0;
       yield* electronTheme.onUpdated(() => {
         void runEffect(
           desktopWindow.syncAppearance.pipe(Effect.withSpan("desktop.lifecycle.themeUpdated")),
@@ -203,6 +225,11 @@ export const layer = Layer.succeed(
           () => {
             quitAllowed = true;
           },
+          () => lastQuitAttempt,
+          (value) => {
+            lastQuitAttempt = value;
+          },
+          desktopWindow,
         );
       });
       yield* electronApp.on("activate", () => {

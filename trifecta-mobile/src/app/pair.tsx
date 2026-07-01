@@ -24,6 +24,7 @@ const NPX_COMMAND = "npx @belweave/trifecta";
 
 const TIPS = [
   "Open the desktop app → Settings → Connections → copy the pairing URL",
+  "Both Trifecta and T3 Code pairing URLs work — the app detects the server automatically",
   "HTTPS and Cloudflare Tunnel URLs work — the app upgrades to WSS automatically",
   "Use Tailscale or stay on the same LAN when not using a public tunnel",
   "Pairing tokens are one-time. After exchange, this app keeps a persistent session in your keychain",
@@ -92,10 +93,10 @@ export default function PairScreen() {
     try {
       // Use platform-specific URL for connection
       const platformURL = getServerURLForPlatform(url);
-      await fetchEnvironment(platformURL);
-      const result = await exchangeToken(platformURL, tok);
+      const flavor = await fetchEnvironment(platformURL);
+      const result = await exchangeToken(platformURL, tok, flavor);
       // Store the original URL (not the Android alias) for consistency
-      await pair(url, result.bearerToken);
+      await pair(url, result.bearerToken, result.flavor);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace("/");
     } catch (err) {

@@ -26,6 +26,7 @@ export class DesktopApplicationMenu extends Context.Service<
 type DesktopApplicationMenuRuntimeServices =
   | DesktopUpdates.DesktopUpdates
   | DesktopWindow.DesktopWindow
+  | ElectronApp.ElectronApp
   | ElectronDialog.ElectronDialog;
 
 const { logInfo: logUpdaterInfo } = DesktopObservability.makeComponentLogger("desktop-updater");
@@ -37,6 +38,15 @@ const dispatchMenuAction = Effect.fn("desktop.menu.dispatchMenuAction")(function
 ): Effect.fn.Return<void, DesktopWindow.DesktopWindowError, DesktopWindow.DesktopWindow> {
   const desktopWindow = yield* DesktopWindow.DesktopWindow;
   yield* desktopWindow.dispatchMenuAction(action);
+});
+
+const quitApplication = Effect.fn("desktop.menu.quitApplication")(function* (): Effect.fn.Return<
+  void,
+  never,
+  ElectronApp.ElectronApp
+> {
+  const electronApp = yield* ElectronApp.ElectronApp;
+  yield* electronApp.quit;
 });
 
 const checkForUpdatesFromMenu: Effect.Effect<
@@ -127,6 +137,9 @@ const make = Effect.gen(function* () {
     const settingsClick = () => {
       runMenuEffect("open-settings", dispatchMenuAction("open-settings"));
     };
+    const quitClick = () => {
+      runMenuEffect("quit", quitApplication());
+    };
     const template: Electron.MenuItemConstructorOptions[] = [];
 
     if (environment.platform === "darwin") {
@@ -151,7 +164,11 @@ const make = Effect.gen(function* () {
           { role: "hideOthers" },
           { role: "unhide" },
           { type: "separator" },
-          { role: "quit" },
+          {
+            label: `Quit ${appName}`,
+            accelerator: "CmdOrCtrl+Q",
+            click: quitClick,
+          },
         ],
       });
     }
@@ -170,7 +187,15 @@ const make = Effect.gen(function* () {
                 },
                 { type: "separator" as const },
               ]),
-          { role: environment.platform === "darwin" ? "close" : "quit" },
+          ...(environment.platform === "darwin"
+            ? [{ role: "close" as const }]
+            : [
+                {
+                  label: "Quit",
+                  accelerator: "CmdOrCtrl+Q",
+                  click: quitClick,
+                },
+              ]),
         ],
       },
       { role: "editMenu" },

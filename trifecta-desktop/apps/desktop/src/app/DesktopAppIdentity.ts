@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as DesktopAssets from "./DesktopAssets.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
+import { MIGRATION_MARKER } from "./DesktopLocalStorageMigration.ts";
 
 const COMMIT_HASH_PATTERN = /^[0-9a-f]{7,40}$/i;
 const COMMIT_HASH_DISPLAY_LENGTH = 12;
@@ -83,6 +84,19 @@ const make = Effect.gen(function* () {
   });
 
   const resolveUserDataPath = Effect.gen(function* () {
+    const newUserDataPath = environment.path.join(
+      environment.appDataDirectory,
+      environment.userDataDirName,
+    );
+
+    const migrationMarkerPath = environment.path.join(newUserDataPath, MIGRATION_MARKER);
+    const migrationMarkerExists = yield* fileSystem
+      .exists(migrationMarkerPath)
+      .pipe(Effect.orElseSucceed(() => false));
+    if (migrationMarkerExists) {
+      return newUserDataPath;
+    }
+
     const legacyPath = environment.path.join(
       environment.appDataDirectory,
       environment.legacyUserDataDirName,
@@ -90,9 +104,7 @@ const make = Effect.gen(function* () {
     const legacyPathExists = yield* fileSystem
       .exists(legacyPath)
       .pipe(Effect.orElseSucceed(() => false));
-    return legacyPathExists
-      ? legacyPath
-      : environment.path.join(environment.appDataDirectory, environment.userDataDirName);
+    return legacyPathExists ? legacyPath : newUserDataPath;
   }).pipe(Effect.withSpan("desktop.appIdentity.resolveUserDataPath"));
 
   const configure = Effect.gen(function* () {

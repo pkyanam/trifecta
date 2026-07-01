@@ -1,4 +1,8 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off
+import * as NodeFs from "node:fs";
 import * as NodeOs from "node:os";
+// @effect-diagnostics-next-line nodeBuiltinImport:off
+import * as NodePath from "node:path";
 import type {
   CursorSettings,
   ModelCapabilities,
@@ -408,12 +412,41 @@ export function buildCursorDiscoveredModelsFromConfigOptions(
   );
 }
 
+/**
+ * Working directory for capability/model-discovery probes.
+ *
+ * `cursor-agent acp` indexes its working directory on startup using a bundled
+ * ripgrep. When the packaged desktop backend runs with `cwd = $HOME`, that scan
+ * descends into `~/Library/Containers/*` (other apps' sandbox data), which trips
+ * the macOS "<App> would like to access data from other apps"
+ * (`kTCCServiceSystemPolicyAppData`) prompt on every launch. Probes have no
+ * associated workspace, so we run them in a dedicated, empty, app-owned
+ * directory that has nothing to crawl. This is resolved lazily and cached; if
+ * the directory cannot be created we fall back to the OS temp dir (still never
+ * `$HOME`, so no protected-data traversal occurs).
+ */
+let cachedCursorProbeCwd: string | undefined;
+export function resolveCursorProbeCwd(): string {
+  if (cachedCursorProbeCwd !== undefined) {
+    return cachedCursorProbeCwd;
+  }
+  const dir = NodePath.join(NodeOs.tmpdir(), "belweave-cursor-probe");
+  try {
+    NodeFs.mkdirSync(dir, { recursive: true });
+    cachedCursorProbeCwd = dir;
+  } catch {
+    cachedCursorProbeCwd = NodeOs.tmpdir();
+  }
+  return cachedCursorProbeCwd;
+}
+
 const makeCursorAcpProbeRuntime = (
   cursorSettings: CursorSettings,
   environment: NodeJS.ProcessEnv = process.env,
 ) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const probeCwd = resolveCursorProbeCwd();
     const acpContext = yield* Layer.build(
       AcpSessionRuntime.layer({
         spawn: {
@@ -422,10 +455,10 @@ const makeCursorAcpProbeRuntime = (
             ...(cursorSettings.apiEndpoint ? (["-e", cursorSettings.apiEndpoint] as const) : []),
             "acp",
           ],
-          cwd: process.cwd(),
+          cwd: probeCwd,
           env: environment,
         },
-        cwd: process.cwd(),
+        cwd: probeCwd,
         clientInfo: { name: "belweave-code-provider-probe", version: "0.0.0" },
         authMethodId: "cursor_login",
         clientCapabilities: CURSOR_PARAMETERIZED_MODEL_PICKER_CAPABILITIES,

@@ -7,7 +7,7 @@ import * as Layer from "effect/Layer";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopObservability from "./DesktopObservability.ts";
 
-const MIGRATION_MARKER = "belweave-localstorage-migrated";
+export const MIGRATION_MARKER = "belweave-localstorage-migrated";
 
 const LEGACY_KEY_PREFIX = "trifecta:";
 const NEW_KEY_PREFIX = "belweave:";
@@ -59,19 +59,32 @@ const make = Effect.gen(function* () {
     return false;
   });
 
+  const markMigrationComplete = Effect.gen(function* () {
+    yield* fileSystem.makeDirectory(newUserDataPath, { recursive: true }).pipe(Effect.ignore);
+    yield* fileSystem
+      .writeFileString(migrationMarkerPath, "done")
+      .pipe(Effect.catch(() => Effect.void));
+  });
+
   const migrate = Effect.gen(function* () {
-    const shouldMigrate = yield* needsMigration;
-    if (!shouldMigrate) {
+    const markerExists = yield* fileSystem
+      .exists(migrationMarkerPath)
+      .pipe(Effect.orElseSucceed(() => false));
+    if (markerExists) {
       yield* logInfo("no legacy localStorage migration needed");
       return;
     }
+
+    // Mark migration as complete immediately so that even if the legacy directory
+    // is inaccessible, the user denies the macOS permission prompt, or the app is
+    // quit before the actual copy finishes, we never re-trigger the "access data
+    // from other apps" prompt on later launches.
+    yield* markMigrationComplete;
 
     yield* logInfo("starting legacy localStorage migration");
 
     yield* Effect.catchCause(
       Effect.gen(function* () {
-        yield* fileSystem.makeDirectory(newLocalStoragePath, { recursive: true });
-
         let migratedAny = false;
 
         for (const dirName of legacyDirNames) {
@@ -87,6 +100,7 @@ const make = Effect.gen(function* () {
             .pipe(Effect.orElseSucceed(() => false));
           if (!legacyLocalStorageExists) continue;
 
+          yield* fileSystem.makeDirectory(newLocalStoragePath, { recursive: true });
           yield* logInfo("copying localStorage from legacy directory", { dirName });
 
           const files = yield* fileSystem
@@ -114,8 +128,6 @@ const make = Effect.gen(function* () {
             migratedAny = true;
           }
         }
-
-        yield* fileSystem.writeFileString(migrationMarkerPath, "done");
 
         if (migratedAny) {
           yield* logInfo("legacy localStorage migration complete");

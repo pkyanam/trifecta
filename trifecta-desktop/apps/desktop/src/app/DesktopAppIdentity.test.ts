@@ -102,6 +102,7 @@ const withIdentity = <A, E, R>(
     readonly calls?: ElectronAppCalls;
     readonly environment?: TestEnvironmentInput;
     readonly legacyPathExists?: boolean;
+    readonly migrationMarkerExists?: boolean;
     readonly packageJson?: string;
     readonly icnsIconPath?: Option.Option<string>;
   } = {},
@@ -119,8 +120,10 @@ const withIdentity = <A, E, R>(
           FileSystem.layerNoop({
             exists: (path) =>
               Effect.succeed(
-                input.legacyPathExists === true &&
-                  (path.includes("Trifecta (Alpha)") || path.includes("trifecta")),
+                (input.migrationMarkerExists === true &&
+                  path.includes("belweave-localstorage-migrated")) ||
+                  (input.legacyPathExists === true &&
+                    (path.includes("Trifecta (Alpha)") || path.includes("trifecta"))),
               ),
             readFileString: () =>
               Effect.succeed(input.packageJson ?? '{"belweaveCommitHash":"abcdef1234567890"}'),
@@ -135,7 +138,7 @@ const withIdentity = <A, E, R>(
 };
 
 describe("DesktopAppIdentity", () => {
-  it.effect("keeps using the legacy userData path when it already exists", () =>
+  it.effect("keeps using the legacy userData path when it already exists before migration", () =>
     withIdentity(
       Effect.gen(function* () {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
@@ -144,6 +147,30 @@ describe("DesktopAppIdentity", () => {
         assert.equal(userDataPath, "/Users/alice/Library/Application Support/Trifecta (Alpha)");
       }),
       { legacyPathExists: true },
+    ),
+  );
+
+  it.effect("uses the new userData path once localStorage migration has run", () =>
+    withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        const userDataPath = yield* identity.resolveUserDataPath;
+
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/belweave");
+      }),
+      { legacyPathExists: true, migrationMarkerExists: true },
+    ),
+  );
+
+  it.effect("uses the new userData path when no legacy path exists", () =>
+    withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        const userDataPath = yield* identity.resolveUserDataPath;
+
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/belweave");
+      }),
+      { legacyPathExists: false },
     ),
   );
 

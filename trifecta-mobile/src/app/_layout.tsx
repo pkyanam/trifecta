@@ -70,11 +70,12 @@ export default function RootLayout() {
 }
 
 function WsClientInner({ children }: { children: React.ReactNode }) {
-  const { serverURL, bearerToken, isPaired } = useConnection();
+  const { serverURL, bearerToken, flavor, isPaired } = useConnection();
   return (
     <WsClientProvider
       serverURL={isPaired ? serverURL : null}
       bearerToken={isPaired ? bearerToken : null}
+      flavor={isPaired ? flavor : null}
     >
       <ThreadListProvider>
         <ActiveThreadProvider>

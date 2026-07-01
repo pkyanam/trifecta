@@ -1,4 +1,9 @@
-import { issueWebSocketToken, makeWebSocketURL, getServerURLForPlatform } from "@/services/pairing";
+import {
+  issueWebSocketToken,
+  makeWebSocketURL,
+  getServerURLForPlatform,
+  type ServerFlavor,
+} from "@/services/pairing";
 import type { ServerConfig } from "@/types/thread";
 import React, {
   createContext,
@@ -79,6 +84,7 @@ class WsRpcClient {
   constructor(
     private serverURL: string,
     private bearerToken: string,
+    private flavor: ServerFlavor,
     private onStatus: (s: WsStatus) => void,
     private onConfig: (c: ServerConfig) => void,
   ) {}
@@ -89,9 +95,9 @@ class WsRpcClient {
     try {
       // Use platform-specific URL for WebSocket connection
       const platformURL = getServerURLForPlatform(this.serverURL);
-      const wsToken = await issueWebSocketToken(platformURL, this.bearerToken);
+      const wsToken = await issueWebSocketToken(platformURL, this.bearerToken, this.flavor);
       if (!this.alive) return;
-      const url = makeWebSocketURL(platformURL, wsToken);
+      const url = makeWebSocketURL(platformURL, wsToken, this.flavor);
       const ws = new WebSocket(url);
       this.ws = ws;
 
@@ -469,17 +475,19 @@ export function WsClientProvider({
   children,
   serverURL,
   bearerToken,
+  flavor,
 }: {
   children: React.ReactNode;
   serverURL: string | null;
   bearerToken: string | null;
+  flavor: ServerFlavor | null;
 }) {
   const [status, setStatus] = useState<WsStatus>("offline");
   const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
   const clientRef = useRef<WsRpcClient | null>(null);
 
   useEffect(() => {
-    if (!serverURL || !bearerToken) {
+    if (!serverURL || !bearerToken || !flavor) {
       // Use setTimeout to avoid setState in effect warning
       const timer = setTimeout(() => {
         setStatus("offline");
@@ -488,7 +496,7 @@ export function WsClientProvider({
       return () => clearTimeout(timer);
     }
 
-    const client = new WsRpcClient(serverURL, bearerToken, setStatus, setServerConfig);
+    const client = new WsRpcClient(serverURL, bearerToken, flavor, setStatus, setServerConfig);
     clientRef.current = client;
     client.connect();
 
@@ -496,7 +504,7 @@ export function WsClientProvider({
       client.destroy();
       clientRef.current = null;
     };
-  }, [serverURL, bearerToken]);
+  }, [serverURL, bearerToken, flavor]);
 
   const request = useCallback(
     (method: string, payload: unknown) => {
