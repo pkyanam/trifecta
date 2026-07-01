@@ -21,6 +21,7 @@ const DesktopSettingsPatch = Schema.Struct({
   tailscaleServePort: Schema.optionalKey(Schema.Number),
   updateChannel: Schema.optionalKey(Schema.Literals(["latest", "nightly"])),
   updateChannelConfiguredByUser: Schema.optionalKey(Schema.Boolean),
+  backendPort: Schema.optionalKey(Schema.Number),
 });
 
 const decodeDesktopSettingsPatch = Schema.decodeEffect(Schema.fromJsonString(DesktopSettingsPatch));
@@ -95,6 +96,7 @@ describe("DesktopSettings", () => {
       tailscaleServePort: 443,
       updateChannel: "nightly",
       updateChannelConfiguredByUser: false,
+      backendPort: null,
     } satisfies DesktopSettingsValue);
   });
 
@@ -116,6 +118,7 @@ describe("DesktopSettings", () => {
           tailscaleServePort: 8443,
           updateChannel: "latest",
           updateChannelConfiguredByUser: true,
+          backendPort: null,
         } satisfies DesktopSettingsValue);
 
         const exposure = yield* settings.setServerExposureMode("local-only");
@@ -133,6 +136,10 @@ describe("DesktopSettings", () => {
         assert.isTrue(updateChannel.changed);
         assert.equal(updateChannel.settings.updateChannel, "nightly");
         assert.equal(updateChannel.settings.updateChannelConfiguredByUser, true);
+
+        const backendPort = yield* settings.setBackendPort(4888);
+        assert.isTrue(backendPort.changed);
+        assert.equal(backendPort.settings.backendPort, 4888);
       }),
     ),
   );
@@ -154,6 +161,13 @@ describe("DesktopSettings", () => {
         const updateChannel = yield* settings.setUpdateChannel("latest");
         assert.isFalse(updateChannel.changed);
         assert.equal(updateChannel.settings.updateChannelConfiguredByUser, false);
+
+        const backendPort = yield* settings.setBackendPort(4888);
+        assert.isTrue(backendPort.changed);
+        assert.equal(backendPort.settings.backendPort, 4888);
+
+        const backendPortNoOp = yield* settings.setBackendPort(4888);
+        assert.isFalse(backendPortNoOp.changed);
       }),
     ),
   );
@@ -195,6 +209,7 @@ describe("DesktopSettings", () => {
           tailscaleServePort: 8443,
           updateChannel: "latest",
           updateChannelConfiguredByUser: false,
+          backendPort: null,
         } satisfies DesktopSettingsValue);
       }),
     ),
@@ -234,6 +249,7 @@ describe("DesktopSettings", () => {
           tailscaleServePort: 443,
           updateChannel: "nightly",
           updateChannelConfiguredByUser: false,
+          backendPort: null,
         } satisfies DesktopSettingsValue);
       }),
       { appVersion: "0.0.17-nightly.20260415.1" },
@@ -256,6 +272,7 @@ describe("DesktopSettings", () => {
           tailscaleServePort: 443,
           updateChannel: "latest",
           updateChannelConfiguredByUser: true,
+          backendPort: null,
         } satisfies DesktopSettingsValue);
       }),
       { appVersion: "0.0.17-nightly.20260415.1" },
@@ -277,7 +294,28 @@ describe("DesktopSettings", () => {
           tailscaleServePort: 443,
           updateChannel: "latest",
           updateChannelConfiguredByUser: false,
+          backendPort: null,
         } satisfies DesktopSettingsValue);
+      }),
+    ),
+  );
+
+  it.effect("normalizes invalid persisted backend ports", () =>
+    withSettings(
+      Effect.gen(function* () {
+        const settings = yield* DesktopAppSettings.DesktopAppSettings;
+        yield* writeSettingsPatch({
+          backendPort: 0,
+        });
+
+        assert.deepEqual(yield* settings.load, {
+          ...DEFAULT_DESKTOP_SETTINGS,
+          backendPort: null,
+        } satisfies DesktopSettingsValue);
+
+        const invalid = yield* settings.setBackendPort(100_000);
+        assert.isFalse(invalid.changed);
+        assert.equal(invalid.settings.backendPort, null);
       }),
     ),
   );

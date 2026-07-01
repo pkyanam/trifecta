@@ -26,6 +26,7 @@ export interface DesktopSettings {
   readonly tailscaleServePort: number;
   readonly updateChannel: DesktopUpdateChannel;
   readonly updateChannelConfiguredByUser: boolean;
+  readonly backendPort: number | null;
 }
 
 export interface DesktopSettingsChange {
@@ -41,6 +42,7 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   tailscaleServePort: DEFAULT_TAILSCALE_SERVE_PORT,
   updateChannel: "latest",
   updateChannelConfiguredByUser: false,
+  backendPort: null,
 };
 
 const DesktopSettingsDocument = Schema.Struct({
@@ -49,6 +51,7 @@ const DesktopSettingsDocument = Schema.Struct({
   tailscaleServePort: Schema.optionalKey(Schema.Number),
   updateChannel: Schema.optionalKey(DesktopUpdateChannelSchema),
   updateChannelConfiguredByUser: Schema.optionalKey(Schema.Boolean),
+  backendPort: Schema.optionalKey(Schema.Number),
 });
 
 type DesktopSettingsDocument = typeof DesktopSettingsDocument.Type;
@@ -84,6 +87,9 @@ export interface DesktopAppSettingsShape {
   readonly setUpdateChannel: (
     channel: DesktopUpdateChannel,
   ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
+  readonly setBackendPort: (
+    port: number,
+  ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
 }
 
 export class DesktopAppSettings extends Context.Service<
@@ -102,6 +108,12 @@ function normalizeTailscaleServePort(value: unknown): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65_535
     ? value
     : DEFAULT_TAILSCALE_SERVE_PORT;
+}
+
+function normalizeBackendPort(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65_535
+    ? value
+    : null;
 }
 
 function normalizeDesktopSettingsDocument(
@@ -124,6 +136,7 @@ function normalizeDesktopSettingsDocument(
       ? Option.getOrElse(parsedUpdateChannel, () => defaultSettings.updateChannel)
       : defaultSettings.updateChannel,
     updateChannelConfiguredByUser,
+    backendPort: normalizeBackendPort(parsed.backendPort),
   };
 }
 
@@ -147,6 +160,9 @@ function toDesktopSettingsDocument(
   }
   if (settings.updateChannelConfiguredByUser !== defaults.updateChannelConfiguredByUser) {
     document.updateChannelConfiguredByUser = settings.updateChannelConfiguredByUser;
+  }
+  if (settings.backendPort !== defaults.backendPort && settings.backendPort !== null) {
+    document.backendPort = settings.backendPort;
   }
 
   return document;
@@ -178,6 +194,16 @@ function setTailscaleServe(
         ...settings,
         tailscaleServeEnabled: input.enabled,
         tailscaleServePort: port,
+      };
+}
+
+function setBackendPort(settings: DesktopSettings, port: number): DesktopSettings {
+  const normalized = normalizeBackendPort(port);
+  return settings.backendPort === normalized
+    ? settings
+    : {
+        ...settings,
+        backendPort: normalized,
       };
 }
 
@@ -285,6 +311,10 @@ export const layer = Layer.effect(
         persist((settings) => setUpdateChannel(settings, channel)).pipe(
           Effect.withSpan("desktop.settings.setUpdateChannel", { attributes: { channel } }),
         ),
+      setBackendPort: (port) =>
+        persist((settings) => setBackendPort(settings, port)).pipe(
+          Effect.withSpan("desktop.settings.setBackendPort", { attributes: { port } }),
+        ),
     });
   }),
 );
@@ -313,6 +343,7 @@ export const layerTest = (initialSettings: DesktopSettings = DEFAULT_DESKTOP_SET
           update((settings) => setServerExposureMode(settings, mode)),
         setTailscaleServe: (input) => update((settings) => setTailscaleServe(settings, input)),
         setUpdateChannel: (channel) => update((settings) => setUpdateChannel(settings, channel)),
+        setBackendPort: (port) => update((settings) => setBackendPort(settings, port)),
       });
     }),
   );
