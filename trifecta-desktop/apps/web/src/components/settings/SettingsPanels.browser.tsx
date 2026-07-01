@@ -984,7 +984,9 @@ describe("GeneralSettingsPanel observability", () => {
         }),
       )
       .not.toBeInTheDocument();
-    await reopenedPairingLinkDialog.getByRole("button", { name: "Create link", exact: true }).click();
+    await reopenedPairingLinkDialog
+      .getByRole("button", { name: "Create link", exact: true })
+      .click();
     await expect
       .element(
         reopenedPairingLinkDialog.getByRole("img", {

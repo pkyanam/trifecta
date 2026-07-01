@@ -62,7 +62,7 @@ import {
 } from "@belweave/contracts/settings";
 import { usePrimaryEnvironmentId } from "../environments/primary";
 import { isElectron } from "../env";
-import { APP_BASE_NAME, APP_STAGE_LABEL, APP_VERSION } from "../branding";
+import { APP_BASE_NAME, APP_VERSION } from "../branding";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { isMacPlatform, newCommandId } from "../lib/utils";
 import {
@@ -2447,9 +2447,6 @@ const SidebarChromeHeader = memo(function SidebarChromeHeader({
             >
               <span className="truncate text-sm font-semibold tracking-tight text-foreground">
                 {APP_BASE_NAME}
-              </span>
-              <span className="rounded-full bg-muted/50 px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
-                {APP_STAGE_LABEL}
               </span>
             </Link>
           }

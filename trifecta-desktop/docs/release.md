@@ -16,7 +16,6 @@ This document covers the unified release workflow for stable and nightly desktop
   - Linux `x64` AppImage
   - Windows `x64` NSIS installer
 - Publishes one GitHub Release with all produced files.
-  - Stable tags with a suffix after `X.Y.Z` (for example `1.2.3-alpha.1`) are published as GitHub prereleases.
   - Only plain stable `X.Y.Z` releases are marked as the repository's latest release.
   - Nightly runs are always GitHub prereleases and never marked latest.
   - Automatically generated release notes are pinned to the previous tag in the same channel, so stable compares to the previous stable tag and nightly compares to the previous nightly tag.
@@ -106,7 +105,7 @@ One-time Vercel dashboard setup:
   - The desktop UI shows a rocket update button when an update is available; click once to download, click again after download to restart/install.
 - Provider: GitHub Releases (`provider: github`) configured at build time.
 - Stable track discovery:
-  - stable-channel builds are published as GitHub Latest releases, including alpha builds whose versions carry a semver prerelease suffix such as `0.0.38-alpha.1`
+  - stable-channel builds are published as GitHub Latest releases
   - nightly builds remain GitHub prereleases and use the dedicated `nightly` updater channel
   - the release workflow verifies that GitHub exposes the stable tag through `/releases/latest` and that macOS, Windows, and Linux updater manifests are present
 - Repository slug source:

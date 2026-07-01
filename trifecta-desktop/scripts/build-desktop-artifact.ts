@@ -756,7 +756,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
         ...commandOutputOptions(options.verbose),
         // Windows needs shell mode to resolve .cmd shims (e.g. bun.cmd).
         shell: process.platform === "win32",
-      })`bun run build:desktop`,
+      })`bun run build:desktop -- --force`,
     );
   }
 
@@ -929,7 +929,9 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
     Flag.optional,
   ),
   buildVersion: Flag.string("build-version").pipe(
-    Flag.withDescription("Artifact version metadata (env: BELWEAVE_DESKTOP_VERSION)."),
+    Flag.withDescription(
+      'Artifact version metadata, e.g. 0.1.0. Shorthand: -v "0.1.0" (env: BELWEAVE_DESKTOP_VERSION).',
+    ),
     Flag.optional,
   ),
   outputDir: Flag.string("output-dir").pipe(
@@ -975,6 +977,25 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
 const cliRuntimeLayer = Layer.mergeAll(Logger.layer([Logger.consolePretty()]), NodeServices.layer);
 
 if (import.meta.main) {
+  // Expand short flags before the Effect CLI parser sees them.
+  // Supports: -v "0.1.0"  -->  --build-version "0.1.0"
+  const expandedArgv: string[] = [];
+  for (let i = 0; i < process.argv.length; i++) {
+    const arg = process.argv[i];
+    if (arg === "-v") {
+      const next = process.argv[i + 1];
+      if (next && !next.startsWith("-")) {
+        expandedArgv.push("--build-version", next);
+        i++; // consume the value
+      } else {
+        expandedArgv.push("--build-version");
+      }
+    } else {
+      expandedArgv.push(arg!);
+    }
+  }
+  process.argv = expandedArgv;
+
   Command.run(buildDesktopArtifactCli, { version: "0.0.0" }).pipe(
     Effect.scoped,
     Effect.provide(cliRuntimeLayer),
