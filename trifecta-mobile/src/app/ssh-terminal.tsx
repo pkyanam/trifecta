@@ -216,8 +216,8 @@ export default function SshTerminalScreen() {
   // instead of loading from a CDN. This eliminates the CDN dependency and
   // allows a stricter CSP with no external script sources.
   const [xtermAssets] = useAssets([
-    require("../../assets/xterm/xterm.min.js"),
-    require("../../assets/xterm/addon-fit.min.js"),
+    require("../../assets/xterm/xterm.min.xjs"),
+    require("../../assets/xterm/addon-fit.min.xjs"),
     require("../../assets/xterm/xterm.css"),
   ]);
   const [xtermJs, setXtermJs] = useState("");
