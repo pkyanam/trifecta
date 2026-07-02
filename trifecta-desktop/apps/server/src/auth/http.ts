@@ -16,7 +16,7 @@ import { SessionCredentialService } from "./Services/SessionCredentialService.ts
 import { isReviewSession, REVIEW_ACCESS_DENIED_MESSAGE } from "./reviewAccess.ts";
 import { deriveAuthClientMetadata } from "./utils.ts";
 import { ServerConfig } from "../config.ts";
-import { browserApiCorsHeaders } from "../httpCors.ts";
+import { corsHeadersForRequest } from "../httpCors.ts";
 
 export const respondToAuthError = (error: AuthError) =>
   Effect.gen(function* () {
@@ -26,11 +26,12 @@ export const respondToAuthError = (error: AuthError) =>
         cause: error.cause,
       });
     }
+    const corsHeaders = yield* corsHeadersForRequest;
     return HttpServerResponse.jsonUnsafe(
       {
         error: error.message,
       },
-      { status: error.status ?? 500, headers: browserApiCorsHeaders },
+      { status: error.status ?? 500, headers: corsHeaders },
     );
   });
 
@@ -41,9 +42,10 @@ export const authSessionRouteLayer = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const serverAuth = yield* ServerAuth;
     const session = yield* serverAuth.getSessionState(request);
+    const corsHeaders = yield* corsHeadersForRequest;
     return HttpServerResponse.jsonUnsafe(session, {
       status: 200,
-      headers: browserApiCorsHeaders,
+      headers: corsHeaders,
     });
   }),
 );
@@ -86,10 +88,11 @@ export const authBootstrapRouteLayer = HttpRouter.add(
       payload.credential,
       deriveAuthClientMetadata({ request }),
     );
+    const corsHeaders = yield* corsHeadersForRequest;
 
     return yield* HttpServerResponse.jsonUnsafe(result.response, {
       status: 200,
-      headers: browserApiCorsHeaders,
+      headers: corsHeaders,
     }).pipe(
       HttpServerResponse.setCookie(sessions.cookieName, result.sessionToken, {
         expires: DateTime.toDate(result.response.expiresAt),
@@ -121,9 +124,10 @@ export const authBearerBootstrapRouteLayer = HttpRouter.add(
       payload.credential,
       deriveAuthClientMetadata({ request }),
     );
+    const corsHeaders = yield* corsHeadersForRequest;
     return HttpServerResponse.jsonUnsafe(result satisfies AuthBearerBootstrapResult, {
       status: 200,
-      headers: browserApiCorsHeaders,
+      headers: corsHeaders,
     });
   }).pipe(Effect.catchTag("AuthError", (error) => respondToAuthError(error))),
 );
@@ -136,9 +140,10 @@ export const authWebSocketTokenRouteLayer = HttpRouter.add(
     const serverAuth = yield* ServerAuth;
     const session = yield* serverAuth.authenticateHttpRequest(request);
     const result = yield* serverAuth.issueWebSocketToken(session);
+    const corsHeaders = yield* corsHeadersForRequest;
     return HttpServerResponse.jsonUnsafe(result satisfies AuthWebSocketTokenResult, {
       status: 200,
-      headers: browserApiCorsHeaders,
+      headers: corsHeaders,
     });
   }).pipe(Effect.catchTag("AuthError", (error) => respondToAuthError(error))),
 );

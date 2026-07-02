@@ -1,4 +1,5 @@
 import type { DesktopDiscoveredSshHost } from "@belweave/contracts";
+import * as Os from "node:os";
 
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -203,7 +204,7 @@ const readKnownHostsHostnames = Effect.fnUntraced(function* (filePath: string) {
 export const discoverSshHosts = Effect.fnUntraced(
   function* (input: { readonly homeDir?: string }) {
     const path = yield* Path.Path;
-    const homeDir = input?.homeDir ?? process.env.HOME ?? process.env.USERPROFILE ?? "";
+    const homeDir = input?.homeDir ?? Os.homedir() ?? "";
     if (homeDir.trim().length === 0) {
       return [];
     }

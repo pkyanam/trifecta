@@ -185,6 +185,23 @@ export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
   return { command: fileManagerCommandForPlatform(platform), args: [input.cwd] };
 });
 
+/**
+ * Escape a single argument for cmd.exe when using `shell: true` on Windows.
+ *
+ * cmd.exe treats `""` inside a double-quoted string as a literal `"`. All
+ * other shell metacharacters (`&`, `|`, `<`, `>`, `^`) are inert inside
+ * double quotes. However, cmd.exe still expands `%VAR%` inside double quotes,
+ * so we strip percent signs to prevent environment variable expansion. We
+ * also strip newlines/carriage returns to prevent line-break injection.
+ */
+export function escapeWindowsShellArg(arg: string): string {
+  const sanitized = arg
+    .replace(/"/g, '""')
+    .replace(/%/g, "")
+    .replace(/[\r\n]/g, "");
+  return `"${sanitized}"`;
+}
+
 export const launchDetached = (launch: EditorLaunch) =>
   Effect.gen(function* () {
     if (!isCommandAvailable(launch.command)) {
@@ -197,7 +214,7 @@ export const launchDetached = (launch: EditorLaunch) =>
         const isWin32 = process.platform === "win32";
         child = spawn(
           launch.command,
-          isWin32 ? launch.args.map((a) => `"${a}"`) : [...launch.args],
+          isWin32 ? launch.args.map(escapeWindowsShellArg) : [...launch.args],
           {
             detached: true,
             stdio: "ignore",

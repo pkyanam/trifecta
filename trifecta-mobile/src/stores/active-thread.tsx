@@ -1,4 +1,5 @@
 import type { ModelSelection, ThreadId } from "@/types/thread";
+import { secureRandomId } from "@/utils/secure-id";
 import * as SecureStore from "expo-secure-store";
 import React, {
   createContext,
@@ -38,16 +39,6 @@ interface ActiveThreadContextValue {
 const ActiveThreadContext = createContext<ActiveThreadContextValue | null>(null);
 const ACTIVE_THREAD_KEY = "trifecta.activeThreadId";
 const LEGACY_ACTIVE_THREAD_KEY = "trifecta_active_thread_id";
-
-function randomId(): string {
-  let result = "";
-  while (result.length < 32) {
-    result += Math.floor(Math.random() * 0x100000000)
-      .toString(16)
-      .padStart(8, "0");
-  }
-  return result.slice(0, 32);
-}
 
 function nowISO(): string {
   return new Date().toISOString();
@@ -119,10 +110,10 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
     ) => {
       const payload: Record<string, unknown> = {
         type: "thread.turn.start",
-        commandId: randomId(),
+        commandId: secureRandomId(),
         threadId,
         message: {
-          messageId: randomId(),
+          messageId: secureRandomId(),
           role: "user",
           text,
           attachments: [],
@@ -145,16 +136,16 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
       runtimeMode = "full-access",
       interactionMode = "default",
     ): Promise<ThreadId> => {
-      const threadId = randomId();
+      const threadId = secureRandomId();
       const now = nowISO();
       const titleSeed = text.slice(0, 80).trim();
 
       const payload: Record<string, unknown> = {
         type: "thread.turn.start",
-        commandId: randomId(),
+        commandId: secureRandomId(),
         threadId,
         message: {
-          messageId: randomId(),
+          messageId: secureRandomId(),
           role: "user",
           text,
           attachments: [],

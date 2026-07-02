@@ -1,14 +1,15 @@
 import { Icon } from "@/components/icon";
 import { LiquidMetalButton } from "@/components/liquid-metal";
 import { SymbolImage } from "@/components/symbol-image";
-import { exchangeToken, fetchEnvironment, parsePairingURL, getServerURLForPlatform } from "@/services/pairing";
+import { exchangeToken, fetchEnvironment, parsePairingURL, getServerURLForPlatform, isSecureTransportURL } from "@/services/pairing";
 import { useConnection } from "@/stores/connection";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
-import { Check, Copy, Link2, Terminal, Wifi, Zap } from "lucide-react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { Check, Copy, Link2, Terminal, Wifi, X, Zap } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -34,6 +35,8 @@ export default function PairScreen() {
   const { pair } = useConnection();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ returnTo?: string }>();
+  const fromSettings = params.returnTo === "settings";
 
   const [serverURL, setServerURL] = useState("");
   const [token, setToken] = useState("");
@@ -81,11 +84,7 @@ export default function PairScreen() {
     setTimeout(() => setCopied(false), 2500);
   }, []);
 
-  const handleConnect = useCallback(async () => {
-    if (!canConnect || isConnecting) return;
-    const url = serverURL.trim().replace(/\/+$/, "");
-    const tok = token.trim();
-
+  const doConnect = useCallback(async (url: string, tok: string) => {
     setIsConnecting(true);
     setError(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -98,14 +97,49 @@ export default function PairScreen() {
       // Store the original URL (not the Android alias) for consistency
       await pair(url, result.bearerToken, result.flavor);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace("/");
+      if (fromSettings) {
+        router.replace("/(settings)/settings");
+      } else {
+        router.replace("/");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connection failed");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsConnecting(false);
     }
-  }, [canConnect, isConnecting, serverURL, token, pair, router]);
+  }, [pair, router, fromSettings]);
+
+  const handleConnect = useCallback(async () => {
+    if (!canConnect || isConnecting) return;
+    const url = serverURL.trim().replace(/\/+$/, "");
+    const tok = token.trim();
+
+    // Warn the user when connecting to a non-local HTTP server — the
+    // pairing token and all subsequent WebSocket traffic will be sent in
+    // cleartext and can be intercepted on the network.
+    if (!isSecureTransportURL(url)) {
+      Alert.alert(
+        "Insecure Connection",
+        "This server uses HTTP over a public network. Your pairing token and all traffic will be sent unencrypted and can be intercepted. Continue?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Continue", style: "destructive", onPress: () => doConnect(url, tok) },
+        ],
+      );
+      return;
+    }
+
+    doConnect(url, tok);
+  }, [canConnect, isConnecting, serverURL, token, doConnect]);
+
+  const handleCancel = useCallback(() => {
+    if (fromSettings) {
+      router.replace("/(settings)/settings");
+    } else {
+      router.back();
+    }
+  }, [fromSettings, router]);
 
   const monoFont = Platform.OS === "ios" ? "Menlo" : "monospace";
 
@@ -135,8 +169,19 @@ export default function PairScreen() {
           <View className="flex-1" />
           <View className="flex-row items-center gap-1.5 bg-muted rounded-full px-3 py-1.5">
             <Icon icon={Wifi} className="w-3 h-3 text-foreground" />
-            <Text className="text-[12px] font-semibold text-foreground">Pair</Text>
+            <Text className="text-[12px] font-semibold text-foreground">
+              {fromSettings ? "Add server" : "Pair"}
+            </Text>
           </View>
+          {fromSettings && (
+            <Pressable
+              onPress={handleCancel}
+              className="ml-2 w-8 h-8 rounded-full bg-muted items-center justify-center active:opacity-60"
+              accessibilityLabel="Cancel"
+            >
+              <Icon icon={X} className="w-4 h-4 text-foreground" />
+            </Pressable>
+          )}
         </View>
 
         {/* ── Hero ──────────────────────────────────────── */}

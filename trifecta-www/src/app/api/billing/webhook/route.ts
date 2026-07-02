@@ -43,6 +43,15 @@ function verifyStripeSignature(payload: string, signature: string | null): boole
   const expected = parts.v1;
   if (!timestamp || !expected) return false;
 
+  // Reject replayed webhooks: Stripe signs the timestamp into the HMAC, so
+  // a valid signature with a stale timestamp means the webhook is being
+  // replayed. Stripe recommends a 5-minute tolerance.
+  const timestampNum = Number.parseInt(timestamp, 10);
+  if (!Number.isInteger(timestampNum)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  const TOLERANCE_SECONDS = 300;
+  if (Math.abs(now - timestampNum) > TOLERANCE_SECONDS) return false;
+
   const signedPayload = `${timestamp}.${payload}`;
   const digest = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');
 

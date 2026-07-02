@@ -19,6 +19,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { GitCommandError, type VcsRef } from "@belweave/contracts";
 import { dedupeRemoteBranchesWithLocalMatches } from "@belweave/shared/git";
 import { compactTraceAttributes } from "@belweave/shared/observability";
+import { isPathInside } from "@belweave/shared/path";
 import { decodeJsonResult } from "@belweave/shared/schemaJson";
 import { gitCommandDuration, gitCommandsTotal, withMetrics } from "../observability/Metrics.ts";
 import * as GitVcsDriver from "./GitVcsDriver.ts";
@@ -1876,6 +1877,20 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     const sanitizedBranch = targetBranch.replace(/\//g, "-");
     const repoName = path.basename(input.cwd);
     const worktreePath = input.path ?? path.join(worktreesDir, repoName, sanitizedBranch);
+
+    if (input.path !== null) {
+      const resolvedWorktreePath = path.resolve(input.path);
+      const resolvedWorktreesDir = path.resolve(worktreesDir);
+      if (!isPathInside(resolvedWorktreesDir, resolvedWorktreePath, path.sep)) {
+        return yield* new GitCommandError({
+          operation: "GitVcsDriver.createWorktree",
+          command: "git worktree add",
+          cwd: input.cwd,
+          detail: `worktree path must be inside the server worktrees directory (${worktreesDir})`,
+        });
+      }
+    }
+
     const args = input.newRefName
       ? ["worktree", "add", "-b", input.newRefName, worktreePath, input.refName]
       : ["worktree", "add", worktreePath, input.refName];
@@ -1955,6 +1970,17 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   const removeWorktree: GitVcsDriver.GitVcsDriverShape["removeWorktree"] = Effect.fn(
     "removeWorktree",
   )(function* (input) {
+    const resolvedWorktreePath = path.resolve(input.path);
+    const resolvedWorktreesDir = path.resolve(worktreesDir);
+    if (!isPathInside(resolvedWorktreesDir, resolvedWorktreePath, path.sep)) {
+      return yield* new GitCommandError({
+        operation: "GitVcsDriver.removeWorktree",
+        command: "git worktree remove",
+        cwd: input.cwd,
+        detail: `worktree path must be inside the server worktrees directory (${worktreesDir})`,
+      });
+    }
+
     const args = ["worktree", "remove"];
     if (input.force) {
       args.push("--force");
