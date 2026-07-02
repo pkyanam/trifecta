@@ -15,9 +15,6 @@
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		DAA0F50B3C7F466DAB21C297 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438159DF9A4C4A329FF30F9D /* SceneDelegate.swift */; };
-		A28A86CFB53E49AC82A6A97E /* xterm.min.xjs in Resources */ = {isa = PBXBuildFile; fileRef = 26D26A186E925A9C45FB1ED5 /* xterm.min.xjs */; };
-		26E430A35D609EED9F5655CC /* addon-fit.min.xjs in Resources */ = {isa = PBXBuildFile; fileRef = 3C23F19E74321017469A7B5D /* addon-fit.min.xjs */; };
-		C385A84F08D2ADF87E9FC5D3 /* xterm.xcss in Resources */ = {isa = PBXBuildFile; fileRef = A1958671B239A468B32F6E53 /* xterm.xcss */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,9 +32,6 @@
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Trifecta/AppDelegate.swift; sourceTree = "<group>"; };
 		438159DF9A4C4A329FF30F9D /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = Trifecta/SceneDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Trifecta-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Trifecta-Bridging-Header.h"; path = "Trifecta/Trifecta-Bridging-Header.h"; sourceTree = "<group>"; };
-		26D26A186E925A9C45FB1ED5 /* xterm.min.xjs */ = {isa = PBXFileReference; lastKnownFileType = text; name = xterm.min.xjs; path = "xterm.min.xjs"; sourceTree = "<group>"; };
-		3C23F19E74321017469A7B5D /* addon-fit.min.xjs */ = {isa = PBXFileReference; lastKnownFileType = text; name = addon-fit.min.xjs; path = "addon-fit.min.xjs"; sourceTree = "<group>"; };
-		A1958671B239A468B32F6E53 /* xterm.xcss */ = {isa = PBXFileReference; lastKnownFileType = text; name = xterm.xcss; path = "xterm.xcss"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,7 +53,6 @@
 				438159DF9A4C4A329FF30F9D /* SceneDelegate.swift */,
 				F11748442D0722820044C1D9 /* Trifecta-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
-				E71A6E8C7216BCE56724F6C6 /* XtermAssets */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
@@ -131,17 +124,6 @@
 			);
 			name = Supporting;
 			path = Trifecta/Supporting;
-			sourceTree = "<group>";
-		};
-		E71A6E8C7216BCE56724F6C6 /* XtermAssets */ = {
-			isa = PBXGroup;
-			children = (
-				26D26A186E925A9C45FB1ED5 /* xterm.min.xjs */,
-				3C23F19E74321017469A7B5D /* addon-fit.min.xjs */,
-				A1958671B239A468B32F6E53 /* xterm.xcss */,
-			);
-			name = XtermAssets;
-			path = Trifecta/XtermAssets;
 			sourceTree = "<group>";
 		};
 		CAE55D77F97258EE5C92DF19 /* Trifecta */ = {
@@ -217,9 +199,6 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				80E24DD7FF102CC60E3A5DE8 /* PrivacyInfo.xcprivacy in Resources */,
-				A28A86CFB53E49AC82A6A97E /* xterm.min.xjs in Resources */,
-				26E430A35D609EED9F5655CC /* addon-fit.min.xjs in Resources */,
-				C385A84F08D2ADF87E9FC5D3 /* xterm.xcss in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

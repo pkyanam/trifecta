@@ -10,6 +10,7 @@ import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pre
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system";
+import { Asset } from "expo-asset";
 import { FadeIn, FadeOut } from "react-native-reanimated";
 import { WebView } from "react-native-webview";
 import { X, Maximize2, Minimize2, Copy, Check, Shield, AlertTriangle } from "lucide-react-native";
@@ -211,11 +212,10 @@ export default function SshTerminalScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const insets = useSafeAreaInsets();
 
-  // Load xterm.js, addon-fit, and xterm.css from the app's main bundle.
-  // These files are added as native bundle resources in the Xcode project
-  // (ios/Trifecta/XtermAssets/) and are copied to the root of the app bundle
-  // during the build. We read them directly with FileSystem.readAsStringAsync,
-  // which works reliably in both debug and release builds.
+  // Load xterm.js, addon-fit, and xterm.css via expo-asset.
+  // Asset.loadAsync() calls downloadAsync() which copies the asset from
+  // the app bundle to the cache directory, making it readable via
+  // FileSystem.readAsStringAsync. This works in both debug and release.
   const [xtermJs, setXtermJs] = useState("");
   const [addonFitJs, setAddonFitJs] = useState("");
   const [xtermCss, setXtermCss] = useState("");
@@ -224,15 +224,21 @@ export default function SshTerminalScreen() {
   useEffect(() => {
     const loadAssets = async () => {
       try {
-        const bundleDir = FileSystem.bundleDirectory;
-        if (!bundleDir) throw new Error("No bundle directory available");
-
-        // Files added via "Copy Bundle Resources" are at the bundle root.
-        const [js, fit, css] = await Promise.all([
-          FileSystem.readAsStringAsync(`${bundleDir}xterm.min.xjs`),
-          FileSystem.readAsStringAsync(`${bundleDir}addon-fit.min.xjs`),
-          FileSystem.readAsStringAsync(`${bundleDir}xterm.xcss`),
+        const assets = await Asset.loadAsync([
+          require("../../assets/xterm/xterm.min.xjs"),
+          require("../../assets/xterm/addon-fit.min.xjs"),
+          require("../../assets/xterm/xterm.xcss"),
         ]);
+
+        // After loadAsync, each asset should have localUri set (the
+        // downloaded cache copy). Fall back to uri if localUri is null.
+        const readAsset = async (asset: Asset): Promise<string> => {
+          const uri = asset.localUri || asset.uri;
+          if (!uri) throw new Error(`Asset has no localUri or uri (name=${asset.name}, type=${asset.type})`);
+          return FileSystem.readAsStringAsync(uri);
+        };
+
+        const [js, fit, css] = await Promise.all(assets.map(readAsset));
         setXtermJs(js);
         setAddonFitJs(fit);
         setXtermCss(css);

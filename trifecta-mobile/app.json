@@ -63,8 +63,7 @@
       "expo-secure-store",
       "./plugins/with-min-ios-deployment-target",
       "./plugins/with-patch-expo-crypto",
-      "./plugins/with-scene-lifecycle",
-      "./plugins/with-xterm-assets"
+      "./plugins/with-scene-lifecycle"
     ],
     "experiments": {
       "typedRoutes": true,
