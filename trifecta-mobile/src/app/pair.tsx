@@ -5,8 +5,8 @@ import { exchangeToken, fetchEnvironment, parsePairingURL, getServerURLForPlatfo
 import { useConnection } from "@/stores/connection";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
-import { Check, Copy, Link2, Terminal, Wifi, Zap } from "lucide-react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { Check, Copy, Link2, Terminal, Wifi, X, Zap } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -34,6 +34,8 @@ export default function PairScreen() {
   const { pair } = useConnection();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ returnTo?: string }>();
+  const fromSettings = params.returnTo === "settings";
 
   const [serverURL, setServerURL] = useState("");
   const [token, setToken] = useState("");
@@ -98,14 +100,26 @@ export default function PairScreen() {
       // Store the original URL (not the Android alias) for consistency
       await pair(url, result.bearerToken, result.flavor);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace("/");
+      if (fromSettings) {
+        router.replace("/(settings)/settings");
+      } else {
+        router.replace("/");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connection failed");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsConnecting(false);
     }
-  }, [canConnect, isConnecting, serverURL, token, pair, router]);
+  }, [canConnect, isConnecting, serverURL, token, pair, router, fromSettings]);
+
+  const handleCancel = useCallback(() => {
+    if (fromSettings) {
+      router.replace("/(settings)/settings");
+    } else {
+      router.back();
+    }
+  }, [fromSettings, router]);
 
   const monoFont = Platform.OS === "ios" ? "Menlo" : "monospace";
 
@@ -135,8 +149,19 @@ export default function PairScreen() {
           <View className="flex-1" />
           <View className="flex-row items-center gap-1.5 bg-muted rounded-full px-3 py-1.5">
             <Icon icon={Wifi} className="w-3 h-3 text-foreground" />
-            <Text className="text-[12px] font-semibold text-foreground">Pair</Text>
+            <Text className="text-[12px] font-semibold text-foreground">
+              {fromSettings ? "Add server" : "Pair"}
+            </Text>
           </View>
+          {fromSettings && (
+            <Pressable
+              onPress={handleCancel}
+              className="ml-2 w-8 h-8 rounded-full bg-muted items-center justify-center active:opacity-60"
+              accessibilityLabel="Cancel"
+            >
+              <Icon icon={X} className="w-4 h-4 text-foreground" />
+            </Pressable>
+          )}
         </View>
 
         {/* ── Hero ──────────────────────────────────────── */}

@@ -36,6 +36,8 @@ interface WsClientContextValue {
     payload: unknown,
     onValue: (value: unknown) => void,
   ) => () => void;
+  /** Force an immediate reconnect (resets backoff). */
+  reconnect: () => void;
 }
 
 const WsClientContext = createContext<WsClientContextValue | null>(null);
@@ -168,6 +170,32 @@ class WsRpcClient {
     this.streams.clear(); // Clear all stream subscriptions
     this.ws?.close();
     this.ws = null;
+  }
+
+  /**
+   * Force an immediate reconnect: tear down the current socket, reset the
+   * backoff counter, and initiate a fresh connection. Safe to call when
+   * already connected (will reconnect) or when offline/error.
+   */
+  reconnect() {
+    if (!this.alive) return;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.clearConnectionTimeout();
+    this.stopHeartbeat();
+    this.failPending();
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.onclose = null;
+      try { this.ws.close(); } catch {}
+      this.ws = null;
+    }
+    this.reconnectAttempt = 0;
+    this.connect();
   }
 
   private clearConnectionTimeout() {
@@ -528,8 +556,12 @@ export function WsClientProvider({
     [],
   );
 
+  const reconnect = useCallback(() => {
+    clientRef.current?.reconnect();
+  }, []);
+
   return (
-    <WsClientContext value={{ status, serverConfig, request, subscribe }}>
+    <WsClientContext value={{ status, serverConfig, request, subscribe, reconnect }}>
       {children}
     </WsClientContext>
   );
