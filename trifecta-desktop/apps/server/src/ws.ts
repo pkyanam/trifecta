@@ -59,6 +59,7 @@ import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { CheckpointDiffQuery } from "./checkpointing/Services/CheckpointDiffQuery.ts";
 import { ServerConfig } from "./config.ts";
 import { isOriginAllowed } from "./httpCors.ts";
+import { makeWsRateLimiter } from "./wsRateLimit.ts";
 import { Keybindings } from "./keybindings.ts";
 import { Open, resolveAvailableEditors } from "./open.ts";
 import { normalizeDispatchCommand } from "./orchestration/Normalizer.ts";
@@ -1834,6 +1835,14 @@ export const websocketRpcRouteLayer = Layer.unwrap(
         const serverAuth = yield* ServerAuth;
         const sessions = yield* SessionCredentialService;
         const config = yield* ServerConfig;
+        const rateLimiter = yield* makeWsRateLimiter;
+
+        // Enforce rate limiting and message size limits before any other
+        // processing to protect against DoS attacks.
+        const limitResponse = yield* rateLimiter.checkAll;
+        if (limitResponse) {
+          return limitResponse;
+        }
 
         // Validate WebSocket Origin header to prevent cross-site WebSocket
         // hijacking (CSWSH). Browsers always send the Origin header on WS
