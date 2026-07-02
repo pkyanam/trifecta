@@ -1,5 +1,4 @@
 import * as SecureStore from "expo-secure-store";
-import * as Crypto from "expo-crypto";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ServerFlavor } from "@/services/pairing";
 
@@ -58,9 +57,12 @@ type ConnectionState = {
 
 const ConnectionContext = createContext<ConnectionState | null>(null);
 
-/** Generate a cryptographically secure unique id for a paired server entry. */
+/** Generate a unique id for a paired server entry. */
 function makeId(): string {
-  return Crypto.randomUUID();
+  return (
+    Math.random().toString(36).slice(2, 10) +
+    Date.now().toString(36)
+  );
 }
 
 /** Normalize a URL for dedupe comparison (trim + strip trailing slashes). */

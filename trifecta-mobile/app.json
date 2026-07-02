@@ -61,7 +61,8 @@
       "expo-system-ui",
       "expo-status-bar",
       "expo-secure-store",
-      "./plugins/with-min-ios-deployment-target"
+      "./plugins/with-min-ios-deployment-target",
+      "./plugins/with-patch-expo-crypto"
     ],
     "experiments": {
       "typedRoutes": true,
