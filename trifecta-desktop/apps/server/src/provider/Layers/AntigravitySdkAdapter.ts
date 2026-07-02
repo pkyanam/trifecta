@@ -1,3 +1,5 @@
+import * as Os from "node:os";
+
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -33,7 +35,7 @@ import type { ProviderAdapterShape, ProviderThreadSnapshot } from "../Services/P
 const DRIVER_KIND = ProviderDriverKind.make("antigravity");
 const ANTIGRAVITY_SDK_RESUME_CURSOR_V = 1 as const;
 const DEFAULT_PYTHON_COMMAND = "python3";
-const DEFAULT_SAVE_DIR = `${process.env.HOME || "."}/.trifecta/antigravity-sdk`;
+const DEFAULT_SAVE_DIR = `${Os.homedir() || "."}/.trifecta/antigravity-sdk`;
 
 const nodeChildProcess = process.getBuiltinModule(
   "child_process",
@@ -383,8 +385,8 @@ function parseAntigravitySdkResume(input: unknown): {
 }
 
 function expandUserPath(path: string): string {
-  if (path === "~") return process.env.HOME || path;
-  if (path.startsWith("~/")) return `${process.env.HOME || "."}${path.slice(1)}`;
+  if (path === "~") return Os.homedir() || path;
+  if (path.startsWith("~/")) return `${Os.homedir() || "."}${path.slice(1)}`;
   return path;
 }
 

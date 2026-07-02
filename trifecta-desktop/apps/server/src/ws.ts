@@ -1,3 +1,5 @@
+import * as Os from "node:os";
+
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -1718,7 +1720,7 @@ const makeWsRpcLayer = (session: AuthenticatedSession) =>
                     });
                   }
 
-                  const home = process.env.HOME ?? process.cwd();
+                  const home = Os.homedir() || process.cwd();
                   const marker = "# >>> trifecta-ssh-keychain >>>";
                   const markerEnd = "# <<< trifecta-ssh-keychain <<<";
                   // No-op block: just the markers, no `security unlock-keychain`.

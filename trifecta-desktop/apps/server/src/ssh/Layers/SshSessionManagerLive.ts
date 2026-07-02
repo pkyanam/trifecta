@@ -1,4 +1,5 @@
 import * as Crypto from "node:crypto";
+import * as Os from "node:os";
 
 import {
   AuthSessionId,
@@ -382,7 +383,7 @@ const make = Effect.gen(function* () {
         .spawn({
           shell: SSH_COMMAND,
           args,
-          cwd: process.env.HOME ?? process.env.USERPROFILE ?? process.cwd(),
+          cwd: Os.homedir() || process.cwd(),
           cols: state.cols,
           rows: state.rows,
           env,
