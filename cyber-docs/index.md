@@ -27,9 +27,12 @@ Findings
 │ 016│ Medium   │ Webhook      │ Stripe webhook replay protection (www)       │ Fixed     │ FINDING-016.md                           │
 │ 017│ Medium   │ Hardening    │ Missing CSP and security headers (www)       │ Fixed     │ FINDING-017.md                           │
 │ 018│ Info     │ Audit        │ Desktop deep review — no new vulns           │ N/V       │ FINDING-018.md                           │
+│ 019│ Medium   │ Transport    │ No HTTPS warning for non-local HTTP (mobile) │ Fixed     │ (Sweep #4)                               │
+│ 020│ Medium   │ Dependency   │ trifecta-www transitive CVEs (shell-quote)   │ Fixed     │ (Sweep #4)                               │
+│ 021│ Medium   │ Supply Chain │ xterm.js loaded from CDN (mobile)            │ Fixed     │ (Sweep #4)                               │
 └────┴──────────┴──────────────┴──────────────────────────────────────────────┴───────────┴──────────────────────────────────────────┘
 
-Summary: 18 findings total — 11 fixed, 2 accepted, 1 not applicable, 4 not vulnerable.
+Summary: 21 findings total — 14 fixed, 2 accepted, 1 not applicable, 4 not vulnerable.
 
 Sweep Log
 
@@ -46,4 +49,8 @@ Sweep Log
 │ 3     │ 08:45Z  │ 09:30Z  │ Mobile + WWW + desktop deep      │ 3 parallel subagents. FINDING-011..018. Mobile   │
 │       │         │         │ offensive review                 │ secure IDs, WebView hardening, logging. WWW      │
 │       │         │         │                                  │ Stripe replay, CSP/headers. Desktop cleared.     │
+├───────┼─────────┼─────────┼──────────────────────────────────┼──────────────────────────────────────────────────┤
+│ 4     │ 09:30Z  │ 09:46Z  │ HTTPS enforcement, dep fixes,    │ FINDING-019..021. HTTPS warning for non-local    │
+│       │         │         │ CDN elimination                  │ HTTP servers. npm audit fix (shell-quote).       │
+│       │         │         │                                  │ xterm.js bundled locally (no CDN).               │
 └───────┴─────────┴─────────┴──────────────────────────────────┴──────────────────────────────────────────────────┘

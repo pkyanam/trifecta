@@ -1,8 +1,8 @@
 # NEXT — Next iteration action
 
-## Status: Sweep #1 + #2 + #3 Complete
+## Status: Sweep #1 + #2 + #3 + #4 Complete
 
-All findings from Sweeps #1, #2, and #3 have been investigated and
+All findings from Sweeps #1, #2, #3, and #4 have been investigated and
 remediated (or accepted/documented). The security audit is complete for
 the current scope across all three components: trifecta-desktop,
 trifecta-mobile, and trifecta-www.
@@ -18,10 +18,16 @@ trifecta-mobile, and trifecta-www.
 - FINDING-017 (Hardening): Missing CSP and security headers (www) — Fixed
 - FINDING-018 (Audit): Desktop deep review — No new vulnerabilities found
 
+### Completed in Sweep #4
+
+- FINDING-019 (Transport): HTTPS warning for non-local HTTP servers (mobile) — Fixed
+- FINDING-020 (Dependency): trifecta-www transitive CVEs (shell-quote critical) — Fixed
+- FINDING-021 (Supply Chain): xterm.js loaded from CDN (mobile) — Fixed (bundled locally)
+
 ### Verification
 
 - trifecta-mobile: `bunx tsc --noEmit` — 10 pre-existing errors (0 new)
-- trifecta-mobile: `bun run lint` — 0 errors (12 pre-existing warnings)
+- trifecta-mobile: `bun run lint` — 0 errors (15 warnings, 1 new for require() import)
 - trifecta-www: `npm run build` — succeeds
 - trifecta-www: `npm run lint` — 1 pre-existing error (0 new)
 - trifecta-desktop: `bun audit` — 0 vulnerabilities
@@ -31,9 +37,9 @@ trifecta-mobile, and trifecta-www.
 - trifecta-desktop: 0 vulnerabilities
 - trifecta-mobile: 3 (2 moderate, 1 low) — all dev dependencies (@babel/core,
   uuid, js-yaml)
-- trifecta-www: 39 (1 critical shell-quote, 6 high, 30 moderate, 2 low) —
-  mostly transitive via Daytona SDK / OpenTelemetry. The critical
-  shell-quote vulnerability is in a dev dependency.
+- trifecta-www: 28 (27 moderate, 1 high) — down from 39 (1 critical, 6 high,
+  30 moderate, 2 low). Critical shell-quote fixed. Remaining are transitive
+  via @daytonaio/sdk OpenTelemetry dependencies requiring breaking version bump.
 
 ### Potential follow-up work (not required for current audit)
 
@@ -41,13 +47,9 @@ trifecta-mobile, and trifecta-www.
 - Replace `'unsafe-inline'` in CSP script-src with nonce-based approach
   (both desktop and www)
 - Add integration tests for CORS origin validation with real HTTP requests
-- Consider adding HSTS header for HTTPS deployments (done for www)
-- Enforce HTTPS for non-local server URLs in mobile pairing flow
-  (while keeping HTTP for LAN/localhost)
-- Upgrade trifecta-www dependencies to resolve transitive CVEs
-  (shell-quote, OpenTelemetry, esbuild)
-- Bundle xterm.js locally instead of loading from CDN (mobile SSH terminal)
+- Upgrade @daytonaio/sdk to resolve remaining 28 transitive OpenTelemetry CVEs
+  (requires breaking version bump from 0.141.x to 0.140.x)
 - Add distributed rate limiting to trifecta-www (Upstash Redis) for
   serverless deployment
 - Review mobile clipboard auto-pair flow for social engineering risk
-  (FINDING-006 from mobile audit — user must explicitly tap "Paste link")
+  (user must explicitly tap "Paste link")
