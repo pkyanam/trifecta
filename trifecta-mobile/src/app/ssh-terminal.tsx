@@ -10,7 +10,6 @@ import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pre
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system";
-import { useAssets } from "expo-asset";
 import { FadeIn, FadeOut } from "react-native-reanimated";
 import { WebView } from "react-native-webview";
 import { X, Maximize2, Minimize2, Copy, Check, Shield, AlertTriangle } from "lucide-react-native";
@@ -212,34 +211,38 @@ export default function SshTerminalScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const insets = useSafeAreaInsets();
 
-  // Load xterm.js and addon-fit from local assets (bundled with the app)
-  // instead of loading from a CDN. This eliminates the CDN dependency and
-  // allows a stricter CSP with no external script sources.
-  const [xtermAssets] = useAssets([
-    require("../../assets/xterm/xterm.min.xjs"),
-    require("../../assets/xterm/addon-fit.min.xjs"),
-    require("../../assets/xterm/xterm.xcss"),
-  ]);
+  // Load xterm.js, addon-fit, and xterm.css from the app's main bundle.
+  // These files are added as native bundle resources in the Xcode project
+  // (ios/Trifecta/XtermAssets/) and are copied to the root of the app bundle
+  // during the build. We read them directly with FileSystem.readAsStringAsync,
+  // which works reliably in both debug and release builds.
   const [xtermJs, setXtermJs] = useState("");
   const [addonFitJs, setAddonFitJs] = useState("");
   const [xtermCss, setXtermCss] = useState("");
   const [assetError, setAssetError] = useState(false);
 
   useEffect(() => {
-    if (!xtermAssets || xtermAssets.length < 3) return;
-    const [jsAsset, fitAsset, cssAsset] = xtermAssets;
-    Promise.all([
-      FileSystem.readAsStringAsync(jsAsset.localUri!),
-      FileSystem.readAsStringAsync(fitAsset.localUri!),
-      FileSystem.readAsStringAsync(cssAsset.localUri!),
-    ]).then(([js, fit, css]) => {
-      setXtermJs(js);
-      setAddonFitJs(fit);
-      setXtermCss(css);
-    }).catch(() => {
-      setAssetError(true);
-    });
-  }, [xtermAssets]);
+    const loadAssets = async () => {
+      try {
+        const bundleDir = FileSystem.bundleDirectory;
+        if (!bundleDir) throw new Error("No bundle directory available");
+
+        // Files added via "Copy Bundle Resources" are at the bundle root.
+        const [js, fit, css] = await Promise.all([
+          FileSystem.readAsStringAsync(`${bundleDir}xterm.min.xjs`),
+          FileSystem.readAsStringAsync(`${bundleDir}addon-fit.min.xjs`),
+          FileSystem.readAsStringAsync(`${bundleDir}xterm.xcss`),
+        ]);
+        setXtermJs(js);
+        setAddonFitJs(fit);
+        setXtermCss(css);
+      } catch (err) {
+        console.error("[SSH Terminal] Failed to load xterm assets:", err);
+        setAssetError(true);
+      }
+    };
+    loadAssets();
+  }, []);
 
   // Get host label from hosts list
   const hostLabel = hosts.find(h => h.id === activeSession?.hostId)?.label || "SSH Terminal";
