@@ -7,6 +7,7 @@ import * as Path from "effect/Path";
 import * as Random from "effect/Random";
 
 import {
+  escapeWindowsShellArg,
   isCommandAvailable,
   launchDetached,
   resolveAvailableEditors,
@@ -639,4 +640,27 @@ it.layer(NodeServices.layer)("resolveAvailableEditors", (it) => {
     });
     assert.deepEqual(editors, []);
   });
+});
+
+it("escapeWindowsShellArg wraps a simple path in double quotes", () => {
+  assert.equal(escapeWindowsShellArg("C:\\workspace"), '"C:\\workspace"');
+});
+
+it("escapeWindowsShellArg wraps a path with spaces in double quotes", () => {
+  assert.equal(escapeWindowsShellArg("C:\\Program Files\\app"), '"C:\\Program Files\\app"');
+});
+
+it("escapeWindowsShellArg doubles internal double quotes to prevent cmd.exe injection", () => {
+  // An attacker-supplied cwd like foo" & calc & "bar must not break out
+  // of the quoted argument. Internal " is doubled to "" which cmd.exe
+  // interprets as a literal " inside the quoted string.
+  assert.equal(escapeWindowsShellArg('foo" & calc & "bar'), '"foo"" & calc & ""bar"');
+});
+
+it("escapeWindowsShellArg handles multiple consecutive double quotes", () => {
+  assert.equal(escapeWindowsShellArg('a""b'), '"a""""b"');
+});
+
+it("escapeWindowsShellArg handles empty string", () => {
+  assert.equal(escapeWindowsShellArg(""), '""');
 });
