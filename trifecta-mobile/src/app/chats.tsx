@@ -6,6 +6,7 @@ import { useActiveThread } from "@/stores/active-thread";
 import { useThreadList } from "@/stores/thread-list";
 import { useWsClient } from "@/stores/ws-client";
 import type { ServerProvider, ThreadShell } from "@/types/thread";
+import { secureRandomId } from "@/utils/secure-id";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Color, Link, Stack, useRouter } from "expo-router";
 import { ChevronRight, Menu, Search } from "lucide-react-native";
@@ -127,7 +128,7 @@ export default function ChatsScreen() {
               try {
                 await request("orchestration.dispatchCommand", {
                   type: "thread.meta.update",
-                  commandId: Math.random().toString(16).slice(2),
+                  commandId: secureRandomId(),
                   threadId: thread.id,
                   title: newTitle.trim(),
                 });
@@ -156,7 +157,7 @@ export default function ChatsScreen() {
               try {
                 await request("orchestration.dispatchCommand", {
                   type: "thread.delete",
-                  commandId: Math.random().toString(16).slice(2),
+                  commandId: secureRandomId(),
                   threadId: thread.id,
                   createdAt: new Date().toISOString(),
                 });

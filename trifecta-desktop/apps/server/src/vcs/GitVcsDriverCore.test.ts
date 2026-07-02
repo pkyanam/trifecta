@@ -15,7 +15,7 @@ const ServerConfigLayer = ServerConfig.layerTest(process.cwd(), {
   prefix: "belweave-git-vcs-driver-test-",
 });
 const TestLayer = GitVcsDriver.layer.pipe(
-  Layer.provide(ServerConfigLayer),
+  Layer.provideMerge(ServerConfigLayer),
   Layer.provideMerge(NodeServices.layer),
 );
 
@@ -263,10 +263,8 @@ it.layer(TestLayer)("GitVcsDriver core integration", (it) => {
         const cwd = yield* makeTmpDir();
         const { initialBranch } = yield* initRepoWithCommit(cwd);
         const pathService = yield* Path.Path;
-        const worktreePath = pathService.join(
-          yield* makeTmpDir("git-worktrees-"),
-          "feature-worktree",
-        );
+        const config = yield* ServerConfig;
+        const worktreePath = pathService.join(config.worktreesDir, "feature-worktree");
         const driver = yield* GitVcsDriver.GitVcsDriver;
 
         const created = yield* driver.createWorktree({
@@ -283,6 +281,59 @@ it.layer(TestLayer)("GitVcsDriver core integration", (it) => {
         yield* driver.removeWorktree({ cwd, path: worktreePath });
         const fileSystem = yield* FileSystem.FileSystem;
         assert.equal(yield* fileSystem.exists(worktreePath), false);
+      }),
+    );
+
+    it.effect("rejects createWorktree with a path outside worktreesDir (path traversal)", () =>
+      Effect.gen(function* () {
+        const cwd = yield* makeTmpDir();
+        const { initialBranch } = yield* initRepoWithCommit(cwd);
+        const pathService = yield* Path.Path;
+        const config = yield* ServerConfig;
+        // a tmp dir that is NOT under config.worktreesDir
+        const outsidePath = pathService.join(
+          yield* makeTmpDir("git-worktrees-outside-"),
+          "escaped",
+        );
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+
+        const error = yield* driver
+          .createWorktree({
+            cwd,
+            path: outsidePath,
+            refName: initialBranch,
+            newRefName: "feature/escape",
+          })
+          .pipe(Effect.flip);
+
+        assert.instanceOf(error, GitCommandError);
+
+        // sanity: worktreesDir is genuinely different from outsidePath
+        assert.isFalse(
+          pathService.resolve(outsidePath) === pathService.resolve(config.worktreesDir),
+        );
+      }),
+    );
+
+    it.effect("rejects removeWorktree with a path outside worktreesDir (path traversal)", () =>
+      Effect.gen(function* () {
+        const cwd = yield* makeTmpDir();
+        yield* initRepoWithCommit(cwd);
+        const pathService = yield* Path.Path;
+        const outsidePath = pathService.join(
+          yield* makeTmpDir("git-worktrees-outside-"),
+          "escaped",
+        );
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+
+        const error = yield* driver
+          .removeWorktree({
+            cwd,
+            path: outsidePath,
+          })
+          .pipe(Effect.flip);
+
+        assert.instanceOf(error, GitCommandError);
       }),
     );
   });

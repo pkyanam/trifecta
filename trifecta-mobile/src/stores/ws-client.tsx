@@ -4,6 +4,7 @@ import {
   getServerURLForPlatform,
   type ServerFlavor,
 } from "@/services/pairing";
+import { secureRandomHex } from "@/utils/secure-id";
 import type { ServerConfig } from "@/types/thread";
 import React, {
   createContext,
@@ -43,14 +44,15 @@ interface WsClientContextValue {
 const WsClientContext = createContext<WsClientContextValue | null>(null);
 
 function randomHex(len: number): string {
-  let result = "";
-  while (result.length < len) {
-    result += Math.floor(Math.random() * 0x100000000)
-      .toString(16)
-      .padStart(8, "0");
-  }
-  return result.slice(0, len);
+  return secureRandomHex(len);
 }
+
+// Dev-only debug log. Stripped from production builds by the bundler when
+// __DEV__ is false, preventing sensitive WebSocket payloads from being
+// logged in production.
+const devLog = (...args: unknown[]) => {
+  if (__DEV__) console.log(...args);
+};
 
 function makeRpcFrame(
   id: string,
@@ -142,7 +144,7 @@ class WsRpcClient {
           this.clearConnectionTimeout();
           this.ws = null;
           this.stopHeartbeat();
-          console.log("WebSocket closed:", {
+          devLog("WebSocket closed:", {
             code: event.code,
             reason: event.reason,
             wasClean: event.wasClean,
@@ -241,15 +243,15 @@ class WsRpcClient {
 
   private handleFrame(frame: Record<string, unknown>) {
     const tag = frame._tag as string;
-    console.log("[WS Client] Received frame:", tag, frame);
+    devLog("[WS Client] Received frame:", tag, frame);
     switch (tag) {
       case "Chunk": {
         const requestId = frame.requestId as string;
         const values = (frame.values as unknown[]) ?? [];
-        console.log("[WS Client] Chunk for requestId:", requestId, "values:", values);
+        devLog("[WS Client] Chunk for requestId:", requestId, "values:", values);
         const sub = this.streams.get(requestId);
         if (sub) {
-          console.log("[WS Client] Found subscription for requestId:", requestId, "method:", sub.method);
+          devLog("[WS Client] Found subscription for requestId:", requestId, "method:", sub.method);
           // Clear timeout on first chunk received
           if ((sub as any).timeout) {
             clearTimeout((sub as any).timeout);
@@ -258,14 +260,14 @@ class WsRpcClient {
           for (const v of values) sub.onValue(v);
           this.send(JSON.stringify({ _tag: "Ack", requestId }));
         } else {
-          console.log("[WS Client] No subscription found for requestId:", requestId);
+          devLog("[WS Client] No subscription found for requestId:", requestId);
         }
         break;
       }
       case "Exit": {
         const requestId = frame.requestId as string;
         const exit = (frame.exit ?? {}) as Record<string, unknown>;
-        console.log("[WS Client] Exit for requestId:", requestId, "exit:", exit);
+        devLog("[WS Client] Exit for requestId:", requestId, "exit:", exit);
         const pend = this.pending.get(requestId);
         if (pend) {
           // Clear timeout if it exists
@@ -468,25 +470,25 @@ class WsRpcClient {
     onValue: (value: unknown) => void,
   ): () => void {
     const id = String(this.nextId++);
-    console.log("[WS Client] Subscribing to stream:", method, "with payload:", payload, "requestId:", id);
+    devLog("[WS Client] Subscribing to stream:", method, "with payload:", payload, "requestId:", id);
     this.streams.set(id, { method, payload, onValue });
     if (this.ws?.readyState === WebSocket.OPEN) {
       const frame = makeRpcFrame(id, method, payload);
-      console.log("[WS Client] Sending subscription frame:", frame);
+      devLog("[WS Client] Sending subscription frame:", frame);
       this.send(frame);
       // Add timeout for subscription to start receiving data
       const timeout = setTimeout(() => {
         if (this.streams.has(id)) {
-          console.log("[WS Client] Subscription timeout for requestId:", id);
+          devLog("[WS Client] Subscription timeout for requestId:", id);
           this.streams.delete(id);
         }
       }, this.REQUEST_TIMEOUT);
       (this.streams.get(id) as any).timeout = timeout;
     } else {
-      console.log("[WS Client] WebSocket not ready, subscription will be sent on reconnect");
+      devLog("[WS Client] WebSocket not ready, subscription will be sent on reconnect");
     }
     return () => {
-      console.log("[WS Client] Unsubscribing from stream:", method, "requestId:", id);
+      devLog("[WS Client] Unsubscribing from stream:", method, "requestId:", id);
       const sub = this.streams.get(id);
       if (sub && (sub as any).timeout) {
         clearTimeout((sub as any).timeout);

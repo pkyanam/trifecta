@@ -9,6 +9,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, Dimensions, Modal, Animated } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
+import * as FileSystem from "expo-file-system";
+import { useAssets } from "expo-asset";
 import { FadeIn, FadeOut } from "react-native-reanimated";
 import { WebView } from "react-native-webview";
 import { X, Maximize2, Minimize2, Copy, Check, Shield, AlertTriangle } from "lucide-react-native";
@@ -202,12 +204,42 @@ export default function SshTerminalScreen() {
   } = useSsh();
   const webViewRef = useRef<WebView>(null);
   const sessionLoadedRef = useRef(false);
+  const [webViewReady, setWebViewReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dimensions, setDimensions] = useState(Dimensions.get("window"));
   const [hostKeyPrompt, setHostKeyPrompt] = useState<any>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const insets = useSafeAreaInsets();
+
+  // Load xterm.js and addon-fit from local assets (bundled with the app)
+  // instead of loading from a CDN. This eliminates the CDN dependency and
+  // allows a stricter CSP with no external script sources.
+  const [xtermAssets] = useAssets([
+    require("../../assets/xterm/xterm.min.js"),
+    require("../../assets/xterm/addon-fit.min.js"),
+    require("../../assets/xterm/xterm.css"),
+  ]);
+  const [xtermJs, setXtermJs] = useState("");
+  const [addonFitJs, setAddonFitJs] = useState("");
+  const [xtermCss, setXtermCss] = useState("");
+  const [assetError, setAssetError] = useState(false);
+
+  useEffect(() => {
+    if (!xtermAssets || xtermAssets.length < 3) return;
+    const [jsAsset, fitAsset, cssAsset] = xtermAssets;
+    Promise.all([
+      FileSystem.readAsStringAsync(jsAsset.localUri!),
+      FileSystem.readAsStringAsync(fitAsset.localUri!),
+      FileSystem.readAsStringAsync(cssAsset.localUri!),
+    ]).then(([js, fit, css]) => {
+      setXtermJs(js);
+      setAddonFitJs(fit);
+      setXtermCss(css);
+    }).catch(() => {
+      setAssetError(true);
+    });
+  }, [xtermAssets]);
 
   // Get host label from hosts list
   const hostLabel = hosts.find(h => h.id === activeSession?.hostId)?.label || "SSH Terminal";
@@ -322,7 +354,7 @@ export default function SshTerminalScreen() {
         Alert.alert("SSH Error", event.message);
       }
     }
-  }, [terminalEvents, router]);
+  }, [terminalEvents, router, webViewReady]);
 
   // When native layout changes (keyboard, rotation), ask xterm to refit.
   // xterm's fitAddon measures actual character metrics and posts a 'dimensions'
@@ -424,7 +456,11 @@ export default function SshTerminalScreen() {
         // to sync the PTY so COLUMNS matches what xterm renders exactly.
         resize({ sessionId, cols: message.cols, rows: message.rows }).catch(console.error);
       } else if (message.type === "ready") {
-        // xterm.js ready
+        // xterm.js is ready — flush any buffered events that arrived before
+        // the WebView finished mounting. Reset the last-written marker so the
+        // write effect reprocesses the entire current buffer.
+        lastWrittenEventRef.current = null;
+        setWebViewReady(true);
       } else if (message.type === "error") {
         console.error("[SSH Terminal] WebView error:", message.message);
         Alert.alert("Terminal Error", message.message);
@@ -438,16 +474,19 @@ export default function SshTerminalScreen() {
     }
   }, [sessionId, sendInput, resize]);
 
-  const html = `
+  const htmlTemplate = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none';">
       <!-- xterm.css is REQUIRED: it positions rows/characters and hides xterm's
            character-measurement element (a row of "W"s). Without it the measure
            element is visible and the terminal layout is garbled. -->
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+      <style>
+        __XTERM_CSS__
+      </style>
       <style>
         * {
           margin: 0;
@@ -474,8 +513,12 @@ export default function SshTerminalScreen() {
           outline: none;
         }
       </style>
-      <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
-      <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+      <script>
+        __XTERM_JS__
+      </script>
+      <script>
+        __ADDON_FIT_JS__
+      </script>
     </head>
     <body>
       <div id="terminal" tabindex="0"></div>
@@ -571,7 +614,33 @@ export default function SshTerminalScreen() {
     </html>
   `;
 
-  if (isLoadingSession) {
+  const html = xtermJs && addonFitJs && xtermCss
+    ? htmlTemplate
+        .replace("__XTERM_CSS__", () => xtermCss)
+        .replace("__XTERM_JS__", () => xtermJs)
+        .replace("__ADDON_FIT_JS__", () => addonFitJs)
+    : "";
+
+  if (assetError) {
+    return (
+      <SafeAreaView className="flex-1 bg-background">
+        <View className="flex-1 items-center justify-center px-8">
+          <Text className="text-foreground text-lg font-semibold text-center">Terminal unavailable</Text>
+          <Text className="text-muted-foreground mt-2 text-center">
+            The terminal could not be loaded. Please restart the app and try again.
+          </Text>
+          <Pressable
+            onPress={() => router.back()}
+            className="mt-6 px-5 py-2.5 rounded-full bg-muted active:opacity-60"
+          >
+            <Text className="text-foreground font-semibold">Go back</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isLoadingSession || !html) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center px-8">
@@ -625,8 +694,6 @@ export default function SshTerminalScreen() {
             onMessage={handleMessage}
             javaScriptEnabled={true}
             domStorageEnabled={true}
-            originWhitelist={['*']}
-            mixedContentMode="compatibility"
             scalesPageToFit={false}
             bounces={false}
             overScrollMode="never"
@@ -638,6 +705,12 @@ export default function SshTerminalScreen() {
             keyboardAppearance="dark"
             hideKeyboardAccessoryView={true}
             textInteractionEnabled={true}
+            onShouldStartLoadWithRequest={(request) => {
+              // Only allow the initial static HTML load. Block all external
+              // navigation to prevent a compromised CDN or injected content
+              // from redirecting the WebView to an attacker-controlled origin.
+              return request.url === "about:blank" || request.url.startsWith("about:blank");
+            }}
           />
         </View>
 

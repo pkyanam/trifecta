@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import * as Crypto from "expo-crypto";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ServerFlavor } from "@/services/pairing";
 
@@ -57,11 +58,9 @@ type ConnectionState = {
 
 const ConnectionContext = createContext<ConnectionState | null>(null);
 
+/** Generate a cryptographically secure unique id for a paired server entry. */
 function makeId(): string {
-  return (
-    Math.random().toString(36).slice(2, 10) +
-    Date.now().toString(36)
-  );
+  return Crypto.randomUUID();
 }
 
 /** Normalize a URL for dedupe comparison (trim + strip trailing slashes). */
@@ -220,13 +219,15 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
         };
         next = [...prev, paired];
       }
-      serversRef.current = next;
-      setServers(next);
-      activeServerIdRef.current = paired.id;
+      // Persist to SecureStore before updating in-memory state so UI never
+      // diverges from what is actually stored.
       await Promise.all([
         writeServers(next),
         SecureStore.setItemAsync(ACTIVE_KEY, paired.id),
       ]);
+      serversRef.current = next;
+      setServers(next);
+      activeServerIdRef.current = paired.id;
       setActiveServerId(paired.id);
       return paired;
     },
@@ -235,23 +236,20 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
 
   const switchServer = useCallback(async (id: string) => {
     if (serversRef.current.every((s) => s.id !== id)) return;
+    await SecureStore.setItemAsync(ACTIVE_KEY, id);
     activeServerIdRef.current = id;
     setActiveServerId(id);
-    await SecureStore.setItemAsync(ACTIVE_KEY, id);
   }, []);
 
   const removeServer = useCallback(async (id: string) => {
     const prev = serversRef.current;
     const next = prev.filter((s) => s.id !== id);
-    serversRef.current = next;
-    setServers(next);
     const wasActive = prev.some((s) => s.id === id) && activeServerIdRef.current === id;
     let nextActiveId = activeServerIdRef.current;
     if (wasActive) {
       nextActiveId = next.length > 0 ? next[0].id : null;
-      activeServerIdRef.current = nextActiveId;
-      setActiveServerId(nextActiveId);
     }
+    // Persist before updating state.
     if (nextActiveId) {
       await Promise.all([
         writeServers(next),
@@ -263,6 +261,12 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
         SecureStore.deleteItemAsync(ACTIVE_KEY),
       ]);
     }
+    serversRef.current = next;
+    setServers(next);
+    if (wasActive) {
+      activeServerIdRef.current = nextActiveId;
+      setActiveServerId(nextActiveId);
+    }
   }, []);
 
   const renameServer = useCallback(async (id: string, label: string) => {
@@ -272,9 +276,9 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
     if (idx < 0) return;
     const next = [...prev];
     next[idx] = { ...next[idx], label: trimmed.length > 0 ? trimmed : null };
+    await writeServers(next);
     serversRef.current = next;
     setServers(next);
-    await writeServers(next);
   }, []);
 
   const unpair = useCallback(async () => {

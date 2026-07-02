@@ -159,9 +159,9 @@ export function SshProvider({ children }: { children: React.ReactNode }) {
     setTerminalEvents([]); // Clear previous terminal events
     setActiveSession(null); // Clear previous session
     try {
-      console.log("[SSH Store] Opening SSH session with input:", input);
+      if (__DEV__) console.log("[SSH Store] Opening SSH session");
       const result = await request("ssh.openSession", input) as SshOpenSessionResult;
-      console.log("[SSH Store] SSH session opened successfully:", result.snapshot);
+      if (__DEV__) console.log("[SSH Store] SSH session opened successfully");
       setActiveSession(result.snapshot);
       return result;
     } catch (err) {

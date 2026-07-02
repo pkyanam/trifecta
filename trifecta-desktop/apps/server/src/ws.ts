@@ -1,3 +1,5 @@
+import * as Os from "node:os";
+
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -51,11 +53,13 @@ import {
   WsRpcGroup,
 } from "@belweave/contracts";
 import { clamp } from "effect/Number";
-import { HttpRouter, HttpServerRequest } from "effect/unstable/http";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
 import { CheckpointDiffQuery } from "./checkpointing/Services/CheckpointDiffQuery.ts";
 import { ServerConfig } from "./config.ts";
+import { isOriginAllowed } from "./httpCors.ts";
+import { WsRateLimiter, WsRateLimiterLive } from "./wsRateLimit.ts";
 import { Keybindings } from "./keybindings.ts";
 import { Open, resolveAvailableEditors } from "./open.ts";
 import { normalizeDispatchCommand } from "./orchestration/Normalizer.ts";
@@ -1718,7 +1722,7 @@ const makeWsRpcLayer = (session: AuthenticatedSession) =>
                     });
                   }
 
-                  const home = process.env.HOME ?? process.cwd();
+                  const home = Os.homedir() || process.cwd();
                   const marker = "# >>> trifecta-ssh-keychain >>>";
                   const markerEnd = "# <<< trifecta-ssh-keychain <<<";
                   // No-op block: just the markers, no `security unlock-keychain`.
@@ -1830,6 +1834,25 @@ export const websocketRpcRouteLayer = Layer.unwrap(
         const request = yield* HttpServerRequest.HttpServerRequest;
         const serverAuth = yield* ServerAuth;
         const sessions = yield* SessionCredentialService;
+        const config = yield* ServerConfig;
+        const rateLimiter = yield* WsRateLimiter;
+
+        // Enforce rate limiting and message size limits before any other
+        // processing to protect against DoS attacks.
+        const limitResponse = yield* rateLimiter.checkAll;
+        if (limitResponse) {
+          return limitResponse;
+        }
+
+        // Validate WebSocket Origin header to prevent cross-site WebSocket
+        // hijacking (CSWSH). Browsers always send the Origin header on WS
+        // upgrades; non-browser clients are not restricted by this check
+        // but still require authentication.
+        const requestOrigin = request.headers["origin"] ?? undefined;
+        if (requestOrigin && !isOriginAllowed(requestOrigin, config)) {
+          return HttpServerResponse.text("Forbidden: origin not allowed", { status: 403 });
+        }
+
         const session = yield* serverAuth.authenticateWebSocketUpgrade(request);
         const rpcWebSocketHttpEffect = yield* RpcServer.toHttpEffectWebsocket(WsRpcGroup, {
           disableTracing: true,

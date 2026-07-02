@@ -8,6 +8,7 @@ import { useWsClient } from "@/stores/ws-client";
 import { cn } from "@/utils/tailwind";
 import { useRouter } from "expo-router";
 import type { LucideIcon } from "lucide-react-native";
+import { useCallback } from "react";
 import {
   Check,
   ChevronRight,
@@ -29,13 +30,13 @@ export default function SettingsScreen() {
   const { themePreference, setThemePreference, hapticsEnabled, setHapticsEnabled } = usePreferences();
   const router = useRouter();
 
-  const handleSwitch = (server: PairedServer) => {
+  const handleSwitch = useCallback((server: PairedServer) => {
     if (server.id === activeServerId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     void switchServer(server.id);
-  };
+  }, [activeServerId, switchServer]);
 
-  const handleRemove = (server: PairedServer) => {
+  const handleRemove = useCallback((server: PairedServer) => {
     const name = serverDisplayName(server);
     Alert.alert(
       "Remove server",
@@ -59,11 +60,11 @@ export default function SettingsScreen() {
         },
       ],
     );
-  };
+  }, [activeServerId, clearThreadState, clearThreadList, removeServer, servers, router]);
 
-  const handleAddServer = () => {
+  const handleAddServer = useCallback(() => {
     router.navigate("/pair?returnTo=settings");
-  };
+  }, [router]);
 
   return (
     <ScrollView
@@ -213,6 +214,7 @@ function ServerRow({
     <Pressable
       onPress={onSelect}
       onLongPress={onRemove}
+      accessibilityHint={!active ? "Double tap to switch. Long press to remove this server" : "Active server"}
       className={cn(
         "flex-row items-center px-4 py-3.5 gap-3 active:bg-accent",
         !isFirst && "border-t border-border",

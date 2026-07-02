@@ -8,16 +8,7 @@ import type {
 import { useCallback, useEffect, useState } from "react";
 import { useActiveThread } from "@/stores/active-thread";
 import { useWsClient } from "@/stores/ws-client";
-
-function randomId(): string {
-  let result = "";
-  while (result.length < 32) {
-    result += Math.floor(Math.random() * 0x100000000)
-      .toString(16)
-      .padStart(8, "0");
-  }
-  return result.slice(0, 32);
-}
+import { secureRandomId } from "@/utils/secure-id";
 
 export interface UseThreadResult {
   detail: ThreadDetail | null;
@@ -163,7 +154,7 @@ export function useThread(threadId: ThreadId | null): UseThreadResult {
     try {
       await request("orchestration.dispatchCommand", {
         type: "thread.turn.interrupt",
-        commandId: randomId(),
+        commandId: secureRandomId(),
         threadId,
         createdAt: new Date().toISOString(),
       });

@@ -74,6 +74,61 @@ export function normalizeServerURL(url: URL): string {
 }
 
 /**
+ * Returns true if the URL points to a local/private network host where
+ * HTTP (without TLS) is acceptable. This includes loopback, private IP
+ * ranges (RFC 1918), link-local, and common dev hostnames.
+ */
+export function isLocalNetworkURL(rawURL: string): boolean {
+  try {
+    const url = new URL(rawURL);
+    const hostname = url.hostname.toLowerCase().replace(/^\[(.*)\]$/, "$1");
+
+    // Loopback
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+      return true;
+    }
+    // Android emulator host alias
+    if (hostname === "10.0.2.2") {
+      return true;
+    }
+
+    // Private IP ranges (RFC 1918 + RFC 4193)
+    if (/^10\.\d+\.\d+\.\d+$/.test(hostname)) return true;
+    if (/^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(hostname)) return true;
+    if (/^192\.168\.\d+\.\d+$/.test(hostname)) return true;
+    if (/^fd[0-9a-f]{2}:/.test(hostname)) return true; // IPv6 ULA
+    if (/^fe80:/.test(hostname)) return true; // IPv6 link-local
+
+    // .local mDNS
+    if (hostname.endsWith(".local")) return true;
+
+    // Tailscale hostnames (100.x.y.z range)
+    if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+$/.test(hostname)) return true;
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Returns true if the URL uses HTTPS, or uses HTTP on a local/private
+ * network where cleartext is acceptable.
+ */
+export function isSecureTransportURL(rawURL: string): boolean {
+  try {
+    const url = new URL(rawURL);
+    if (url.protocol === "https:" || url.protocol === "wss:") return true;
+    if (url.protocol === "http:" || url.protocol === "ws:") {
+      return isLocalNetworkURL(rawURL);
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Probes the server's well-known environment endpoint to determine which
  * flavor it is. Both flavors expose a JSON descriptor at a flavor-specific
  * path:

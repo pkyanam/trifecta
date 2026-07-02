@@ -6,16 +6,9 @@ import { Link, Stack, useRouter } from "expo-router";
 import { ChevronDown, Menu } from "lucide-react-native";
 import { Platform, Alert, Pressable, Text, View } from "react-native";
 import { useDrawer } from "./drawer-content";
+import { secureRandomId } from "@/utils/secure-id";
 
 const IS_ANDROID = Platform.OS === "android";
-
-function randomId(): string {
-  let result = "";
-  while (result.length < 32) {
-    result += Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, "0");
-  }
-  return result.slice(0, 32);
-}
 
 function HeaderTitleMenu() {
   const { selectedModelLabel } = useModel();
@@ -37,7 +30,7 @@ function HeaderTitleMenu() {
             try {
               await request("orchestration.dispatchCommand", {
                 type: "thread.meta.update",
-                commandId: randomId(),
+                commandId: secureRandomId(),
                 threadId: activeThreadId,
                 title: title.trim(),
               });
@@ -60,7 +53,7 @@ function HeaderTitleMenu() {
           try {
             await request("orchestration.dispatchCommand", {
               type: "thread.delete",
-              commandId: randomId(),
+              commandId: secureRandomId(),
               threadId: activeThreadId,
               createdAt: new Date().toISOString(),
             });

@@ -15,7 +15,7 @@ const SSH_ADD_COMMAND = process.platform === "win32" ? "ssh-add.exe" : "ssh-add"
 const AGENT_LOAD_TIMEOUT = Duration.seconds(8);
 
 function resolveHomeDirectory(): string | undefined {
-  return process.env.HOME || process.env.USERPROFILE || Os.homedir() || undefined;
+  return Os.homedir() || process.env.USERPROFILE || undefined;
 }
 
 const resolveDefaultIdentity = Effect.fn(function* () {

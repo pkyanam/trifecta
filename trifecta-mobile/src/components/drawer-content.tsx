@@ -10,6 +10,7 @@ import { useActiveThread } from "@/stores/active-thread";
 import { serverDisplayName, useConnection } from "@/stores/connection";
 import { useThreadList } from "@/stores/thread-list";
 import { useWsClient } from "@/stores/ws-client";
+import { useServerPicker } from "@/components/server-picker-modal";
 import type { ProjectShell, ThreadShell } from "@/types/thread";
 import { projectDisplayName } from "@/utils/projects";
 import { cn } from "@/utils/tailwind";
@@ -150,6 +151,7 @@ export function DrawerContent({
   const { activeThreads, projects } = useThreadList();
   const { activeThreadId, setActiveThreadId } = useActiveThread();
   const { providers, setSelectedModelSelection } = useModel();
+  const { openServerPicker } = useServerPicker();
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
 
   const activeServer = servers.find((s) => s.id === activeServerId) ?? null;
@@ -251,7 +253,7 @@ export function DrawerContent({
       >
         <TouchableGlass
           onPress={() => {
-            if (isPaired) onOpenModal("/(settings)/settings");
+            if (isPaired) openServerPicker();
             else onNavigate("/pair");
           }}
           className="rounded-full p-2 flex-row items-center gap-2.5 active:opacity-60"

@@ -1,7 +1,7 @@
 import { Icon } from "@/components/icon";
 import { LiquidMetalButton } from "@/components/liquid-metal";
 import { SymbolImage } from "@/components/symbol-image";
-import { exchangeToken, fetchEnvironment, parsePairingURL, getServerURLForPlatform } from "@/services/pairing";
+import { exchangeToken, fetchEnvironment, parsePairingURL, getServerURLForPlatform, isSecureTransportURL } from "@/services/pairing";
 import { useConnection } from "@/stores/connection";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
@@ -9,6 +9,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, Copy, Link2, Terminal, Wifi, X, Zap } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -83,11 +84,7 @@ export default function PairScreen() {
     setTimeout(() => setCopied(false), 2500);
   }, []);
 
-  const handleConnect = useCallback(async () => {
-    if (!canConnect || isConnecting) return;
-    const url = serverURL.trim().replace(/\/+$/, "");
-    const tok = token.trim();
-
+  const doConnect = useCallback(async (url: string, tok: string) => {
     setIsConnecting(true);
     setError(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -111,7 +108,30 @@ export default function PairScreen() {
     } finally {
       setIsConnecting(false);
     }
-  }, [canConnect, isConnecting, serverURL, token, pair, router, fromSettings]);
+  }, [pair, router, fromSettings]);
+
+  const handleConnect = useCallback(async () => {
+    if (!canConnect || isConnecting) return;
+    const url = serverURL.trim().replace(/\/+$/, "");
+    const tok = token.trim();
+
+    // Warn the user when connecting to a non-local HTTP server — the
+    // pairing token and all subsequent WebSocket traffic will be sent in
+    // cleartext and can be intercepted on the network.
+    if (!isSecureTransportURL(url)) {
+      Alert.alert(
+        "Insecure Connection",
+        "This server uses HTTP over a public network. Your pairing token and all traffic will be sent unencrypted and can be intercepted. Continue?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Continue", style: "destructive", onPress: () => doConnect(url, tok) },
+        ],
+      );
+      return;
+    }
+
+    doConnect(url, tok);
+  }, [canConnect, isConnecting, serverURL, token, doConnect]);
 
   const handleCancel = useCallback(() => {
     if (fromSettings) {

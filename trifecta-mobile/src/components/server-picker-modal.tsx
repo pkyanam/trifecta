@@ -1,226 +1,180 @@
 import { Icon } from "@/components/icon";
-import { TouchableGlass } from "@/components/touchable-glass";
 import { serverDisplayName, serverHostname, useConnection, type PairedServer } from "@/stores/connection";
-import { useWsClient, type WsStatus } from "@/stores/ws-client";
+import { useWsClient } from "@/stores/ws-client";
 import { cn } from "@/utils/tailwind";
-import { useRouter } from "expo-router";
-import { Check, Plus, RefreshCw, Server, X } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef, useState } from "react";
+import { Check, ChevronRight, Plus, Server, X } from "lucide-react-native";
+import React, { createContext, use, useCallback, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+
+// ── Context ─────────────────────────────────────────────────────────────
 
 /**
- * On-launch server picker. Appears when the app is paired with one or more
- * servers but is not connected (the active server is unreachable). Lets the
- * user pick a different server to connect to, retry the active one, or pair
- * a new server.
+ * Global server picker modal controller.
  *
- * Trigger rules:
- *  - Only when paired and there is at least one server.
- *  - Skip the initial "offline" state before the first connect attempt.
- *  - Show immediately once a connection attempt has failed (error/offline
- *    after we've seen "connecting").
- *  - Also show if stuck in "connecting" beyond a grace period.
- *  - Auto-hide as soon as status becomes "connected"; resets dismissal.
+ * The provider is mounted once in the root layout, wrapping the entire app.
+ * Any descendant can call `openServerPicker()` to show a quick server-switch
+ * modal without navigating away.
  */
-export function ServerPickerModal() {
-  const { isPaired, isLoading, servers, activeServerId, switchServer } = useConnection();
-  const { status, reconnect } = useWsClient();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+type ServerPickerContextValue = {
+  openServerPicker: () => void;
+  closeServerPicker: () => void;
+};
 
+const ServerPickerContext = createContext<ServerPickerContextValue | null>(null);
+
+export function useServerPicker() {
+  const ctx = use(ServerPickerContext);
+  if (!ctx) throw new Error("useServerPicker must be used within ServerPickerProvider");
+  return ctx;
+}
+
+// ── Provider (wraps children) ────────────────────────────────────────────
+
+export function ServerPickerProvider({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
-  // Tracks whether we've ever started a real connection attempt this session,
-  // so we don't flash the modal on the initial "offline" before "connecting".
-  const sawAttemptRef = useRef(false);
-
-  useEffect(() => {
-    if (status === "connecting" || status === "connected") {
-      sawAttemptRef.current = true;
-    }
-  }, [status]);
-
-  useEffect(() => {
-    // No servers / still loading credentials → never show.
-    if (isLoading || !isPaired || servers.length === 0) {
-      setTimeout(() => setVisible(false), 0);
-      return;
-    }
-
-    // Connected → hide and reset dismissal for next disconnect.
-    if (status === "connected") {
-      setTimeout(() => {
-        setVisible(false);
-        setDismissed(false);
-      }, 0);
-      return;
-    }
-
-    if (dismissed) return;
-
-    // A real attempt already happened and now we're offline/error → show now.
-    if (sawAttemptRef.current && (status === "error" || status === "offline")) {
-      setTimeout(() => setVisible(true), 0);
-      return;
-    }
-
-    // Stuck connecting for too long → show after grace period.
-    if (status === "connecting") {
-      const timer = setTimeout(() => setVisible(true), 6000);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading, isPaired, servers.length, status, dismissed]);
-
-  const handleSelect = (server: PairedServer) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (server.id === activeServerId) {
-      reconnect();
-    } else {
-      void switchServer(server.id);
-    }
-    // Keep the modal open until status flips to "connected" so a failed
-    // switch lets the user try another server without re-triggering.
-  };
-
-  const handlePairNew = () => {
-    setVisible(false);
-    setDismissed(true);
-    router.navigate("/pair");
-  };
-
-  const handleDismiss = () => {
-    setDismissed(true);
-    setVisible(false);
-  };
+  const open = useCallback(() => setVisible(true), []);
+  const close = useCallback(() => setVisible(false), []);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleDismiss}
-      statusBarTranslucent
-    >
-      <View className="flex-1 bg-black/40 justify-center items-center px-6">
-        <Pressable className="absolute inset-0" onPress={handleDismiss} />
+    <ServerPickerContext value={{ openServerPicker: open, closeServerPicker: close }}>
+      {children}
+      <ServerPickerContent visible={visible} onClose={close} />
+    </ServerPickerContext>
+  );
+}
+
+// ── Modal content ───────────────────────────────────────────────────────
+
+function ServerPickerContent({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const { servers, activeServerId, isPaired, switchServer } = useConnection();
+  const { status } = useWsClient();
+  const router = useRouter();
+  const isConnected = status === "connected";
+
+  const handleSelect = useCallback(async (server: PairedServer) => {
+    if (server.id === activeServerId) {
+      onClose();
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await switchServer(server.id);
+    onClose();
+  }, [activeServerId, switchServer, onClose]);
+
+  const handleAddServer = useCallback(() => {
+    onClose();
+    router.navigate("/pair?returnTo=settings");
+  }, [onClose, router]);
+
+  if (!isPaired || servers.length === 0) {
+    // Don't render the modal if there are no servers — the pair screen
+    // handles the empty state.
+    return null;
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable
+        className="flex-1 bg-black/60 items-center justify-center"
+        onPress={onClose}
+      >
         <View
-          className="w-full max-w-[400px] bg-background rounded-3xl overflow-hidden border border-border"
-          style={{ maxHeight: `80%` }}
+          className="w-full max-w-lg mx-4 bg-background rounded-3xl overflow-hidden border border-border/50"
+          style={{ borderRadius: 24 }}
         >
-          {/* Header */}
-          <View className="flex-row items-center px-5 pt-5 pb-3">
-            <View className="flex-1">
-              <Text className="text-[19px] font-bold text-foreground tracking-tight">
-                Connect to server
-              </Text>
-              <StatusLine status={status} />
-            </View>
-            <Pressable
-              onPress={handleDismiss}
-              className="w-8 h-8 rounded-full bg-muted items-center justify-center active:opacity-60"
-              accessibilityLabel="Dismiss"
-            >
-              <Icon icon={X} className="w-4 h-4 text-foreground" />
-            </Pressable>
-          </View>
-
-          {/* Server list */}
-          <ScrollView
-            className="px-3"
-            contentContainerStyle={{ paddingBottom: 8 }}
-            showsVerticalScrollIndicator={false}
-          >
-            {servers.map((server) => (
-              <PickerRow
-                key={server.id}
-                server={server}
-                active={server.id === activeServerId}
-                status={status}
-                onPress={() => handleSelect(server)}
-              />
-            ))}
-          </ScrollView>
-
-          {/* Actions */}
-          <View
-            className="px-5 pt-3 gap-2.5 border-t border-border"
-            style={{ paddingBottom: Math.max(insets.bottom + 12, 16) }}
-          >
-            {activeServerId && servers.some((s) => s.id === activeServerId) && (
+          <Pressable className="w-full" onPress={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <View className="px-5 py-4 border-b border-border/50 flex-row items-center justify-between">
+              <View className="flex-row items-center gap-2">
+                <Icon icon={Server} className="w-5 h-5 text-foreground" />
+                <Text className="text-xl font-bold text-foreground">Servers</Text>
+              </View>
               <Pressable
-                onPress={() => {
-                  const active = servers.find((s) => s.id === activeServerId);
-                  if (active) handleSelect(active);
-                }}
-                className="flex-row items-center justify-center gap-2 py-3 rounded-2xl bg-muted active:bg-accent"
+                onPress={onClose}
+                className="w-8 h-8 items-center justify-center rounded-full active:bg-muted/50"
+                accessibilityLabel="Close"
               >
-                <Icon icon={RefreshCw} className="w-4 h-4 text-foreground" strokeWidth={2.5} />
-                <Text className="text-[15px] font-semibold text-foreground">Retry connection</Text>
+                <Icon icon={X} className="w-4 h-4 text-foreground" />
               </Pressable>
-            )}
-            <TouchableGlass
-              onPress={handlePairNew}
-              className="rounded-2xl py-3.5 flex-row items-center justify-center gap-2 active:opacity-60"
-            >
-              <Icon icon={Plus} className="w-4 h-4 text-foreground" strokeWidth={2.5} />
-              <Text className="text-[15px] font-semibold text-foreground">Pair new server</Text>
-            </TouchableGlass>
-          </View>
+            </View>
+
+            {/* Server list */}
+            <ScrollView className="max-h-96" showsVerticalScrollIndicator={servers.length > 6}>
+              {servers.map((server, i) => {
+                const active = server.id === activeServerId;
+                return (
+                  <PickerServerRow
+                    key={server.id}
+                    server={server}
+                    active={active}
+                    connected={active && isConnected}
+                    isFirst={i === 0}
+                    onSelect={() => void handleSelect(server)}
+                  />
+                );
+              })}
+            </ScrollView>
+
+            {/* Add server */}
+            <View className="border-t border-border/50">
+              <Pressable
+                onPress={handleAddServer}
+                className="flex-row items-center gap-3 px-5 py-3.5 active:bg-muted"
+              >
+                <View className="w-7 h-7 rounded-full bg-muted items-center justify-center">
+                  <Icon icon={Plus} className="w-4 h-4 text-foreground" strokeWidth={2.5} />
+                </View>
+                <Text className="flex-1 text-[16px] text-foreground">Add server</Text>
+                <Icon icon={ChevronRight} className="w-3.5 h-3.5 text-muted-foreground/50" />
+              </Pressable>
+            </View>
+          </Pressable>
         </View>
-      </View>
+      </Pressable>
     </Modal>
   );
 }
 
-function StatusLine({ status }: { status: WsStatus }) {
-  const text =
-    status === "connecting"
-      ? "Connecting…"
-      : status === "error"
-        ? "Connection failed"
-        : status === "offline"
-          ? "Disconnected"
-          : "Not connected";
-  return (
-    <Text className="text-[13px] text-muted-foreground mt-0.5">{text}</Text>
-  );
-}
-
-function PickerRow({
+function PickerServerRow({
   server,
   active,
-  status,
-  onPress,
+  connected,
+  isFirst,
+  onSelect,
 }: {
   server: PairedServer;
   active: boolean;
-  status: WsStatus;
-  onPress: () => void;
+  connected: boolean;
+  isFirst: boolean;
+  onSelect: () => void;
 }) {
   const name = serverDisplayName(server);
   const host = serverHostname(server.serverURL);
   const showHost = server.label?.trim() && server.label.trim() !== host;
   const flavorLabel = server.flavor === "t3code" ? "T3 Code" : "Trifecta";
-  const connecting = active && status === "connecting";
 
   return (
     <Pressable
-      onPress={onPress}
-      className="flex-row items-center px-3 py-3 gap-3 rounded-2xl active:bg-muted"
+      onPress={onSelect}
+      className={cn(
+        "flex-row items-center px-5 py-3.5 gap-3 active:bg-muted",
+        !isFirst && "border-t border-border/30",
+      )}
     >
       <View
         className={cn(
-          "w-9 h-9 rounded-full items-center justify-center",
-          active ? "bg-accent" : "bg-muted",
+          "w-2 h-2 rounded-full",
+          active ? (connected ? "bg-sf-green" : "bg-sf-yellow") : "bg-muted-foreground/30",
         )}
-      >
-        <Icon
-          icon={Server}
-          className={cn("w-4 h-4", active ? "text-foreground" : "text-muted-foreground")}
-        />
-      </View>
+      />
       <View className="flex-1 min-w-0">
         <Text
           numberOfLines={1}
@@ -231,15 +185,13 @@ function PickerRow({
         <Text numberOfLines={1} className="text-[12px] text-muted-foreground/70 mt-0.5">
           {showHost ? `${host} · ` : ""}
           {flavorLabel}
-          {connecting ? " · connecting…" : active ? " · active" : ""}
+          {active && !connected ? " · connecting…" : ""}
         </Text>
       </View>
       {active ? (
         <Icon icon={Check} className="w-4 h-4 text-sf-green" strokeWidth={2.5} />
       ) : (
-        <View className="px-3 py-1.5 rounded-full bg-muted">
-          <Text className="text-[12px] font-semibold text-foreground">Connect</Text>
-        </View>
+        <Icon icon={ChevronRight} className="w-3.5 h-3.5 text-muted-foreground/50" />
       )}
     </Pressable>
   );

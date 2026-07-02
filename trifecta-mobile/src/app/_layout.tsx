@@ -5,7 +5,7 @@ import {
   useDrawer,
 } from "@/components/drawer-content";
 import { DrawerLayout } from "@/components/drawer-layout";
-import { ServerPickerModal } from "@/components/server-picker-modal";
+import { ServerPickerProvider } from "@/components/server-picker-modal";
 import "@/global.css";
 import "@/utils/fetch-polyfill";
 import { useSystemBackgroundColor } from "@/utils/use-system-background-color";
@@ -80,9 +80,10 @@ function WsClientInner({ children }: { children: React.ReactNode }) {
       <ThreadListProvider>
         <ActiveThreadProvider>
           <SshProvider>
-            <ServerChangeResetter />
-            {children}
-            <ServerPickerModal />
+            <ServerPickerProvider>
+              <ServerChangeResetter />
+              {children}
+            </ServerPickerProvider>
           </SshProvider>
         </ActiveThreadProvider>
       </ThreadListProvider>
