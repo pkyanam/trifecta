@@ -9,6 +9,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, Dimensions, Modal, Animated } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
+import * as FileSystem from "expo-file-system";
+import { useAssets } from "expo-asset";
 import { FadeIn, FadeOut } from "react-native-reanimated";
 import { WebView } from "react-native-webview";
 import { X, Maximize2, Minimize2, Copy, Check, Shield, AlertTriangle } from "lucide-react-native";
@@ -208,6 +210,32 @@ export default function SshTerminalScreen() {
   const [hostKeyPrompt, setHostKeyPrompt] = useState<any>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const insets = useSafeAreaInsets();
+
+  // Load xterm.js and addon-fit from local assets (bundled with the app)
+  // instead of loading from a CDN. This eliminates the CDN dependency and
+  // allows a stricter CSP with no external script sources.
+  const [xtermAssets] = useAssets([
+    require("../../assets/xterm/xterm.min.js"),
+    require("../../assets/xterm/addon-fit.min.js"),
+    require("../../assets/xterm/xterm.css"),
+  ]);
+  const [xtermJs, setXtermJs] = useState("");
+  const [addonFitJs, setAddonFitJs] = useState("");
+  const [xtermCss, setXtermCss] = useState("");
+
+  useEffect(() => {
+    if (!xtermAssets || xtermAssets.length < 3) return;
+    const [jsAsset, fitAsset, cssAsset] = xtermAssets;
+    Promise.all([
+      FileSystem.readAsStringAsync(jsAsset.localUri!),
+      FileSystem.readAsStringAsync(fitAsset.localUri!),
+      FileSystem.readAsStringAsync(cssAsset.localUri!),
+    ]).then(([js, fit, css]) => {
+      setXtermJs(js);
+      setAddonFitJs(fit);
+      setXtermCss(css);
+    }).catch(() => {});
+  }, [xtermAssets]);
 
   // Get host label from hosts list
   const hostLabel = hosts.find(h => h.id === activeSession?.hostId)?.label || "SSH Terminal";
@@ -438,17 +466,19 @@ export default function SshTerminalScreen() {
     }
   }, [sessionId, sendInput, resize]);
 
-  const html = `
+  const htmlTemplate = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net 'unsafe-inline'; style-src https://cdn.jsdelivr.net 'unsafe-inline'; img-src data:; connect-src 'none';">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none';">
       <!-- xterm.css is REQUIRED: it positions rows/characters and hides xterm's
            character-measurement element (a row of "W"s). Without it the measure
            element is visible and the terminal layout is garbled. -->
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+      <style>
+        __XTERM_CSS__
+      </style>
       <style>
         * {
           margin: 0;
@@ -475,8 +505,12 @@ export default function SshTerminalScreen() {
           outline: none;
         }
       </style>
-      <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
-      <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+      <script>
+        __XTERM_JS__
+      </script>
+      <script>
+        __ADDON_FIT_JS__
+      </script>
     </head>
     <body>
       <div id="terminal" tabindex="0"></div>
@@ -572,7 +606,14 @@ export default function SshTerminalScreen() {
     </html>
   `;
 
-  if (isLoadingSession) {
+  const html = xtermJs && addonFitJs && xtermCss
+    ? htmlTemplate
+        .replace("__XTERM_CSS__", () => xtermCss)
+        .replace("__XTERM_JS__", () => xtermJs)
+        .replace("__ADDON_FIT_JS__", () => addonFitJs)
+    : "";
+
+  if (isLoadingSession || !html) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center px-8">

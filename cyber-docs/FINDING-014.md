@@ -29,11 +29,15 @@ context and exfiltrate terminal contents.
 4. Added a Content-Security-Policy meta tag to the WebView HTML:
    ```
    default-src 'none';
-   script-src https://cdn.jsdelivr.net 'unsafe-inline';
-   style-src https://cdn.jsdelivr.net 'unsafe-inline';
+   script-src 'unsafe-inline';
+   style-src 'unsafe-inline';
    img-src data:;
    connect-src 'none';
    ```
-   This restricts script/style loading to only the jsdelivr CDN and inline
-   scripts, blocks all network connections from the WebView, and disables
-   all other resource types.
+   This restricts all resource loading to inline content only — no external
+   origins are allowed. Blocks all network connections from the WebView.
+5. Bundled xterm.js and addon-fit locally (via `expo-asset`) instead of
+   loading from `cdn.jsdelivr.net`. This eliminates the CDN dependency
+   entirely, allowing the CSP to have no external script/style sources.
+   The xterm files are loaded from `assets/xterm/` at runtime and inlined
+   into the WebView HTML.
