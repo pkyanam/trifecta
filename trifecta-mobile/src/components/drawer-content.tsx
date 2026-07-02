@@ -7,9 +7,10 @@ import { LiquidMetalButton } from "@/components/liquid-metal";
 import { TouchableGlass } from "@/components/touchable-glass";
 import { SafeAreaView } from "@/components/tw";
 import { useActiveThread } from "@/stores/active-thread";
-import { useConnection } from "@/stores/connection";
+import { serverDisplayName, useConnection } from "@/stores/connection";
 import { useThreadList } from "@/stores/thread-list";
 import { useWsClient } from "@/stores/ws-client";
+import { useServerPicker } from "@/components/server-picker-modal";
 import type { ProjectShell, ThreadShell } from "@/types/thread";
 import { projectDisplayName } from "@/utils/projects";
 import { cn } from "@/utils/tailwind";
@@ -145,17 +146,16 @@ export function DrawerContent({
   onNavigate: (path: Href) => void;
   onOpenModal: (path: Href) => void;
 }) {
-  const { serverURL, isPaired } = useConnection();
+  const { servers, activeServerId, isPaired } = useConnection();
   const { status: wsStatus } = useWsClient();
   const { activeThreads, projects } = useThreadList();
   const { activeThreadId, setActiveThreadId } = useActiveThread();
   const { providers, setSelectedModelSelection } = useModel();
+  const { openServerPicker } = useServerPicker();
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(() => new Set());
 
-  const serverHost = (() => {
-    if (!serverURL) return null;
-    try { return new URL(serverURL).hostname; } catch { return serverURL; }
-  })();
+  const activeServer = servers.find((s) => s.id === activeServerId) ?? null;
+  const serverLabel = activeServer ? serverDisplayName(activeServer) : null;
 
   const isConnected = wsStatus === "connected";
 
@@ -193,13 +193,15 @@ export function DrawerContent({
       {/* Header */}
       <View className="px-4 pt-2 pb-3">
         <Text className="text-[28px] font-bold text-foreground">Trifecta</Text>
-        {isPaired && serverHost ? (
+        {isPaired && serverLabel ? (
           <View className="flex-row items-center gap-1.5 mt-1">
             <Icon
               icon={Wifi}
               className={`w-3 h-3 ${isConnected ? "text-sf-green" : "text-muted-foreground"}`}
             />
-            <Text className="text-[12px] text-muted-foreground">{serverHost}</Text>
+            <Text className="text-[12px] text-muted-foreground" numberOfLines={1}>
+              {serverLabel}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -251,7 +253,7 @@ export function DrawerContent({
       >
         <TouchableGlass
           onPress={() => {
-            if (isPaired) onOpenModal("/(settings)/settings");
+            if (isPaired) openServerPicker();
             else onNavigate("/pair");
           }}
           className="rounded-full p-2 flex-row items-center gap-2.5 active:opacity-60"
@@ -260,7 +262,7 @@ export function DrawerContent({
             <Icon icon={isPaired ? Server : Wifi} className="w-4 h-4 text-foreground" />
           </View>
           <Text className="text-sm text-foreground" numberOfLines={1}>
-            {serverHost ?? "Not connected"}
+            {serverLabel ?? "Not connected"}
           </Text>
         </TouchableGlass>
         <View className="flex-1" />
