@@ -444,6 +444,7 @@ export default function SshTerminalScreen() {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net 'unsafe-inline'; style-src https://cdn.jsdelivr.net 'unsafe-inline'; img-src data:; connect-src 'none';">
       <!-- xterm.css is REQUIRED: it positions rows/characters and hides xterm's
            character-measurement element (a row of "W"s). Without it the measure
            element is visible and the terminal layout is garbled. -->
@@ -625,8 +626,6 @@ export default function SshTerminalScreen() {
             onMessage={handleMessage}
             javaScriptEnabled={true}
             domStorageEnabled={true}
-            originWhitelist={['*']}
-            mixedContentMode="compatibility"
             scalesPageToFit={false}
             bounces={false}
             overScrollMode="never"
@@ -638,6 +637,12 @@ export default function SshTerminalScreen() {
             keyboardAppearance="dark"
             hideKeyboardAccessoryView={true}
             textInteractionEnabled={true}
+            onShouldStartLoadWithRequest={(request) => {
+              // Only allow the initial static HTML load. Block all external
+              // navigation to prevent a compromised CDN or injected content
+              // from redirecting the WebView to an attacker-controlled origin.
+              return request.url === "about:blank" || request.url.startsWith("about:blank");
+            }}
           />
         </View>
 
