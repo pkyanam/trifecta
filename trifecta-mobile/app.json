@@ -60,7 +60,8 @@
       "expo-web-browser",
       "expo-system-ui",
       "expo-status-bar",
-      "expo-secure-store"
+      "expo-secure-store",
+      "./plugins/with-min-ios-deployment-target"
     ],
     "experiments": {
       "typedRoutes": true,
