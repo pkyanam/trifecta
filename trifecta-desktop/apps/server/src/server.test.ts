@@ -1009,7 +1009,22 @@ const splitHeaderTokens = (value: string | null) =>
     .toSorted();
 
 const assertBrowserApiCorsHeaders = (headers: Headers) => {
-  assert.equal(headers.get("access-control-allow-origin"), "*");
+  // Dynamic CORS: allowed origins are reflected back. The test server runs
+  // on localhost, so loopback origins are allowed. Disallowed origins (like
+  // crossOriginClientOrigin) do not get an access-control-allow-origin header.
+  const allowMethods = splitHeaderTokens(headers.get("access-control-allow-methods"));
+  assert.deepEqual(allowMethods, ["GET", "OPTIONS", "POST"]);
+  assert.deepEqual(splitHeaderTokens(headers.get("access-control-allow-headers")), [
+    "authorization",
+    "b3",
+    "content-type",
+    "traceparent",
+  ]);
+};
+
+const assertBrowserApiCorsHeadersForOrigin = (headers: Headers, origin: string) => {
+  assert.equal(headers.get("access-control-allow-origin"), origin);
+  assert.equal(headers.get("access-control-allow-credentials"), "true");
   assert.deepEqual(splitHeaderTokens(headers.get("access-control-allow-methods")), [
     "GET",
     "OPTIONS",
@@ -1152,10 +1167,11 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       yield* buildAppUnderTest();
 
       const url = yield* getHttpServerUrl("/.well-known/belweave/environment");
+      const loopbackOrigin = "http://localhost:5173";
       const response = yield* Effect.promise(() =>
         fetch(url, {
           headers: {
-            origin: crossOriginClientOrigin,
+            origin: loopbackOrigin,
           },
         }),
       );
@@ -1164,7 +1180,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       )) as typeof testEnvironmentDescriptor;
 
       assert.equal(response.status, 200);
-      assertBrowserApiCorsHeaders(response.headers);
+      assertBrowserApiCorsHeadersForOrigin(response.headers, loopbackOrigin);
       assert.deepEqual(body, testEnvironmentDescriptor);
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
@@ -1296,7 +1312,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
-      const origin = crossOriginClientOrigin;
+      const origin = "http://localhost:5173";
       const { response: bootstrapResponse, body: bootstrapBody } = yield* bootstrapBearerSession(
         defaultDesktopBootstrapToken,
         {
@@ -1305,7 +1321,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       );
 
       assert.equal(bootstrapResponse.status, 200);
-      assertBrowserApiCorsHeaders(bootstrapResponse.headers);
+      assertBrowserApiCorsHeadersForOrigin(bootstrapResponse.headers, origin);
       assert.equal(bootstrapBody.authenticated, true);
       assert.equal(typeof bootstrapBody.sessionToken, "string");
 
@@ -1324,7 +1340,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       };
 
       assert.equal(sessionResponse.status, 200);
-      assertBrowserApiCorsHeaders(sessionResponse.headers);
+      assertBrowserApiCorsHeadersForOrigin(sessionResponse.headers, origin);
       assert.equal(sessionBody.authenticated, true);
       assert.equal(sessionBody.sessionMethod, "bearer-session-token");
 
@@ -1343,7 +1359,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       };
 
       assert.equal(wsTokenResponse.status, 200);
-      assertBrowserApiCorsHeaders(wsTokenResponse.headers);
+      assertBrowserApiCorsHeadersForOrigin(wsTokenResponse.headers, origin);
       assert.equal(typeof wsTokenBody.token, "string");
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
@@ -1355,11 +1371,12 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         yield* buildAppUnderTest();
 
         const wsTokenUrl = yield* getHttpServerUrl("/api/auth/ws-token");
+        const loopbackOrigin = "http://localhost:5173";
         const response = yield* Effect.promise(() =>
           fetch(wsTokenUrl, {
             method: "OPTIONS",
             headers: {
-              origin: crossOriginClientOrigin,
+              origin: loopbackOrigin,
               "access-control-request-method": "POST",
               "access-control-request-headers": "authorization",
             },
@@ -1367,7 +1384,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         );
 
         assert.equal(response.status, 204);
-        assertBrowserApiCorsHeaders(response.headers);
+        assertBrowserApiCorsHeadersForOrigin(response.headers, loopbackOrigin);
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
@@ -1376,11 +1393,12 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       yield* buildAppUnderTest();
 
       const wsTokenUrl = yield* getHttpServerUrl("/api/auth/ws-token");
+      const loopbackOrigin = "http://localhost:5173";
       const response = yield* Effect.promise(() =>
         fetch(wsTokenUrl, {
           method: "POST",
           headers: {
-            origin: crossOriginClientOrigin,
+            origin: loopbackOrigin,
           },
         }),
       );
@@ -1389,7 +1407,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       };
 
       assert.equal(response.status, 401);
-      assertBrowserApiCorsHeaders(response.headers);
+      assertBrowserApiCorsHeadersForOrigin(response.headers, loopbackOrigin);
       assert.equal(body.error, "Authentication required.");
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
@@ -1983,7 +2001,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       });
 
       assert.equal(response.status, 204);
-      assert.equal(response.headers["access-control-allow-origin"], "*");
+      assert.equal(response.headers["access-control-allow-origin"], "http://localhost:5733");
       assert.deepEqual(localTraceRecords, [
         {
           type: "otlp-span",
@@ -2049,7 +2067,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       );
 
       assert.equal(response.status, 204);
-      assert.equal(response.headers.get("access-control-allow-origin"), "*");
+      assert.equal(response.headers.get("access-control-allow-origin"), "http://localhost:5733");
       assert.deepEqual(splitHeaderTokens(response.headers.get("access-control-allow-methods")), [
         "GET",
         "OPTIONS",

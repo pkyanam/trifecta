@@ -3,6 +3,7 @@ import { decodeOtlpTraceRecords } from "@belweave/shared/observability";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import { cast } from "effect/Function";
@@ -33,7 +34,8 @@ import * as DateTime from "effect/DateTime";
 import {
   browserApiCorsAllowedHeaders,
   browserApiCorsAllowedMethods,
-  browserApiCorsHeaders,
+  corsHeadersForRequest,
+  isOriginAllowed,
 } from "./httpCors.ts";
 
 const PROJECT_FAVICON_CACHE_CONTROL = "public, max-age=3600";
@@ -53,11 +55,30 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
 };
 
-export const browserApiCorsLayer = HttpRouter.cors({
-  allowedMethods: [...browserApiCorsAllowedMethods],
-  allowedHeaders: [...browserApiCorsAllowedHeaders],
-  maxAge: 600,
-});
+/**
+ * CORS middleware layer with dynamic origin validation based on server config.
+ *
+ * Replaces the previous `access-control-allow-origin: *` wildcard with a
+ * dynamic allowlist that validates each request's Origin header against:
+ * - Loopback origins (127.0.0.1, localhost, ::1) on any port
+ * - The server's own origin
+ * - The configured devUrl and publicUrl
+ */
+export const browserApiCorsLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const config = yield* ServerConfig;
+    // The runtime supports `allowedOrigins` as a function for dynamic origin
+    // validation, but the TypeScript types only declare `ReadonlyArray<string>`.
+    // Cast to work around the type limitation.
+    return HttpRouter.cors({
+      allowedOrigins: ((origin: string) => isOriginAllowed(origin, config)) as unknown as string[],
+      allowedMethods: [...browserApiCorsAllowedMethods],
+      allowedHeaders: [...browserApiCorsAllowedHeaders],
+      credentials: true,
+      maxAge: 600,
+    });
+  }),
+);
 
 export function isLoopbackHostname(hostname: string): boolean {
   const normalizedHostname = hostname
@@ -88,9 +109,10 @@ export const serverEnvironmentRouteLayer = HttpRouter.add(
     const descriptor = yield* Effect.service(ServerEnvironment).pipe(
       Effect.flatMap((serverEnvironment) => serverEnvironment.getDescriptor),
     );
+    const corsHeaders = yield* corsHeadersForRequest;
     return HttpServerResponse.jsonUnsafe(descriptor, {
       status: 200,
-      headers: browserApiCorsHeaders,
+      headers: corsHeaders,
     });
   }),
 );
@@ -351,6 +373,7 @@ export const healthCheckRouteLayer = HttpRouter.add(
     const address = httpServer.address;
     const isListening = typeof address === "object" && address !== null && "port" in address;
     const now = yield* DateTime.now;
+    const corsHeaders = yield* corsHeadersForRequest;
 
     return HttpServerResponse.jsonUnsafe(
       {
@@ -360,7 +383,7 @@ export const healthCheckRouteLayer = HttpRouter.add(
       },
       {
         status: isListening ? 200 : 503,
-        headers: browserApiCorsHeaders,
+        headers: corsHeaders,
       },
     );
   }),
@@ -399,6 +422,8 @@ export const serverStatusRouteLayer = HttpRouter.add(
       ? `${baseUrl}/pair#token=${encodeURIComponent(config.reviewPairingToken)}`
       : undefined;
 
+    const corsHeaders = yield* corsHeadersForRequest;
+
     return HttpServerResponse.jsonUnsafe(
       {
         version: 1,
@@ -413,7 +438,7 @@ export const serverStatusRouteLayer = HttpRouter.add(
       },
       {
         status: 200,
-        headers: browserApiCorsHeaders,
+        headers: corsHeaders,
       },
     );
   }).pipe(Effect.catchTag("AuthError", respondToAuthError)),

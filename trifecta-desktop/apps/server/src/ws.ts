@@ -53,11 +53,12 @@ import {
   WsRpcGroup,
 } from "@belweave/contracts";
 import { clamp } from "effect/Number";
-import { HttpRouter, HttpServerRequest } from "effect/unstable/http";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
 import { CheckpointDiffQuery } from "./checkpointing/Services/CheckpointDiffQuery.ts";
 import { ServerConfig } from "./config.ts";
+import { isOriginAllowed } from "./httpCors.ts";
 import { Keybindings } from "./keybindings.ts";
 import { Open, resolveAvailableEditors } from "./open.ts";
 import { normalizeDispatchCommand } from "./orchestration/Normalizer.ts";
@@ -1832,6 +1833,17 @@ export const websocketRpcRouteLayer = Layer.unwrap(
         const request = yield* HttpServerRequest.HttpServerRequest;
         const serverAuth = yield* ServerAuth;
         const sessions = yield* SessionCredentialService;
+        const config = yield* ServerConfig;
+
+        // Validate WebSocket Origin header to prevent cross-site WebSocket
+        // hijacking (CSWSH). Browsers always send the Origin header on WS
+        // upgrades; non-browser clients are not restricted by this check
+        // but still require authentication.
+        const requestOrigin = request.headers["origin"] ?? undefined;
+        if (requestOrigin && !isOriginAllowed(requestOrigin, config)) {
+          return HttpServerResponse.text("Forbidden: origin not allowed", { status: 403 });
+        }
+
         const session = yield* serverAuth.authenticateWebSocketUpgrade(request);
         const rpcWebSocketHttpEffect = yield* RpcServer.toHttpEffectWebsocket(WsRpcGroup, {
           disableTracing: true,
