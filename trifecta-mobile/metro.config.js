@@ -9,21 +9,24 @@ const config = getDefaultConfig(__dirname);
 // instead of .js for xterm.js and addon-fit.js because Metro parses .js
 // files as source modules, which would execute the 488KB minified xterm
 // library as a Metro module and crash at runtime.
-config.resolver.assetExts = [...config.resolver.assetExts, "xjs"];
+config.resolver.assetExts = [...config.resolver.assetExts, "xjs", "xcss"];
 
-config.resolver.resolveRequest = (context, moduleName, platform) => {
+const withUniwind = withUniwindConfig(config, {
+  cssEntryFile: "./src/global.css",
+  debug: true,
+});
+
+// Wrap Uniwind's resolveRequest so we can intercept web-only SwiftUI
+// imports without breaking Uniwind's asset/CSS resolution on native.
+const uniwindResolveRequest = withUniwind.resolver.resolveRequest;
+withUniwind.resolver.resolveRequest = (context, moduleName, platform) => {
   if (
     platform === "web" &&
     ["@expo/ui/swift-ui", "@expo/ui/swift-ui/modifiers"].includes(moduleName)
   ) {
-    return {
-      type: "empty",
-    };
+    return { type: "empty" };
   }
-  return context.resolveRequest(context, moduleName, platform);
+  return uniwindResolveRequest(context, moduleName, platform);
 };
 
-module.exports = withUniwindConfig(config, {
-  cssEntryFile: "./src/global.css",
-  debug: true,
-});
+module.exports = withUniwind;

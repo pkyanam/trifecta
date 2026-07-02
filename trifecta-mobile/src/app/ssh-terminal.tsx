@@ -218,7 +218,7 @@ export default function SshTerminalScreen() {
   const [xtermAssets] = useAssets([
     require("../../assets/xterm/xterm.min.xjs"),
     require("../../assets/xterm/addon-fit.min.xjs"),
-    require("../../assets/xterm/xterm.css"),
+    require("../../assets/xterm/xterm.xcss"),
   ]);
   const [xtermJs, setXtermJs] = useState("");
   const [addonFitJs, setAddonFitJs] = useState("");
