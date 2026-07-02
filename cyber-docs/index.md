@@ -32,7 +32,7 @@ Findings
 │ 021│ Medium   │ Supply Chain │ xterm.js loaded from CDN (mobile)            │ Fixed     │ (Sweep #4)                               │
 └────┴──────────┴──────────────┴──────────────────────────────────────────────┴───────────┴──────────────────────────────────────────┘
 
-Summary: 21 findings total — 14 fixed, 2 accepted, 1 not applicable, 4 not vulnerable.
+Summary: 21 findings total — 15 fixed, 3 accepted, 1 not applicable, 2 not vulnerable.
 
 Sweep Log
 

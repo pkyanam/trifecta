@@ -65,6 +65,11 @@ describe("isOriginAllowed", () => {
     expect(isOriginAllowed("http://localhost:3773", config)).toBe(true);
   });
 
+  it("allows IPv6 loopback origin with brackets", () => {
+    expect(isOriginAllowed("http://[::1]:5173", config)).toBe(true);
+    expect(isOriginAllowed("http://[::1]:3773", config)).toBe(true);
+  });
+
   it("allows the server's own origin", () => {
     expect(isOriginAllowed("http://localhost:3773", config)).toBe(true);
   });
@@ -122,7 +127,7 @@ describe("computeAllowedOriginsList", () => {
     const origins = computeAllowedOriginsList(config);
     expect(origins).toContain("http://localhost:3773");
     expect(origins).toContain("http://127.0.0.1:3773");
-    expect(origins).toContain("http://::1:3773");
+    expect(origins).toContain("http://[::1]:3773");
   });
 
   it("includes devUrl when configured", () => {

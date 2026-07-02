@@ -664,3 +664,16 @@ it("escapeWindowsShellArg handles multiple consecutive double quotes", () => {
 it("escapeWindowsShellArg handles empty string", () => {
   assert.equal(escapeWindowsShellArg(""), '""');
 });
+
+it("escapeWindowsShellArg strips percent signs to prevent cmd.exe variable expansion", () => {
+  // %PATH% inside double quotes is still expanded by cmd.exe; stripping
+  // percent signs neutralizes this.
+  assert.equal(escapeWindowsShellArg("C:\\%PATH%\\file"), '"C:\\PATH\\file"');
+  assert.equal(escapeWindowsShellArg("%USERPROFILE%\\proj"), '"USERPROFILE\\proj"');
+});
+
+it("escapeWindowsShellArg strips newlines to prevent line-break injection", () => {
+  assert.equal(escapeWindowsShellArg("foo\rbar"), '"foobar"');
+  assert.equal(escapeWindowsShellArg("foo\nbar"), '"foobar"');
+  assert.equal(escapeWindowsShellArg("foo\r\nbar"), '"foobar"');
+});

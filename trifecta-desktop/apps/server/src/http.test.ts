@@ -51,12 +51,15 @@ describe("Content Security Policy", () => {
     expect(indexHtml).toContain("base-uri 'self'");
   });
 
-  it("CSP allows WebSocket connections", () => {
-    expect(indexHtml).toContain("connect-src 'self' ws: wss:");
+  it("CSP allows WebSocket connections to loopback only", () => {
+    expect(indexHtml).toContain(
+      "connect-src 'self' ws://localhost:* ws://127.0.0.1:* ws://[::1]:* wss://localhost:* wss://127.0.0.1:* wss://[::1]:*",
+    );
   });
 
-  it("CSP allows inline scripts (theme detection)", () => {
-    expect(indexHtml).toContain("script-src 'self' 'unsafe-inline'");
+  it("CSP uses hash for inline script instead of unsafe-inline", () => {
+    expect(indexHtml).toContain("script-src 'self' 'sha256-");
+    expect(indexHtml).not.toContain("script-src 'self' 'unsafe-inline'");
   });
 
   it("CSP allows inline styles and Google Fonts", () => {

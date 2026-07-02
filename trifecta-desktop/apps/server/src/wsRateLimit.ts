@@ -8,8 +8,9 @@
  *
  * @module wsRateLimit
  */
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as Ref from "effect/Ref";
+import * as Layer from "effect/Layer";
 import * as Clock from "effect/Clock";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 
@@ -83,19 +84,32 @@ function pruneStaleEntries(map: RateLimitMap, now: number, windowMs: number): vo
 }
 
 /**
- * Extracts the client IP from the request. Checks X-Forwarded-For first
- * (for reverse proxy setups), then falls back to the socket remote address.
+ * Whether to trust X-Forwarded-For headers for client IP extraction.
+ * Only enable when the server is behind a trusted reverse proxy.
+ * Defaults to false — direct connections use the socket remote address.
+ */
+const TRUST_PROXY = process.env.TRUST_PROXY === "1" || process.env.TRUST_PROXY === "true";
+
+/**
+ * Extracts the client IP from the request.
+ *
+ * Only trusts X-Forwarded-For when TRUST_PROXY is enabled (i.e. the server
+ * is behind a trusted reverse proxy). Otherwise, falls back to the socket
+ * remote address to prevent clients from spoofing their IP via headers.
  */
 function getClientIp(request: HttpServerRequest.HttpServerRequest): string {
-  const forwardedFor = request.headers["x-forwarded-for"] as string | string[] | undefined;
-  if (typeof forwardedFor === "string") {
-    return forwardedFor.split(",")[0]!.trim();
+  if (TRUST_PROXY) {
+    const forwardedFor = request.headers["x-forwarded-for"] as string | string[] | undefined;
+    if (typeof forwardedFor === "string") {
+      return forwardedFor.split(",")[0]!.trim();
+    }
+    if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
+      return forwardedFor[0]!.trim();
+    }
   }
-  if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
-    return forwardedFor[0]!;
-  }
-  // Effect HTTP request doesn't expose socket directly; use a fallback
-  return "unknown";
+  // Fall back to the real remote address when not behind a trusted proxy.
+  const remote = (request as unknown as { remoteAddress?: string }).remoteAddress;
+  return remote ?? "unknown";
 }
 
 /**
@@ -117,83 +131,9 @@ export function checkMessageSize(
 }
 
 /**
- * Creates a rate limiter effect that tracks per-IP WebSocket upgrade requests.
- *
- * The rate limiter state is stored in a Ref and shared across all requests.
- * Uses a sliding window algorithm with per-IP tracking.
+ * WsRateLimiterShape - Service API for WebSocket rate limiting.
  */
-export const makeWsRateLimiter = Effect.gen(function* () {
-  const rateLimitMap = yield* Ref.make<RateLimitMap>(new Map());
-
-  return {
-    /**
-     * Checks if the current request is within rate limits.
-     * Returns an error response if rate-limited, or undefined if allowed.
-     */
-    check: Effect.gen(function* () {
-      const request = yield* HttpServerRequest.HttpServerRequest;
-      const ip = getClientIp(request);
-      const now = yield* Clock.currentTimeMillis;
-      const map = yield* Ref.get(rateLimitMap);
-
-      // Prune stale entries periodically
-      pruneStaleEntries(map, now, RATE_LIMIT_WINDOW_MS);
-
-      if (!checkIpRateLimit(map, ip, now, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_UPGRADES)) {
-        return HttpServerResponse.text("Too many requests", { status: STATUS_TOO_MANY_REQUESTS });
-      }
-      return undefined;
-    }),
-
-    /**
-     * Checks if the request body size is within limits.
-     * Returns an error response if too large, or undefined if OK.
-     */
-    checkSize: Effect.gen(function* () {
-      const request = yield* HttpServerRequest.HttpServerRequest;
-      if (!checkMessageSize(request.headers)) {
-        return HttpServerResponse.text("Payload too large", {
-          status: STATUS_PAYLOAD_TOO_LARGE,
-        });
-      }
-      return undefined;
-    }),
-
-    /**
-     * Combined check: validates both rate limit and message size.
-     * Returns an error response if any limit is exceeded, or undefined if OK.
-     */
-    checkAll: Effect.gen(function* () {
-      const request = yield* HttpServerRequest.HttpServerRequest;
-
-      // Check message size first (cheap)
-      if (!checkMessageSize(request.headers)) {
-        return HttpServerResponse.text("Payload too large", {
-          status: STATUS_PAYLOAD_TOO_LARGE,
-        });
-      }
-
-      // Check rate limit
-      const ip = getClientIp(request);
-      const now = yield* Clock.currentTimeMillis;
-      const map = yield* Ref.get(rateLimitMap);
-      pruneStaleEntries(map, now, RATE_LIMIT_WINDOW_MS);
-
-      if (!checkIpRateLimit(map, ip, now, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_UPGRADES)) {
-        return HttpServerResponse.text("Too many requests", {
-          status: STATUS_TOO_MANY_REQUESTS,
-        });
-      }
-
-      return undefined;
-    }),
-  };
-});
-
-/**
- * Type for the WebSocket rate limiter service.
- */
-export interface WsRateLimiter {
+export interface WsRateLimiterShape {
   readonly check: Effect.Effect<
     HttpServerResponse.HttpServerResponse | undefined,
     never,
@@ -210,3 +150,74 @@ export interface WsRateLimiter {
     HttpServerRequest.HttpServerRequest
   >;
 }
+
+/**
+ * Context tag for the WebSocket rate limiter service.
+ *
+ * The limiter is created once at server startup and shared across all
+ * WebSocket upgrade requests, so per-IP rate limit state persists across
+ * connections.
+ */
+export class WsRateLimiter extends Context.Service<WsRateLimiter, WsRateLimiterShape>()(
+  "belweave/WsRateLimiter",
+) {}
+
+/**
+ * Creates the WebSocket rate limiter layer.
+ *
+ * The rate limiter state (a plain Map closed over by the layer) is created
+ * once and shared across all requests, so the sliding window per-IP quota
+ * accumulates correctly across WebSocket upgrades.
+ */
+export const WsRateLimiterLive = Layer.sync(WsRateLimiter, () => {
+  const rateLimitMap: RateLimitMap = new Map();
+
+  return {
+    check: Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const ip = getClientIp(request);
+      const now = yield* Clock.currentTimeMillis;
+
+      pruneStaleEntries(rateLimitMap, now, RATE_LIMIT_WINDOW_MS);
+
+      if (!checkIpRateLimit(rateLimitMap, ip, now, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_UPGRADES)) {
+        return HttpServerResponse.text("Too many requests", { status: STATUS_TOO_MANY_REQUESTS });
+      }
+      return undefined;
+    }),
+
+    checkSize: Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      if (!checkMessageSize(request.headers)) {
+        return HttpServerResponse.text("Payload too large", {
+          status: STATUS_PAYLOAD_TOO_LARGE,
+        });
+      }
+      return undefined;
+    }),
+
+    checkAll: Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+
+      // Check message size first (cheap)
+      if (!checkMessageSize(request.headers)) {
+        return HttpServerResponse.text("Payload too large", {
+          status: STATUS_PAYLOAD_TOO_LARGE,
+        });
+      }
+
+      // Check rate limit
+      const ip = getClientIp(request);
+      const now = yield* Clock.currentTimeMillis;
+      pruneStaleEntries(rateLimitMap, now, RATE_LIMIT_WINDOW_MS);
+
+      if (!checkIpRateLimit(rateLimitMap, ip, now, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_UPGRADES)) {
+        return HttpServerResponse.text("Too many requests", {
+          status: STATUS_TOO_MANY_REQUESTS,
+        });
+      }
+
+      return undefined;
+    }),
+  } satisfies WsRateLimiterShape;
+});

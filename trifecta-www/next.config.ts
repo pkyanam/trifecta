@@ -18,8 +18,13 @@ function buildCsp(): string {
   // We extract it at runtime from the key prefix, but for the CSP header
   // (which is set at build/start time) we use a conservative allowlist.
   const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+  // Allow an explicit Clerk Frontend API domain via env override for
+  // production (pk_live_) deployments that use a custom domain.
+  const clerkCustomDomain = process.env.CLERK_CSP_ORIGIN ?? "";
   let clerkOrigin = "";
-  if (clerkPublishableKey.startsWith("pk_")) {
+  if (clerkCustomDomain) {
+    clerkOrigin = clerkCustomDomain;
+  } else if (clerkPublishableKey.startsWith("pk_")) {
     // pk_test_|pk_live_  →  <key-id>.clerk.accounts.dev  (or custom domain)
     // The key format is pk_<env>_<id>; Clerk's frontend API is at
     // https://<id>.clerk.accounts.dev (test) or the custom domain (live).

@@ -204,6 +204,7 @@ export default function SshTerminalScreen() {
   } = useSsh();
   const webViewRef = useRef<WebView>(null);
   const sessionLoadedRef = useRef(false);
+  const [webViewReady, setWebViewReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dimensions, setDimensions] = useState(Dimensions.get("window"));
@@ -222,6 +223,7 @@ export default function SshTerminalScreen() {
   const [xtermJs, setXtermJs] = useState("");
   const [addonFitJs, setAddonFitJs] = useState("");
   const [xtermCss, setXtermCss] = useState("");
+  const [assetError, setAssetError] = useState(false);
 
   useEffect(() => {
     if (!xtermAssets || xtermAssets.length < 3) return;
@@ -234,7 +236,9 @@ export default function SshTerminalScreen() {
       setXtermJs(js);
       setAddonFitJs(fit);
       setXtermCss(css);
-    }).catch(() => {});
+    }).catch(() => {
+      setAssetError(true);
+    });
   }, [xtermAssets]);
 
   // Get host label from hosts list
@@ -350,7 +354,7 @@ export default function SshTerminalScreen() {
         Alert.alert("SSH Error", event.message);
       }
     }
-  }, [terminalEvents, router]);
+  }, [terminalEvents, router, webViewReady]);
 
   // When native layout changes (keyboard, rotation), ask xterm to refit.
   // xterm's fitAddon measures actual character metrics and posts a 'dimensions'
@@ -452,7 +456,11 @@ export default function SshTerminalScreen() {
         // to sync the PTY so COLUMNS matches what xterm renders exactly.
         resize({ sessionId, cols: message.cols, rows: message.rows }).catch(console.error);
       } else if (message.type === "ready") {
-        // xterm.js ready
+        // xterm.js is ready — flush any buffered events that arrived before
+        // the WebView finished mounting. Reset the last-written marker so the
+        // write effect reprocesses the entire current buffer.
+        lastWrittenEventRef.current = null;
+        setWebViewReady(true);
       } else if (message.type === "error") {
         console.error("[SSH Terminal] WebView error:", message.message);
         Alert.alert("Terminal Error", message.message);
@@ -612,6 +620,25 @@ export default function SshTerminalScreen() {
         .replace("__XTERM_JS__", () => xtermJs)
         .replace("__ADDON_FIT_JS__", () => addonFitJs)
     : "";
+
+  if (assetError) {
+    return (
+      <SafeAreaView className="flex-1 bg-background">
+        <View className="flex-1 items-center justify-center px-8">
+          <Text className="text-foreground text-lg font-semibold text-center">Terminal unavailable</Text>
+          <Text className="text-muted-foreground mt-2 text-center">
+            The terminal could not be loaded. Please restart the app and try again.
+          </Text>
+          <Pressable
+            onPress={() => router.back()}
+            className="mt-6 px-5 py-2.5 rounded-full bg-muted active:opacity-60"
+          >
+            <Text className="text-foreground font-semibold">Go back</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (isLoadingSession || !html) {
     return (

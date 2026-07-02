@@ -7,6 +7,11 @@ import * as Crypto from "expo-crypto";
  * `Math.random()` for any ID that is sent over the wire (command IDs,
  * message IDs, thread IDs, trace/span IDs) to prevent predictability
  * attacks.
+ *
+ * Note: When remote JS debugging is enabled in dev builds, `Crypto.getRandomBytes`
+ * may fall back to `Math.random()` under the hood (see expo-crypto docs).
+ * This only affects development — production builds (`__DEV__ === false`) use
+ * the native CSPRNG and are not impacted.
  */
 export function secureRandomHex(length: number): string {
   const byteLength = Math.ceil(length / 2);

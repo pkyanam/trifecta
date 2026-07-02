@@ -27,7 +27,7 @@ context and exfiltrate terminal contents.
 3. Added `onShouldStartLoadWithRequest` that only allows `about:blank` (the
    URL used for static HTML source), blocking all external navigation
 4. Added a Content-Security-Policy meta tag to the WebView HTML:
-   ```
+   ```text
    default-src 'none';
    script-src 'unsafe-inline';
    style-src 'unsafe-inline';

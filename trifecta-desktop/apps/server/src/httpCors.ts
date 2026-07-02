@@ -21,7 +21,10 @@ const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
  * Returns true if the given origin URL host is a loopback address.
  */
 function isLoopbackOrigin(originUrl: URL): boolean {
-  return LOOPBACK_HOSTS.has(originUrl.hostname);
+  // Node's URL.hostname includes brackets for IPv6 (e.g. "[::1]"), so
+  // strip them before comparing against the unbracketed LOOPBACK_HOSTS set.
+  const host = originUrl.hostname.replace(/^\[(.*)\]$/, "$1");
+  return LOOPBACK_HOSTS.has(host);
 }
 
 /**
@@ -40,10 +43,13 @@ function computeAllowedOrigins(config: ServerConfigShape): Set<string> {
   // Server's own origin (common host variants)
   const port = config.port;
   for (const h of ["localhost", "127.0.0.1", "::1"]) {
-    origins.add(`http://${h}:${port}`);
+    // IPv6 addresses must be bracketed in URL origin strings.
+    const host = h.includes(":") ? `[${h}]` : h;
+    origins.add(`http://${host}:${port}`);
   }
   if (config.host && config.host !== "0.0.0.0" && config.host !== "::") {
-    origins.add(`http://${config.host}:${port}`);
+    const host = config.host.includes(":") ? `[${config.host}]` : config.host;
+    origins.add(`http://${host}:${port}`);
   }
 
   // Dev URL (Vite dev server)

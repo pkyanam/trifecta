@@ -59,7 +59,7 @@ function ServerPickerContent({
   const router = useRouter();
   const isConnected = status === "connected";
 
-  const handleSelect = async (server: PairedServer) => {
+  const handleSelect = useCallback(async (server: PairedServer) => {
     if (server.id === activeServerId) {
       onClose();
       return;
@@ -67,12 +67,12 @@ function ServerPickerContent({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await switchServer(server.id);
     onClose();
-  };
+  }, [activeServerId, switchServer, onClose]);
 
-  const handleAddServer = () => {
+  const handleAddServer = useCallback(() => {
     onClose();
     router.navigate("/pair?returnTo=settings");
-  };
+  }, [onClose, router]);
 
   if (!isPaired || servers.length === 0) {
     // Don't render the modal if there are no servers — the pair screen

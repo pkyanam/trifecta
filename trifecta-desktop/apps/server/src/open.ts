@@ -190,11 +190,16 @@ export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
  *
  * cmd.exe treats `""` inside a double-quoted string as a literal `"`. All
  * other shell metacharacters (`&`, `|`, `<`, `>`, `^`) are inert inside
- * double quotes, so wrapping in quotes with internal quotes doubled is
- * sufficient to prevent argument injection.
+ * double quotes. However, cmd.exe still expands `%VAR%` inside double quotes,
+ * so we strip percent signs to prevent environment variable expansion. We
+ * also strip newlines/carriage returns to prevent line-break injection.
  */
 export function escapeWindowsShellArg(arg: string): string {
-  return `"${arg.replace(/"/g, '""')}"`;
+  const sanitized = arg
+    .replace(/"/g, '""')
+    .replace(/%/g, "")
+    .replace(/[\r\n]/g, "");
+  return `"${sanitized}"`;
 }
 
 export const launchDetached = (launch: EditorLaunch) =>
