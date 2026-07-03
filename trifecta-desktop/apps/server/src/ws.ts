@@ -58,7 +58,7 @@ import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
 import { CheckpointDiffQuery } from "./checkpointing/Services/CheckpointDiffQuery.ts";
 import { ServerConfig } from "./config.ts";
-import { isOriginAllowed } from "./httpCors.ts";
+import { isWebSocketOriginAllowed } from "./httpCors.ts";
 import { WsRateLimiter, WsRateLimiterLive } from "./wsRateLimit.ts";
 import { Keybindings } from "./keybindings.ts";
 import { Open, resolveAvailableEditors } from "./open.ts";
@@ -1847,9 +1847,12 @@ export const websocketRpcRouteLayer = Layer.unwrap(
         // Validate WebSocket Origin header to prevent cross-site WebSocket
         // hijacking (CSWSH). Browsers always send the Origin header on WS
         // upgrades; non-browser clients are not restricted by this check
-        // but still require authentication.
+        // but still require authentication. Mobile clients (React Native)
+        // connecting via LAN/Tailscale are allowed via isWebSocketOriginAllowed,
+        // which permits private/local network origins in addition to the
+        // configured CORS allowlist.
         const requestOrigin = request.headers["origin"] ?? undefined;
-        if (requestOrigin && !isOriginAllowed(requestOrigin, config)) {
+        if (requestOrigin && !isWebSocketOriginAllowed(requestOrigin, config)) {
           return HttpServerResponse.text("Forbidden: origin not allowed", { status: 403 });
         }
 

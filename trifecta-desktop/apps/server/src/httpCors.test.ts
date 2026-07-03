@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { ServerConfigShape } from "./config.ts";
-import { buildCorsHeaders, computeAllowedOriginsList, isOriginAllowed } from "./httpCors.ts";
+import {
+  buildCorsHeaders,
+  computeAllowedOriginsList,
+  isLocalNetworkOrigin,
+  isOriginAllowed,
+  isWebSocketOriginAllowed,
+} from "./httpCors.ts";
 
 function makeConfig(overrides: Partial<ServerConfigShape> = {}): ServerConfigShape {
   return {
@@ -146,5 +152,97 @@ describe("computeAllowedOriginsList", () => {
     });
     const origins = computeAllowedOriginsList(config);
     expect(origins).toContain("https://trifecta.example.com");
+  });
+});
+
+describe("isLocalNetworkOrigin", () => {
+  it("allows loopback origins", () => {
+    expect(isLocalNetworkOrigin(new URL("http://localhost:8081"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://127.0.0.1:8081"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://[::1]:8081"))).toBe(true);
+  });
+
+  it("allows Android emulator host alias", () => {
+    expect(isLocalNetworkOrigin(new URL("http://10.0.2.2:8081"))).toBe(true);
+  });
+
+  it("allows RFC 1918 private ranges", () => {
+    expect(isLocalNetworkOrigin(new URL("http://10.0.0.1:13773"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://10.255.255.255:13773"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://172.16.0.1:13773"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://172.31.255.255:13773"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://192.168.1.31:13773"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://192.168.0.1:13773"))).toBe(true);
+  });
+
+  it("rejects non-private IP ranges", () => {
+    expect(isLocalNetworkOrigin(new URL("http://172.15.0.1:13773"))).toBe(false);
+    expect(isLocalNetworkOrigin(new URL("http://172.32.0.1:13773"))).toBe(false);
+    expect(isLocalNetworkOrigin(new URL("http://11.0.0.1:13773"))).toBe(false);
+  });
+
+  it("allows IPv6 ULA and link-local", () => {
+    expect(isLocalNetworkOrigin(new URL("http://[fd12:3456::1]:13773"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://[fe80::1]:13773"))).toBe(true);
+  });
+
+  it("allows .local mDNS hostnames", () => {
+    expect(isLocalNetworkOrigin(new URL("http://my-mac.local:13773"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://preetham-macbook.local:13773"))).toBe(true);
+  });
+
+  it("allows Tailscale 100.x.y.z range", () => {
+    expect(isLocalNetworkOrigin(new URL("http://100.64.0.1:13773"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://100.127.255.255:13773"))).toBe(true);
+    expect(isLocalNetworkOrigin(new URL("http://100.63.255.255:13773"))).toBe(false);
+    expect(isLocalNetworkOrigin(new URL("http://100.128.0.1:13773"))).toBe(false);
+  });
+
+  it("rejects public internet origins", () => {
+    expect(isLocalNetworkOrigin(new URL("https://evil.example.com"))).toBe(false);
+    expect(isLocalNetworkOrigin(new URL("http://8.8.8.8:13773"))).toBe(false);
+  });
+});
+
+describe("isWebSocketOriginAllowed", () => {
+  const config = makeConfig({ port: 3773, host: "localhost" });
+
+  it("allows undefined origin (non-browser clients like iOS/SocketRocket)", () => {
+    expect(isWebSocketOriginAllowed(undefined, config)).toBe(true);
+  });
+
+  it("allows loopback origins on any port", () => {
+    expect(isWebSocketOriginAllowed("http://localhost:5173", config)).toBe(true);
+    expect(isWebSocketOriginAllowed("http://127.0.0.1:5173", config)).toBe(true);
+    expect(isWebSocketOriginAllowed("http://[::1]:3773", config)).toBe(true);
+  });
+
+  it("allows LAN/private network origins (mobile clients)", () => {
+    expect(isWebSocketOriginAllowed("http://192.168.1.31:13773", config)).toBe(true);
+    expect(isWebSocketOriginAllowed("http://10.0.0.5:13773", config)).toBe(true);
+    expect(isWebSocketOriginAllowed("http://172.16.0.1:13773", config)).toBe(true);
+  });
+
+  it("allows mDNS and Tailscale origins", () => {
+    expect(isWebSocketOriginAllowed("http://my-mac.local:13773", config)).toBe(true);
+    expect(isWebSocketOriginAllowed("http://100.64.1.2:13773", config)).toBe(true);
+  });
+
+  it("allows configured devUrl and publicUrl", () => {
+    const configWithUrls = makeConfig({
+      devUrl: new URL("http://127.0.0.1:5173"),
+      publicUrl: new URL("https://trifecta.example.com"),
+    });
+    expect(isWebSocketOriginAllowed("http://127.0.0.1:5173", configWithUrls)).toBe(true);
+    expect(isWebSocketOriginAllowed("https://trifecta.example.com", configWithUrls)).toBe(true);
+  });
+
+  it("rejects arbitrary external origins", () => {
+    expect(isWebSocketOriginAllowed("https://evil.example.com", config)).toBe(false);
+    expect(isWebSocketOriginAllowed("http://8.8.8.8:13773", config)).toBe(false);
+  });
+
+  it("rejects malformed origins", () => {
+    expect(isWebSocketOriginAllowed("not-a-url", config)).toBe(false);
   });
 });

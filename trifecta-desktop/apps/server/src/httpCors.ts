@@ -28,6 +28,50 @@ function isLoopbackOrigin(originUrl: URL): boolean {
 }
 
 /**
+ * Returns true if the given origin URL host is a private/local network
+ * address where cleartext connections are acceptable.
+ *
+ * This mirrors the mobile app's `isLocalNetworkURL` logic and covers:
+ * - Loopback (127.0.0.1, ::1, localhost)
+ * - Android emulator host alias (10.0.2.2)
+ * - RFC 1918 private ranges (10.x, 172.16-31.x, 192.168.x)
+ * - IPv6 ULA (fd00::/8) and link-local (fe80::/10)
+ * - `.local` mDNS hostnames
+ * - Tailscale (100.64.0.0/10) addresses
+ *
+ * Used by the WebSocket Origin check to allow mobile clients (React Native
+ * on Android/OkHttp sends an Origin header derived from the connection URL)
+ * to connect via LAN/Tailscale. WebSocket connections are already
+ * authenticated via a short-lived wsToken, so this is safe — the Origin
+ * check is defense-in-depth against browser-based CSWSH, not mobile apps.
+ */
+export function isLocalNetworkOrigin(originUrl: URL): boolean {
+  if (isLoopbackOrigin(originUrl)) return true;
+
+  const host = originUrl.hostname.replace(/^\[(.*)\]$/, "$1").toLowerCase();
+
+  // Android emulator host alias
+  if (host === "10.0.2.2") return true;
+
+  // RFC 1918 private ranges
+  if (/^10\.\d+\.\d+\.\d+$/.test(host)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(host)) return true;
+  if (/^192\.168\.\d+\.\d+$/.test(host)) return true;
+
+  // IPv6 ULA (fd00::/8) and link-local (fe80::/10)
+  if (/^fd[0-9a-f]{2}:/.test(host)) return true;
+  if (/^fe80:/.test(host)) return true;
+
+  // .local mDNS
+  if (host.endsWith(".local")) return true;
+
+  // Tailscale (100.64.0.0/10)
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+$/.test(host)) return true;
+
+  return false;
+}
+
+/**
  * Computes the set of allowed CORS origins for the current server configuration.
  *
  * Allowed origins:
@@ -103,6 +147,48 @@ export function isOriginAllowed(
   // Check against configured allowed origins
   const allowedOrigins = computeAllowedOrigins(config);
   return allowedOrigins.has(requestOrigin);
+}
+
+/**
+ * Determines whether the given WebSocket upgrade origin should be allowed.
+ *
+ * This is more permissive than {@link isOriginAllowed} because WebSocket
+ * upgrades from mobile clients (React Native) legitimately originate from
+ * LAN/Tailscale addresses. The WebSocket connection is already authenticated
+ * via a short-lived `wsToken`, so the Origin check here is defense-in-depth
+ * against browser-based Cross-Site WebSocket Hijacking (CSWSH) — not a
+ * primary auth boundary.
+ *
+ * In addition to the CORS allowlist, this allows any private/local network
+ * origin (RFC 1918, mDNS, Tailscale, loopback) so mobile apps connecting
+ * over LAN can establish the persistent WebSocket connection.
+ */
+export function isWebSocketOriginAllowed(
+  requestOrigin: string | undefined,
+  config: ServerConfigShape,
+): boolean {
+  if (!requestOrigin) {
+    // No Origin header — non-browser clients (iOS/SocketRocket). Allow;
+    // authentication via wsToken still applies.
+    return true;
+  }
+
+  let originUrl: URL;
+  try {
+    originUrl = new URL(requestOrigin);
+  } catch {
+    return false;
+  }
+
+  // Allow any local/private network origin (LAN, mDNS, Tailscale, loopback).
+  // Mobile clients connect via these addresses and Android/OkHttp sends an
+  // Origin header derived from the connection URL.
+  if (isLocalNetworkOrigin(originUrl)) {
+    return true;
+  }
+
+  // Fall back to the standard CORS allowlist (devUrl, publicUrl, etc.)
+  return isOriginAllowed(requestOrigin, config);
 }
 
 /**
