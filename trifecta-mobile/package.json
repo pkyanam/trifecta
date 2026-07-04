@@ -1,7 +1,7 @@
 {
   "name": "trifecta-mobile",
   "main": "expo-router/entry",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -50,6 +50,7 @@
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-gfm-table": "^2.0.0",
     "micromark-extension-gfm-table": "^2.1.1",
+    "patch-package": "^8.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
@@ -75,5 +76,8 @@
     "eslint-config-expo": "~56.0.4",
     "typescript": "~6.0.3"
   },
-  "private": true
+  "private": true,
+  "patchedDependencies": {
+    "expo-modules-jsi@56.0.7": "patches/expo-modules-jsi@56.0.7.patch"
+  }
 }

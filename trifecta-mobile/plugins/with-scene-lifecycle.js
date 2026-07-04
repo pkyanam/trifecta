@@ -2,6 +2,7 @@ const {
   withInfoPlist,
   withDangerousMod,
   withXcodeProject,
+  IOSConfig,
 } = require("@expo/config-plugins");
 const fs = require("fs");
 const path = require("path");
@@ -182,7 +183,10 @@ function withSceneLifecycle(config) {
   config = withDangerousMod(config, [
     "ios",
     (config) => {
-      const iosDir = config.modRequest.platformProjectDir;
+      // Use projectRoot instead of platformProjectDir to avoid breakage
+      // when multiple @expo/config-plugins versions are hoisted in node_modules.
+      const iosDir = config.modRequest.platformProjectDir ||
+        path.join(config.modRequest.projectRoot, "ios");
 
       // Write SceneDelegate.swift
       const sceneDelegatePath = path.join(iosDir, "Trifecta", "SceneDelegate.swift");
@@ -207,14 +211,24 @@ function withSceneLifecycle(config) {
   // 3. Add SceneDelegate.swift to the Xcode project
   config = withXcodeProject(config, (config) => {
     const project = config.modResults;
-    const target = project.targets.find((t) => t.name === "Trifecta");
-    if (target) {
-      const group = project.mainGroup.findSubpath("Trifecta", true);
-      if (group && !group.children.some((c) => c.path === "SceneDelegate.swift")) {
-        const fileRef = group.newReference("SceneDelegate.swift");
-        fileRef.lastKnownFileType = "sourcecode.swift";
-        target.addSourceFile(fileRef);
-      }
+    const projectName = IOSConfig.XcodeUtils.getProjectName(
+      config.modRequest.projectRoot
+    );
+    // Check if SceneDelegate.swift is already in the project.
+    const allFiles = project.getPbxFileReferenceList
+      ? project.getPbxFileReferenceList()
+      : [];
+    const alreadyAdded = allFiles.some(
+      (f) => f.path && f.path.includes("SceneDelegate.swift")
+    );
+    if (!alreadyAdded) {
+      // Use the full relative path so Xcode resolves the file correctly
+      // (the Trifecta group has no `path` attribute, so files need full paths).
+      IOSConfig.XcodeUtils.addBuildSourceFileToGroup({
+        filepath: `${projectName}/SceneDelegate.swift`,
+        groupName: projectName,
+        project,
+      });
     }
     return config;
   });
