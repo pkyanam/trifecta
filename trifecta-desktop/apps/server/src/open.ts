@@ -8,6 +8,9 @@
  * @module Open
  */
 import { spawn } from "node:child_process";
+import { statSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import { EDITORS, OpenError, type EditorId } from "@belweave/contracts";
 import { isCommandAvailable, type CommandAvailabilityOptions } from "@belweave/shared/shell";
@@ -33,6 +36,31 @@ interface EditorLaunch {
 }
 
 const TARGET_WITH_POSITION_PATTERN = /^(.*?):(\d+)(?::(\d+))?$/;
+
+function defaultMacosApplicationRoots(): ReadonlyArray<string> {
+  return ["/Applications", `${homedir()}/Applications`];
+}
+
+function isMacosApplicationInstalled(name: string, roots: ReadonlyArray<string>): boolean {
+  const bundleName = `${name}.app`;
+  for (const root of roots) {
+    try {
+      if (statSync(join(root, bundleName)).isDirectory()) {
+        return true;
+      }
+    } catch {
+      // ignore missing or inaccessible app bundles
+    }
+  }
+  return false;
+}
+
+function getMacosAppName(editor: (typeof EDITORS)[number]): string | undefined {
+  if ("macosAppName" in editor) {
+    return editor.macosAppName;
+  }
+  return undefined;
+}
 
 function parseTargetPathAndPosition(target: string): {
   path: string;
@@ -107,8 +135,13 @@ function fileManagerCommandForPlatform(platform: NodeJS.Platform): string {
 export function resolveAvailableEditors(
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
+  options: {
+    readonly macosApplicationRoots?: ReadonlyArray<string>;
+  } = {},
 ): ReadonlyArray<EditorId> {
   const available: EditorId[] = [];
+  const macosApplicationRoots =
+    platform === "darwin" ? (options.macosApplicationRoots ?? defaultMacosApplicationRoots()) : [];
 
   for (const editor of EDITORS) {
     if (editor.commands === null) {
@@ -121,6 +154,16 @@ export function resolveAvailableEditors(
 
     const command = resolveAvailableCommand(editor.commands, { platform, env });
     if (command !== null) {
+      available.push(editor.id);
+      continue;
+    }
+
+    const macosAppName = getMacosAppName(editor);
+    if (
+      platform === "darwin" &&
+      macosAppName &&
+      isMacosApplicationInstalled(macosAppName, macosApplicationRoots)
+    ) {
       available.push(editor.id);
     }
   }
@@ -158,6 +201,9 @@ export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
   input: OpenInEditorInput,
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
+  options: {
+    readonly macosApplicationRoots?: ReadonlyArray<string>;
+  } = {},
 ): Effect.fn.Return<EditorLaunch, OpenError> {
   yield* Effect.annotateCurrentSpan({
     "open.editor": input.editor,
@@ -170,10 +216,31 @@ export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
   }
 
   if (editorDef.commands) {
-    const command =
-      resolveAvailableCommand(editorDef.commands, { platform, env }) ?? editorDef.commands[0];
+    const command = resolveAvailableCommand(editorDef.commands, { platform, env });
+    if (command !== null) {
+      return {
+        command,
+        args: resolveEditorArgs(editorDef, input.cwd),
+      };
+    }
+
+    const macosAppName = getMacosAppName(editorDef);
+    if (
+      platform === "darwin" &&
+      macosAppName &&
+      isMacosApplicationInstalled(
+        macosAppName,
+        options.macosApplicationRoots ?? defaultMacosApplicationRoots(),
+      )
+    ) {
+      return {
+        command: "open",
+        args: ["-a", macosAppName, input.cwd],
+      };
+    }
+
     return {
-      command,
+      command: editorDef.commands[0],
       args: resolveEditorArgs(editorDef, input.cwd),
     };
   }

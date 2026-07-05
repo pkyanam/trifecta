@@ -88,6 +88,7 @@ it.layer(NodeServices.layer)("resolveEditorLaunch", (it) => {
         { cwd: "/tmp/workspace", editor: "zed" },
         "darwin",
         { PATH: "" },
+        { macosApplicationRoots: [] },
       );
       assert.deepEqual(zedLaunch, {
         command: "zed",
@@ -277,6 +278,7 @@ it.layer(NodeServices.layer)("resolveEditorLaunch", (it) => {
         { cwd: "/tmp/workspace/src/open.ts:71:5", editor: "zed" },
         "darwin",
         { PATH: "" },
+        { macosApplicationRoots: [] },
       );
       assert.deepEqual(zedLineAndColumn, {
         command: "zed",
@@ -287,6 +289,7 @@ it.layer(NodeServices.layer)("resolveEditorLaunch", (it) => {
         { cwd: "/tmp/workspace/AGENTS.md:48", editor: "zed" },
         "darwin",
         { PATH: "" },
+        { macosApplicationRoots: [] },
       );
       assert.deepEqual(zedLineOnly, {
         command: "zed",
@@ -476,6 +479,29 @@ it.layer(NodeServices.layer)("resolveEditorLaunch", (it) => {
       });
     }),
   );
+
+  it.effect(
+    "falls back to open -a on macOS when the Zed CLI is missing but the app is installed",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "belweave-open-test-" });
+        yield* fs.makeDirectory(path.join(dir, "Zed.app"), { recursive: true });
+
+        const result = yield* resolveEditorLaunch(
+          { cwd: "/tmp/workspace", editor: "zed" },
+          "darwin",
+          { PATH: "" },
+          { macosApplicationRoots: [dir] },
+        );
+
+        assert.deepEqual(result, {
+          command: "open",
+          args: ["-a", "Zed", "/tmp/workspace"],
+        });
+      }),
+  );
 });
 
 it.layer(NodeServices.layer)("launchDetached", (it) => {
@@ -631,6 +657,22 @@ it.layer(NodeServices.layer)("resolveAvailableEditors", (it) => {
         PATH: dir,
       });
       assert.deepEqual(editors, ["zed", "file-manager"]);
+    }),
+  );
+
+  it.effect("includes zed on macOS when the Zed app is installed even without the CLI", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "belweave-editors-" });
+      yield* fs.makeDirectory(path.join(dir, "Zed.app"), { recursive: true });
+
+      const editors = resolveAvailableEditors(
+        "darwin",
+        { PATH: "" },
+        { macosApplicationRoots: [dir] },
+      );
+      assert.deepEqual(editors, ["zed"]);
     }),
   );
 
