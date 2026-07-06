@@ -104,16 +104,10 @@ jobs:
         env:
           DISPATCH_CHANNEL: ${{ github.event.inputs.channel }}
           DISPATCH_VERSION: ${{ github.event.inputs.version }}
-          NIGHTLY_DATE: ${{ github.run_started_at }}
           NIGHTLY_SHA: ${{ github.sha }}
-          NIGHTLY_RUN_NUMBER: ${{ github.run_number }}
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "schedule" || ( "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${DISPATCH_CHANNEL:-stable}" == "nightly" ) ]]; then
-            nightly_date="$(date -u -d "$NIGHTLY_DATE" +%Y%m%d)"
-
             node scripts/resolve-nightly-release.ts \
-              --date "$nightly_date" \
-              --run-number "$NIGHTLY_RUN_NUMBER" \
               --sha "$NIGHTLY_SHA" \
               --github-output
 

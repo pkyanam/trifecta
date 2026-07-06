@@ -26,8 +26,8 @@ interface NightlyVersion {
   readonly major: number;
   readonly minor: number;
   readonly patch: number;
-  readonly date: number;
-  readonly runNumber: number;
+  readonly nightlyNumber: number;
+  readonly legacy: boolean;
 }
 
 const parseNumericIdentifier = (identifier: string): number | undefined =>
@@ -99,25 +99,45 @@ const compareNightlyVersions = (left: NightlyVersion, right: NightlyVersion): nu
   if (left.major !== right.major) return left.major - right.major;
   if (left.minor !== right.minor) return left.minor - right.minor;
   if (left.patch !== right.patch) return left.patch - right.patch;
-  if (left.date !== right.date) return left.date - right.date;
-  return left.runNumber - right.runNumber;
+  // Legacy (old format: vX.Y.Z-nightly.DATE.RUN) tags sort before new-format
+  // tags (vX.Y.Z-nightly.N) so release-note diffs keep working across the
+  // tag-format transition.
+  if (left.legacy !== right.legacy) return left.legacy ? -1 : 1;
+  return left.nightlyNumber - right.nightlyNumber;
 };
 
 const parseNightlyTag = (tag: string): NightlyVersion | undefined => {
   // Accept both the current `v<semver>` format and the legacy `nightly-v<semver>`
   // format so release note diffs keep working across the tag-format transition.
-  const match = /^(?:nightly-)?v(\d+)\.(\d+)\.(\d+)-nightly\.(\d{8})\.(\d+)$/.exec(tag);
-  if (!match) return undefined;
 
-  const [, major, minor, patch, date, runNumber] = match;
-  if (!major || !minor || !patch || !date || !runNumber) return undefined;
+  // Legacy format: vX.Y.Z-nightly.DATE.RUN (8-digit date + run number)
+  const legacyMatch = /^(?:nightly-)?v(\d+)\.(\d+)\.(\d+)-nightly\.(\d{8})\.(\d+)$/.exec(tag);
+  if (legacyMatch) {
+    const [, major, minor, patch, date, runNumber] = legacyMatch;
+    if (!major || !minor || !patch || !date || !runNumber) return undefined;
+
+    return {
+      major: Number(major),
+      minor: Number(minor),
+      patch: Number(patch),
+      nightlyNumber: Number(date) * 100000 + Number(runNumber),
+      legacy: true,
+    };
+  }
+
+  // New format: vX.Y.Z-nightly.N
+  const newMatch = /^(?:nightly-)?v(\d+)\.(\d+)\.(\d+)-nightly\.(\d+)$/.exec(tag);
+  if (!newMatch) return undefined;
+
+  const [, major, minor, patch, nightlyNumber] = newMatch;
+  if (!major || !minor || !patch || !nightlyNumber) return undefined;
 
   return {
     major: Number(major),
     minor: Number(minor),
     patch: Number(patch),
-    date: Number(date),
-    runNumber: Number(runNumber),
+    nightlyNumber: Number(nightlyNumber),
+    legacy: false,
   };
 };
 

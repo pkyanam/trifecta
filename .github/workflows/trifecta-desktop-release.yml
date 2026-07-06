@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - "v*.*.*"
-      - "!v*-nightly.*"
   workflow_dispatch:
     inputs:
       channel:
@@ -118,14 +117,27 @@ jobs:
               exit 1
             fi
 
-            echo "release_channel=stable" >> "$GITHUB_OUTPUT"
             echo "version=$version" >> "$GITHUB_OUTPUT"
             echo "tag=v$version" >> "$GITHUB_OUTPUT"
-            echo "name=Trifecta v$version" >> "$GITHUB_OUTPUT"
-            if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            if [[ "$version" =~ -nightly\.[0-9]+$ ]]; then
+              # Nightly tag (for example v0.0.55-nightly.1): publish as a
+              # prerelease on the nightly update channel.
+              echo "release_channel=nightly" >> "$GITHUB_OUTPUT"
+              echo "name=Trifecta Nightly $version" >> "$GITHUB_OUTPUT"
+              echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+              echo "make_latest=false" >> "$GITHUB_OUTPUT"
+            elif [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              # Stable tag (for example v0.0.55): publish as the latest release
+              # on the stable update channel.
+              echo "release_channel=stable" >> "$GITHUB_OUTPUT"
+              echo "name=Trifecta v$version" >> "$GITHUB_OUTPUT"
               echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
               echo "make_latest=true" >> "$GITHUB_OUTPUT"
             else
+              # Other prerelease suffixes (for example v0.0.55-rc.1): stable
+              # channel, but marked as a prerelease and not latest.
+              echo "release_channel=stable" >> "$GITHUB_OUTPUT"
+              echo "name=Trifecta v$version" >> "$GITHUB_OUTPUT"
               echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
               echo "make_latest=false" >> "$GITHUB_OUTPUT"
             fi

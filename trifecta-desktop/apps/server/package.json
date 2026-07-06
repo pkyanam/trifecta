@@ -1,6 +1,6 @@
 {
   "name": "@belweave/trifecta",
-  "version": "0.0.44",
+  "version": "0.0.45",
   "description": "Trifecta server — orchestrate AI coding agents (Codex, Claude Code, OpenCode, Gemini, Cursor, and more) behind one interface, paired with the Trifecta desktop, web, iOS, and Android clients.",
   "keywords": [
     "acp",

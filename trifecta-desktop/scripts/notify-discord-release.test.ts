@@ -7,35 +7,35 @@ it("builds a prerelease Discord announcement for nightly subscribers", () => {
     buildDiscordReleaseAnnouncement({
       target: "prerelease",
       roleId: "111111111111111111",
-      releaseName: "Trifecta Nightly 1.2.4-nightly.20260501.17 (abcdef123456)",
-      version: "1.2.4-nightly.20260501.17",
-      tag: "v1.2.4-nightly.20260501.17",
+      releaseName: "Trifecta Nightly 1.2.4-nightly.17 (abcdef123456)",
+      version: "1.2.4-nightly.17",
+      tag: "v1.2.4-nightly.17",
       releaseUrl: new URL(
-        "https://github.com/t3dotgg/belweave-code/releases/tag/v1.2.4-nightly.20260501.17",
+        "https://github.com/t3dotgg/belweave-code/releases/tag/v1.2.4-nightly.17",
       ),
       timestamp: "2026-05-01T01:41:00.000Z",
     }),
     {
       content:
-        "<@&111111111111111111> Prerelease published: Trifecta Nightly 1.2.4-nightly.20260501.17 (abcdef123456)",
+        "<@&111111111111111111> Prerelease published: Trifecta Nightly 1.2.4-nightly.17 (abcdef123456)",
       allowed_mentions: {
         roles: ["111111111111111111"],
       },
       embeds: [
         {
-          title: "Trifecta Nightly 1.2.4-nightly.20260501.17 (abcdef123456)",
-          url: "https://github.com/t3dotgg/belweave-code/releases/tag/v1.2.4-nightly.20260501.17",
+          title: "Trifecta Nightly 1.2.4-nightly.17 (abcdef123456)",
+          url: "https://github.com/t3dotgg/belweave-code/releases/tag/v1.2.4-nightly.17",
           description: "A new Trifecta prerelease is available for nightly testers.",
           color: 0x5865f2,
           fields: [
             {
               name: "Version",
-              value: "1.2.4-nightly.20260501.17",
+              value: "1.2.4-nightly.17",
               inline: true,
             },
             {
               name: "Tag",
-              value: "v1.2.4-nightly.20260501.17",
+              value: "v1.2.4-nightly.17",
               inline: true,
             },
           ],

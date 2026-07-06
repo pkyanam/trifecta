@@ -2,7 +2,7 @@
   "expo": {
     "name": "Trifecta",
     "slug": "trifecta-mobile",
-    "version": "1.4.1",
+    "version": "1.4.2",
     "orientation": "portrait",
     "scheme": "trifecta",
     "userInterfaceStyle": "automatic",

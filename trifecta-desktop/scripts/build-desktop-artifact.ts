@@ -9,6 +9,10 @@ import { BRAND_ASSET_PATHS } from "./lib/brand-assets.ts";
 import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
 import { applyMacMask } from "./lib/macos-icon-mask.mjs";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
+import {
+  releasePackageFiles,
+  updateReleasePackageVersions,
+} from "./update-release-package-versions.ts";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -347,6 +351,47 @@ const commandOutputOptions = (verbose: boolean) =>
     stderr: "inherit",
   }) as const;
 
+/**
+ * Aligns every releasable package.json version to the requested build version
+ * before compiling, mirroring the "Align package versions to release version"
+ * step in CI. Without this, bundles that statically import their package.json
+ * (for example the server's `serverVersion`) bake in the stale checked-in
+ * version even when `--build-version` is provided.
+ *
+ * Returns an effect that restores the original file contents, so local builds
+ * do not leave the working tree modified.
+ */
+const alignReleasePackageVersions = Effect.fn("alignReleasePackageVersions")(function* (
+  repoRoot: string,
+  version: string | undefined,
+) {
+  if (!version) {
+    return Effect.void;
+  }
+
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+
+  const originals: Array<readonly [filePath: string, contents: string]> = [];
+  for (const relativePath of releasePackageFiles) {
+    const filePath = path.join(repoRoot, relativePath);
+    originals.push([filePath, yield* fs.readFileString(filePath)]);
+  }
+
+  const { changed } = yield* updateReleasePackageVersions(version, { rootDir: repoRoot });
+  if (!changed) {
+    return Effect.void;
+  }
+
+  yield* Effect.log(`[desktop-artifact] Aligned package versions to ${version} for this build.`);
+  return Effect.forEach(originals, ([filePath, contents]) =>
+    fs.writeFileString(filePath, contents),
+  ).pipe(
+    Effect.andThen(Effect.log("[desktop-artifact] Restored original package.json versions.")),
+    Effect.asVoid,
+  );
+});
+
 const runCommand = Effect.fn("runCommand")(function* (command: ChildProcess.Command) {
   const commandSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const child = yield* commandSpawner.spawn(command);
@@ -391,6 +436,18 @@ function generateMacIconSet(
       ChildProcess.make({
         ...commandOutputOptions(verbose),
       })`iconutil -c icns ${iconsetDir} -o ${targetIcns}`,
+    ).pipe(
+      Effect.catch((cause) =>
+        Effect.gen(function* () {
+          if (yield* fs.exists(targetIcns)) {
+            yield* Effect.logWarning(
+              `[desktop-artifact] iconutil failed; keeping existing macOS icon at ${targetIcns}`,
+            );
+            return;
+          }
+          return yield* cause;
+        }),
+      ),
     );
   });
 }
@@ -539,7 +596,7 @@ function resolveGitHubPublishConfig(updateChannel: "latest" | "nightly"):
 }
 
 export function resolveDesktopUpdateChannel(version: string): "latest" | "nightly" {
-  return /-nightly\.\d{8}\.\d+$/.test(version) ? "nightly" : "latest";
+  return /-nightly\.\d+$/.test(version) ? "nightly" : "latest";
 }
 
 export function resolveDesktopBuildIconAssets(version: string): DesktopBuildIconAssets {
@@ -750,14 +807,16 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     );
 
     yield* Effect.log("[desktop-artifact] Building desktop/server/web artifacts...");
+    const restorePackageVersions = yield* alignReleasePackageVersions(repoRoot, options.version);
     yield* runCommand(
       ChildProcess.make({
         cwd: repoRoot,
+        env: { ...process.env, APP_VERSION: appVersion },
         ...commandOutputOptions(options.verbose),
         // Windows needs shell mode to resolve .cmd shims (e.g. bun.cmd).
         shell: process.platform === "win32",
       })`bun run build:desktop -- --force`,
-    );
+    ).pipe(Effect.ensuring(Effect.orDie(restorePackageVersions)));
   }
 
   for (const [label, dir] of Object.entries(distDirs)) {

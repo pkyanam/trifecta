@@ -117,7 +117,16 @@ function generateIcns(maskedPng, targetIcns) {
       ]);
     }
 
-    runChecked("iconutil", ["-c", "icns", iconsetDir, "-o", targetIcns]);
+    try {
+      runChecked("iconutil", ["-c", "icns", iconsetDir, "-o", targetIcns]);
+    } catch (error) {
+      if (!existsSync(targetIcns)) {
+        throw error;
+      }
+      process.stderr.write(
+        `Warning: iconutil failed; keeping existing macOS icon at ${targetIcns}\n`,
+      );
+    }
   } finally {
     rmSync(iconsetRoot, { recursive: true, force: true });
   }

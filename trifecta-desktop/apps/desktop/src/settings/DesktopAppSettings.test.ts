@@ -90,7 +90,7 @@ describe("DesktopSettings", () => {
   );
 
   it("defaults packaged nightly builds to the nightly update channel", () => {
-    assert.deepEqual(resolveDefaultDesktopSettings("0.0.17-nightly.20260415.1"), {
+    assert.deepEqual(resolveDefaultDesktopSettings("0.0.17-nightly.1"), {
       serverExposureMode: "local-only",
       tailscaleServeEnabled: false,
       tailscaleServePort: 443,
@@ -252,7 +252,7 @@ describe("DesktopSettings", () => {
           backendPort: null,
         } satisfies DesktopSettingsValue);
       }),
-      { appVersion: "0.0.17-nightly.20260415.1" },
+      { appVersion: "0.0.17-nightly.1" },
     ),
   );
 
@@ -275,7 +275,7 @@ describe("DesktopSettings", () => {
           backendPort: null,
         } satisfies DesktopSettingsValue);
       }),
-      { appVersion: "0.0.17-nightly.20260415.1" },
+      { appVersion: "0.0.17-nightly.1" },
     ),
   );
 
