@@ -4,6 +4,7 @@ import {
   ArrowLeftIcon,
   BotIcon,
   ChartNoAxesCombinedIcon,
+  CloudIcon,
   GitBranchIcon,
   KeyboardIcon,
   Link2Icon,
@@ -31,6 +32,7 @@ export type SettingsSectionPath =
   | "/settings/quotas"
   | "/settings/source-control"
   | "/settings/connections"
+  | "/settings/cloud"
   | "/settings/archived";
 
 export const SETTINGS_NAV_ITEMS: ReadonlyArray<{
@@ -45,6 +47,7 @@ export const SETTINGS_NAV_ITEMS: ReadonlyArray<{
   { label: "Usage", to: "/settings/quotas", icon: ChartNoAxesCombinedIcon },
   { label: "Source Control", to: "/settings/source-control", icon: GitBranchIcon },
   { label: "Connections", to: "/settings/connections", icon: Link2Icon },
+  { label: "Cloud", to: "/settings/cloud", icon: CloudIcon },
   { label: "Archive", to: "/settings/archived", icon: ArchiveIcon },
 ];
 

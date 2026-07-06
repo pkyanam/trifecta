@@ -67,6 +67,7 @@ import type {
   OrchestrationThreadStreamItem,
 } from "./orchestration.ts";
 import { EnvironmentId } from "./baseSchemas.ts";
+import type { BelweaveCloudConfig } from "./belweaveCloud.ts";
 import { AuthBearerBootstrapResult, AuthSessionState, AuthWebSocketTokenResult } from "./auth.ts";
 import { AdvertisedEndpoint } from "./remoteAccess.ts";
 import { EditorId } from "./editor.ts";
@@ -383,6 +384,20 @@ export const DesktopRemoteJsonRequestSchema = Schema.Struct({
 
 export type DesktopRemoteJsonRequest = typeof DesktopRemoteJsonRequestSchema.Type;
 
+export const BelweaveCloudFetchRequestSchema = Schema.Struct({
+  url: Schema.String,
+  method: Schema.Literals(["GET", "POST", "DELETE"]),
+  apiKey: Schema.String,
+  body: Schema.optionalKey(Schema.Unknown),
+});
+export type BelweaveCloudFetchRequest = typeof BelweaveCloudFetchRequestSchema.Type;
+
+export const BelweaveCloudFetchResponseSchema = Schema.Struct({
+  status: Schema.Number,
+  bodyText: Schema.String,
+});
+export type BelweaveCloudFetchResponse = typeof BelweaveCloudFetchResponseSchema.Type;
+
 export interface DesktopBridge {
   getAppBranding: () => DesktopAppBranding | null;
   getLocalEnvironmentBootstrap: () => DesktopEnvironmentBootstrap | null;
@@ -395,6 +410,11 @@ export interface DesktopBridge {
   getSavedEnvironmentSecret: (environmentId: EnvironmentId) => Promise<string | null>;
   setSavedEnvironmentSecret: (environmentId: EnvironmentId, secret: string) => Promise<boolean>;
   removeSavedEnvironmentSecret: (environmentId: EnvironmentId) => Promise<void>;
+  getBelweaveCloudConfig: () => Promise<BelweaveCloudConfig | null>;
+  setBelweaveCloudConfig: (config: BelweaveCloudConfig) => Promise<void>;
+  getBelweaveCloudApiKey: () => Promise<string | null>;
+  setBelweaveCloudApiKey: (apiKey: string) => Promise<boolean>;
+  removeBelweaveCloudApiKey: () => Promise<void>;
   discoverSshHosts: () => Promise<readonly DesktopDiscoveredSshHost[]>;
   ensureSshEnvironment: (
     target: DesktopSshEnvironmentTarget,
@@ -412,6 +432,7 @@ export interface DesktopBridge {
     bearerToken: string,
   ) => Promise<AuthWebSocketTokenResult>;
   fetchRemoteJson?: (request: DesktopRemoteJsonRequest) => Promise<unknown>;
+  belweaveCloudFetch?: (request: BelweaveCloudFetchRequest) => Promise<BelweaveCloudFetchResponse>;
   resolveBoxWebSocketUrl?: (wsBaseUrl: string) => Promise<string>;
   onSshPasswordPrompt: (listener: (request: DesktopSshPasswordPromptRequest) => void) => () => void;
   resolveSshPasswordPrompt: (requestId: string, password: string | null) => Promise<void>;
@@ -474,6 +495,11 @@ export interface LocalApi {
     getSavedEnvironmentSecret: (environmentId: EnvironmentId) => Promise<string | null>;
     setSavedEnvironmentSecret: (environmentId: EnvironmentId, secret: string) => Promise<boolean>;
     removeSavedEnvironmentSecret: (environmentId: EnvironmentId) => Promise<void>;
+    getBelweaveCloudConfig: () => Promise<BelweaveCloudConfig | null>;
+    setBelweaveCloudConfig: (config: BelweaveCloudConfig) => Promise<void>;
+    getBelweaveCloudApiKey: () => Promise<string | null>;
+    setBelweaveCloudApiKey: (apiKey: string) => Promise<boolean>;
+    removeBelweaveCloudApiKey: () => Promise<void>;
   };
   server: {
     getConfig: () => Promise<ServerConfig>;

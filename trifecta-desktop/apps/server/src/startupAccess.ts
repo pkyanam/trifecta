@@ -1,7 +1,12 @@
 import { networkInterfaces } from "node:os";
 
 import { QrCode } from "@belweave/shared/qrCode";
+import { fromJsonStringPretty } from "@belweave/shared/schemaJson";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
 import { HttpServer } from "effect/unstable/http";
 
 import { ServerConfig } from "./config.ts";
@@ -11,7 +16,22 @@ export interface HeadlessServeAccessInfo {
   readonly connectionString: string;
   readonly token: string;
   readonly pairingUrl: string;
+  readonly credentialSource: "startup-pairing" | "review-pairing-token";
+  readonly expiresAt: string | undefined;
 }
+
+const HeadlessServeAccessFilePayload = Schema.Struct({
+  version: Schema.Literal(1),
+  connectionString: Schema.String,
+  token: Schema.String,
+  pairingUrl: Schema.String,
+  credentialSource: Schema.Literals(["startup-pairing", "review-pairing-token"]),
+  expiresAt: Schema.optional(Schema.String),
+});
+
+const encodeHeadlessServeAccessFilePayload = Schema.encodeSync(
+  fromJsonStringPretty(HeadlessServeAccessFilePayload),
+);
 
 type NetworkInterfacesMap = ReturnType<typeof networkInterfaces>;
 
@@ -141,14 +161,46 @@ export const issueHeadlessServeAccessInfo = Effect.fn("issueHeadlessServeAccessI
     ? serverConfig.publicUrl.toString().replace(/\/$/, "")
     : resolveHeadlessConnectionString(serverConfig.host, localPort);
 
-  // Use review pairing token if configured, otherwise issue a new one
-  const token = serverConfig.reviewPairingToken
-    ? serverConfig.reviewPairingToken
-    : (yield* serverAuth.issuePairingCredential({ role: "owner" })).credential;
+  if (serverConfig.reviewPairingToken) {
+    return {
+      connectionString,
+      token: serverConfig.reviewPairingToken,
+      pairingUrl: buildPairingUrl(connectionString, serverConfig.reviewPairingToken),
+      credentialSource: "review-pairing-token",
+      expiresAt: undefined,
+    } satisfies HeadlessServeAccessInfo;
+  }
+
+  const pairingCredential = yield* serverAuth.issuePairingCredential({ role: "owner" });
 
   return {
     connectionString,
-    token,
-    pairingUrl: buildPairingUrl(connectionString, token),
+    token: pairingCredential.credential,
+    pairingUrl: buildPairingUrl(connectionString, pairingCredential.credential),
+    credentialSource: "startup-pairing",
+    expiresAt: DateTime.formatIso(pairingCredential.expiresAt),
   } satisfies HeadlessServeAccessInfo;
+});
+
+export const writeHeadlessServeAccessFile = Effect.fn("writeHeadlessServeAccessFile")(function* (
+  accessInfo: HeadlessServeAccessInfo,
+) {
+  const serverConfig = yield* ServerConfig;
+  if (!serverConfig.headlessAccessFile) return;
+
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const filePath = serverConfig.headlessAccessFile;
+  const payload = {
+    version: 1,
+    connectionString: accessInfo.connectionString,
+    token: accessInfo.token,
+    pairingUrl: accessInfo.pairingUrl,
+    credentialSource: accessInfo.credentialSource,
+    ...(accessInfo.expiresAt ? { expiresAt: accessInfo.expiresAt } : {}),
+  } satisfies typeof HeadlessServeAccessFilePayload.Type;
+
+  yield* fs.makeDirectory(path.dirname(filePath), { recursive: true });
+  yield* fs.writeFileString(filePath, `${encodeHeadlessServeAccessFilePayload(payload)}\n`);
+  yield* fs.chmod(filePath, 0o600).pipe(Effect.orElseSucceed(() => undefined));
 });

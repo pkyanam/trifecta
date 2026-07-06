@@ -118,6 +118,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         devUrl: new URL("http://127.0.0.1:5173"),
         noBrowser: true,
         startupPresentation: "browser",
+        headlessAccessFile: undefined,
         desktopBootstrapToken: undefined,
         autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: true,
@@ -186,12 +187,55 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         devUrl: new URL("http://127.0.0.1:4173"),
         noBrowser: true,
         startupPresentation: "browser",
+        headlessAccessFile: undefined,
         desktopBootstrapToken: undefined,
         autoBootstrapProjectFromCwd: true,
         logWebSocketEvents: true,
         tailscaleServeEnabled: true,
         tailscaleServePort: 8443,
       });
+    }),
+  );
+
+  it.effect("resolves a headless access file without enabling the review token path", () =>
+    Effect.gen(function* () {
+      const { join } = yield* Path.Path;
+      const baseDir = join(NodeOS.tmpdir(), "belweave-cli-config-headless-access");
+      const accessFile = join(baseDir, "trifecta-access.json");
+      const resolved = yield* resolveServerConfig(
+        {
+          mode: Option.some("server"),
+          port: Option.some(3773),
+          host: Option.some("0.0.0.0"),
+          baseDir: Option.some(baseDir),
+          cwd: Option.none(),
+          devUrl: Option.none(),
+          noBrowser: Option.none(),
+          bootstrapFd: Option.none(),
+          autoBootstrapProjectFromCwd: Option.none(),
+          logWebSocketEvents: Option.none(),
+          tailscaleServeEnabled: Option.none(),
+          tailscaleServePort: Option.none(),
+          publicUrl: Option.some(new URL("https://env-example.env.belweave.ai")),
+          headlessAccessFile: Option.some(accessFile),
+          reviewPairingToken: Option.none(),
+        },
+        Option.none(),
+        { startupPresentation: "headless" },
+      ).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
+            NetService.layer,
+          ),
+        ),
+      );
+
+      expect(resolved.headlessAccessFile).toBe(accessFile);
+      expect(resolved.publicUrl?.toString()).toBe("https://env-example.env.belweave.ai/");
+      expect(resolved.reviewPairingToken).toBeUndefined();
+      expect(resolved.startupPresentation).toBe("headless");
+      expect(resolved.noBrowser).toBe(true);
     }),
   );
 
@@ -257,6 +301,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         devUrl: new URL("http://127.0.0.1:4173"),
         noBrowser: false,
         startupPresentation: "browser",
+        headlessAccessFile: undefined,
         desktopBootstrapToken: "desktop-bootstrap-token",
         autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: false,
@@ -333,6 +378,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         devUrl: undefined,
         noBrowser: true,
         startupPresentation: "browser",
+        headlessAccessFile: undefined,
         desktopBootstrapToken: "desktop-token",
         autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: false,
@@ -462,6 +508,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         devUrl: new URL("http://127.0.0.1:4173"),
         noBrowser: true,
         startupPresentation: "browser",
+        headlessAccessFile: undefined,
         desktopBootstrapToken: "desktop-token",
         autoBootstrapProjectFromCwd: true,
         logWebSocketEvents: true,
@@ -535,6 +582,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         devUrl: undefined,
         noBrowser: true,
         startupPresentation: "browser",
+        headlessAccessFile: undefined,
         desktopBootstrapToken: undefined,
         autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: false,
@@ -600,6 +648,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         devUrl: undefined,
         noBrowser: true,
         startupPresentation: "headless",
+        headlessAccessFile: undefined,
         desktopBootstrapToken: undefined,
         autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: false,

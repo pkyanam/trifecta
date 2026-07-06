@@ -1,16 +1,25 @@
 import {
+  BelweaveCloudConfigSchema,
   ClientSettingsSchema,
+  DEFAULT_BELWEAVE_CLOUD_CONFIG,
   EnvironmentId,
+  type BelweaveCloudConfig,
   type ClientSettings,
   type EnvironmentId as EnvironmentIdValue,
   type PersistedSavedEnvironmentRecord,
 } from "@belweave/contracts";
 import * as Schema from "effect/Schema";
 
-import { getLocalStorageItem, setLocalStorageItem } from "./hooks/useLocalStorage";
+import {
+  getLocalStorageItem,
+  removeLocalStorageItem,
+  setLocalStorageItem,
+} from "./hooks/useLocalStorage";
 
 export const CLIENT_SETTINGS_STORAGE_KEY = "belweave:client-settings:v1";
 export const SAVED_ENVIRONMENT_REGISTRY_STORAGE_KEY = "belweave:saved-environment-registry:v1";
+export const BELWEAVE_CLOUD_CONFIG_STORAGE_KEY = "belweave:belweave-cloud-config:v1";
+export const BELWEAVE_CLOUD_API_KEY_STORAGE_KEY = "belweave:belweave-cloud-api-key:v1";
 
 const BrowserSavedEnvironmentRecordSchema = Schema.Struct({
   environmentId: EnvironmentId,
@@ -202,4 +211,62 @@ export function removeBrowserSavedEnvironmentSecret(environmentId: EnvironmentId
       return toPersistedSavedEnvironmentRecord(record);
     }),
   });
+}
+
+const BelweaveCloudApiKeyDocumentSchema = Schema.String;
+
+export function readBrowserBelweaveCloudConfig(): BelweaveCloudConfig | null {
+  if (!hasWindow()) {
+    return null;
+  }
+
+  try {
+    return getLocalStorageItem(BELWEAVE_CLOUD_CONFIG_STORAGE_KEY, BelweaveCloudConfigSchema);
+  } catch {
+    return DEFAULT_BELWEAVE_CLOUD_CONFIG;
+  }
+}
+
+export function writeBrowserBelweaveCloudConfig(config: BelweaveCloudConfig): void {
+  if (!hasWindow()) {
+    return;
+  }
+
+  setLocalStorageItem(BELWEAVE_CLOUD_CONFIG_STORAGE_KEY, config, BelweaveCloudConfigSchema);
+}
+
+export function readBrowserBelweaveCloudApiKey(): string | null {
+  if (!hasWindow()) {
+    return null;
+  }
+
+  try {
+    return getLocalStorageItem(
+      BELWEAVE_CLOUD_API_KEY_STORAGE_KEY,
+      BelweaveCloudApiKeyDocumentSchema,
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function writeBrowserBelweaveCloudApiKey(apiKey: string): boolean {
+  if (!hasWindow()) {
+    return false;
+  }
+
+  setLocalStorageItem(
+    BELWEAVE_CLOUD_API_KEY_STORAGE_KEY,
+    apiKey,
+    BelweaveCloudApiKeyDocumentSchema,
+  );
+  return true;
+}
+
+export function removeBrowserBelweaveCloudApiKey(): void {
+  if (!hasWindow()) {
+    return;
+  }
+
+  removeLocalStorageItem(BELWEAVE_CLOUD_API_KEY_STORAGE_KEY);
 }

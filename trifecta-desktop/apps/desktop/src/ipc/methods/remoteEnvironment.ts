@@ -1,4 +1,8 @@
-import { DesktopRemoteJsonRequestSchema } from "@belweave/contracts";
+import {
+  BelweaveCloudFetchRequestSchema,
+  BelweaveCloudFetchResponseSchema,
+  DesktopRemoteJsonRequestSchema,
+} from "@belweave/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
@@ -12,6 +16,13 @@ export const fetchRemoteJson = makeIpcMethod({
   payload: DesktopRemoteJsonRequestSchema,
   result: Schema.Unknown,
   handler: (input) => Effect.promise(() => DesktopRemoteApi.fetchRemoteJson(input)),
+});
+
+export const fetchBelweaveCloud = makeIpcMethod({
+  channel: IpcChannels.FETCH_BELWEAVE_CLOUD_CHANNEL,
+  payload: BelweaveCloudFetchRequestSchema,
+  result: BelweaveCloudFetchResponseSchema,
+  handler: (input) => Effect.promise(() => DesktopRemoteApi.fetchBelweaveCloud(input)),
 });
 
 const ResolveBoxWebSocketUrlRequestSchema = Schema.Struct({

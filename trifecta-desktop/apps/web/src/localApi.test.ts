@@ -181,6 +181,11 @@ function makeDesktopBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridg
     getSavedEnvironmentSecret: async () => null,
     setSavedEnvironmentSecret: async () => true,
     removeSavedEnvironmentSecret: async () => undefined,
+    getBelweaveCloudConfig: async () => null,
+    setBelweaveCloudConfig: async () => undefined,
+    getBelweaveCloudApiKey: async () => null,
+    setBelweaveCloudApiKey: async () => true,
+    removeBelweaveCloudApiKey: async () => undefined,
     discoverSshHosts: async () => [],
     ensureSshEnvironment: async () => {
       throw new Error("ensureSshEnvironment not implemented in test");

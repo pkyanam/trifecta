@@ -47,6 +47,14 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.invoke(IpcChannels.SET_SAVED_ENVIRONMENT_SECRET_CHANNEL, { environmentId, secret }),
   removeSavedEnvironmentSecret: (environmentId) =>
     ipcRenderer.invoke(IpcChannels.REMOVE_SAVED_ENVIRONMENT_SECRET_CHANNEL, environmentId),
+  getBelweaveCloudConfig: () => ipcRenderer.invoke(IpcChannels.GET_BELWEAVE_CLOUD_CONFIG_CHANNEL),
+  setBelweaveCloudConfig: (config) =>
+    ipcRenderer.invoke(IpcChannels.SET_BELWEAVE_CLOUD_CONFIG_CHANNEL, config),
+  getBelweaveCloudApiKey: () => ipcRenderer.invoke(IpcChannels.GET_BELWEAVE_CLOUD_API_KEY_CHANNEL),
+  setBelweaveCloudApiKey: (apiKey) =>
+    ipcRenderer.invoke(IpcChannels.SET_BELWEAVE_CLOUD_API_KEY_CHANNEL, apiKey),
+  removeBelweaveCloudApiKey: () =>
+    ipcRenderer.invoke(IpcChannels.REMOVE_BELWEAVE_CLOUD_API_KEY_CHANNEL),
   discoverSshHosts: () => ipcRenderer.invoke(IpcChannels.DISCOVER_SSH_HOSTS_CHANNEL),
   ensureSshEnvironment: async (target, options) =>
     unwrapEnsureSshEnvironmentResult(
@@ -69,6 +77,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   issueSshWebSocketToken: (httpBaseUrl, bearerToken) =>
     ipcRenderer.invoke(IpcChannels.ISSUE_SSH_WEBSOCKET_TOKEN_CHANNEL, { httpBaseUrl, bearerToken }),
   fetchRemoteJson: (request) => ipcRenderer.invoke(IpcChannels.FETCH_REMOTE_JSON_CHANNEL, request),
+  belweaveCloudFetch: (request) =>
+    ipcRenderer.invoke(IpcChannels.FETCH_BELWEAVE_CLOUD_CHANNEL, request),
   resolveBoxWebSocketUrl: (wsBaseUrl) =>
     ipcRenderer.invoke(IpcChannels.RESOLVE_BOX_WEB_SOCKET_URL_CHANNEL, { wsBaseUrl }),
   onSshPasswordPrompt: (listener) => {

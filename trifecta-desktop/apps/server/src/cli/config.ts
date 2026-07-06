@@ -87,9 +87,15 @@ export const publicUrlFlag = Flag.string("public-url").pipe(
   ),
   Flag.optional,
 );
+export const headlessAccessFileFlag = Flag.string("headless-access-file").pipe(
+  Flag.withDescription(
+    "Write headless/server startup access details as JSON for automation. Contains a normal one-time pairing credential.",
+  ),
+  Flag.optional,
+);
 export const reviewPairingTokenFlag = Flag.string("review-pairing-token").pipe(
   Flag.withDescription(
-    "Pre-configured pairing token for App Store review or automated testing. Bypasses normal token generation.",
+    "Deprecated: pre-configured pairing token for App Store review only. Bypasses normal token generation.",
   ),
   Flag.optional,
 );
@@ -160,6 +166,10 @@ const EnvServerConfig = Config.all({
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
+  headlessAccessFile: Config.string("BELWEAVE_HEADLESS_ACCESS_FILE").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
   reviewPairingToken: Config.string("BELWEAVE_REVIEW_PAIRING_TOKEN").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
@@ -180,6 +190,7 @@ export interface CliServerFlags {
   readonly tailscaleServeEnabled: Option.Option<boolean>;
   readonly tailscaleServePort: Option.Option<number>;
   readonly publicUrl: Option.Option<URL>;
+  readonly headlessAccessFile?: Option.Option<string>;
   readonly reviewPairingToken: Option.Option<string>;
 }
 
@@ -216,6 +227,7 @@ export const sharedServerCommandFlags = {
   tailscaleServeEnabled: tailscaleServeFlag,
   tailscaleServePort: tailscaleServePortFlag,
   publicUrl: publicUrlFlag,
+  headlessAccessFile: headlessAccessFileFlag,
   reviewPairingToken: reviewPairingTokenFlag,
 } as const;
 
@@ -263,6 +275,7 @@ export const resolveServerConfig = (
       tailscaleServeEnabled: flags.tailscaleServeEnabled ?? Option.none(),
       tailscaleServePort: flags.tailscaleServePort ?? Option.none(),
       publicUrl: flags.publicUrl ?? Option.none(),
+      headlessAccessFile: flags.headlessAccessFile ?? Option.none(),
       reviewPairingToken: flags.reviewPairingToken ?? Option.none(),
     } satisfies CliServerFlags;
     const bootstrapFd = Option.getOrUndefined(normalizedFlags.bootstrapFd) ?? env.bootstrapFd;
@@ -407,6 +420,13 @@ export const resolveServerConfig = (
       devUrl,
       noBrowser,
       startupPresentation,
+      headlessAccessFile: Option.getOrElse(
+        resolveOptionPrecedence(
+          normalizedFlags.headlessAccessFile ?? Option.none(),
+          Option.fromUndefinedOr(env.headlessAccessFile),
+        ),
+        () => undefined,
+      ),
       desktopBootstrapToken,
       autoBootstrapProjectFromCwd,
       logWebSocketEvents,
@@ -447,6 +467,7 @@ export const resolveCliAuthConfig = (
       tailscaleServeEnabled: Option.none(),
       tailscaleServePort: Option.none(),
       publicUrl: Option.none(),
+      headlessAccessFile: Option.none(),
       reviewPairingToken: Option.none(),
     },
     cliLogLevel,

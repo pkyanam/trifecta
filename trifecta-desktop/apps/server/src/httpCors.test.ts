@@ -30,6 +30,7 @@ function makeConfig(overrides: Partial<ServerConfigShape> = {}): ServerConfigSha
     devUrl: undefined,
     noBrowser: false,
     startupPresentation: "browser",
+    headlessAccessFile: undefined,
     desktopBootstrapToken: undefined,
     autoBootstrapProjectFromCwd: false,
     logWebSocketEvents: false,

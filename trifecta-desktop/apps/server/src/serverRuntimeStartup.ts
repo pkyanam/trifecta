@@ -38,6 +38,7 @@ import {
   formatHostForUrl,
   isWildcardHost,
   issueHeadlessServeAccessInfo,
+  writeHeadlessServeAccessFile,
 } from "./startupAccess.ts";
 
 export class ServerRuntimeStartupError extends Data.TaggedError("ServerRuntimeStartupError")<{
@@ -443,6 +444,7 @@ export const makeServerRuntimeStartup = Effect.gen(function* () {
       if (serverConfig.startupPresentation === "headless" || serverConfig.mode === "server") {
         yield* Effect.logDebug("startup phase: headless access info");
         const accessInfo = yield* issueHeadlessServeAccessInfo();
+        yield* runStartupPhase("headless.accessFile", writeHeadlessServeAccessFile(accessInfo));
         yield* runStartupPhase(
           "headless.output",
           Console.log(formatHeadlessServeOutput(accessInfo)),

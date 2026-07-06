@@ -9,6 +9,7 @@ import {
   resetSavedEnvironmentRegistryStoreForTests,
   resetSavedEnvironmentRuntimeStoreForTests,
 } from "./environments/runtime";
+import { resetBelweaveCloudStoreForTests } from "./environments/cloud";
 import {
   getPrimaryEnvironmentConnection,
   resetEnvironmentServiceForTests,
@@ -17,10 +18,15 @@ import { getPrimaryKnownEnvironment } from "./environments/primary";
 import { type WsRpcClient } from "./rpc/wsRpcClient";
 import { showContextMenuFallback } from "./contextMenuFallback";
 import {
+  readBrowserBelweaveCloudApiKey,
+  readBrowserBelweaveCloudConfig,
   readBrowserClientSettings,
   readBrowserSavedEnvironmentRegistry,
   readBrowserSavedEnvironmentSecret,
+  removeBrowserBelweaveCloudApiKey,
   removeBrowserSavedEnvironmentSecret,
+  writeBrowserBelweaveCloudApiKey,
+  writeBrowserBelweaveCloudConfig,
   writeBrowserClientSettings,
   writeBrowserSavedEnvironmentRegistry,
   writeBrowserSavedEnvironmentSecret,
@@ -117,6 +123,36 @@ function createBrowserLocalApi(rpcClient?: WsRpcClient): LocalApi {
         }
         removeBrowserSavedEnvironmentSecret(environmentId);
       },
+      getBelweaveCloudConfig: async () => {
+        if (window.desktopBridge) {
+          return window.desktopBridge.getBelweaveCloudConfig();
+        }
+        return readBrowserBelweaveCloudConfig();
+      },
+      setBelweaveCloudConfig: async (config) => {
+        if (window.desktopBridge) {
+          return window.desktopBridge.setBelweaveCloudConfig(config);
+        }
+        writeBrowserBelweaveCloudConfig(config);
+      },
+      getBelweaveCloudApiKey: async () => {
+        if (window.desktopBridge) {
+          return window.desktopBridge.getBelweaveCloudApiKey();
+        }
+        return readBrowserBelweaveCloudApiKey();
+      },
+      setBelweaveCloudApiKey: async (apiKey) => {
+        if (window.desktopBridge) {
+          return window.desktopBridge.setBelweaveCloudApiKey(apiKey);
+        }
+        return writeBrowserBelweaveCloudApiKey(apiKey);
+      },
+      removeBelweaveCloudApiKey: async () => {
+        if (window.desktopBridge) {
+          return window.desktopBridge.removeBelweaveCloudApiKey();
+        }
+        removeBrowserBelweaveCloudApiKey();
+      },
     },
     server: {
       getConfig: () =>
@@ -201,6 +237,7 @@ export async function __resetLocalApiForTests() {
   resetRequestLatencyStateForTests();
   resetSavedEnvironmentRegistryStoreForTests();
   resetSavedEnvironmentRuntimeStoreForTests();
+  resetBelweaveCloudStoreForTests();
   resetServerStateForTests();
   resetWsConnectionStateForTests();
 }

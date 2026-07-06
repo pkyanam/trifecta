@@ -78,6 +78,7 @@ const makeCliTestServerConfig = (baseDir: string) =>
       devUrl: undefined,
       noBrowser: true,
       startupPresentation: "browser",
+      headlessAccessFile: undefined,
       desktopBootstrapToken: undefined,
       autoBootstrapProjectFromCwd: false,
       logWebSocketEvents: false,

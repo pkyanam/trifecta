@@ -70,6 +70,8 @@ it("formats headless serve output with the connection string, token, pairing url
     connectionString: "http://192.168.1.42:3773",
     token: "PAIRCODE",
     pairingUrl: "http://192.168.1.42:3773/pair#token=PAIRCODE",
+    credentialSource: "startup-pairing",
+    expiresAt: "2026-07-06T12:00:00.000Z",
   });
 
   expect(output).toContain("Connection string: http://192.168.1.42:3773");

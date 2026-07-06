@@ -1,6 +1,10 @@
 import { session } from "electron";
 
-import type { DesktopRemoteJsonRequest } from "@belweave/contracts";
+import type {
+  BelweaveCloudFetchRequest,
+  BelweaveCloudFetchResponse,
+  DesktopRemoteJsonRequest,
+} from "@belweave/contracts";
 
 import { extractBoxPortAuth, stripBoxToken } from "./BoxPortAuth.ts";
 import { ensureBoxWsProxy } from "./BoxWsProxy.ts";
@@ -84,4 +88,26 @@ export async function fetchRemoteJson(input: DesktopRemoteJsonRequest): Promise<
       { cause: error },
     );
   }
+}
+
+/**
+ * Perform a Belweave Cloud public API request from the main process so it is
+ * not subject to the renderer's Content-Security-Policy / CORS. Returns the raw
+ * status and body so the renderer can do its own typed error mapping and schema
+ * validation. Only genuine network failures reject.
+ */
+export async function fetchBelweaveCloud(
+  request: BelweaveCloudFetchRequest,
+): Promise<BelweaveCloudFetchResponse> {
+  const response = await fetch(request.url, {
+    method: request.method,
+    headers: {
+      accept: "application/json",
+      authorization: `Bearer ${request.apiKey}`,
+      ...(request.body !== undefined ? { "content-type": "application/json" } : {}),
+    },
+    ...(request.body !== undefined ? { body: JSON.stringify(request.body) } : {}),
+  });
+  const bodyText = await response.text();
+  return { status: response.status, bodyText };
 }

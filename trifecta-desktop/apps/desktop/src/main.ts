@@ -36,6 +36,7 @@ import * as DesktopLocalStorageMigration from "./app/DesktopLocalStorageMigratio
 import * as DesktopObservability from "./app/DesktopObservability.ts";
 import * as DesktopServerExposure from "./backend/DesktopServerExposure.ts";
 import * as WindowsFirewall from "./backend/WindowsFirewall.ts";
+import * as DesktopBelweaveCloud from "./settings/DesktopBelweaveCloud.ts";
 import * as DesktopClientSettings from "./settings/DesktopClientSettings.ts";
 import * as DesktopSavedEnvironments from "./settings/DesktopSavedEnvironments.ts";
 import * as DesktopAppSettings from "./settings/DesktopAppSettings.ts";
@@ -114,6 +115,7 @@ const desktopFoundationLayer = Layer.mergeAll(
   DesktopAppSettings.layer,
   DesktopClientSettings.layer,
   DesktopSavedEnvironments.layer,
+  DesktopBelweaveCloud.layer,
   DesktopAssets.layer,
   DesktopObservability.layer,
   DesktopLocalStorageMigration.layer,

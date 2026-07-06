@@ -68,6 +68,8 @@ export interface ServerConfigShape extends ServerDerivedPaths {
   readonly devUrl: URL | undefined;
   readonly noBrowser: boolean;
   readonly startupPresentation: StartupPresentation;
+  /** Optional JSON file written on headless/server startup with connection and pairing details. */
+  readonly headlessAccessFile: string | undefined;
   readonly desktopBootstrapToken: string | undefined;
   readonly autoBootstrapProjectFromCwd: boolean;
   readonly logWebSocketEvents: boolean;
@@ -179,6 +181,7 @@ export class ServerConfig extends Context.Service<ServerConfig, ServerConfigShap
           devUrl,
           noBrowser: false,
           startupPresentation: "browser",
+          headlessAccessFile: undefined,
           publicUrl: undefined,
           reviewPairingToken: undefined,
         } satisfies ServerConfigShape;

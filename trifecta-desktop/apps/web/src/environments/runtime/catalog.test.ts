@@ -25,6 +25,11 @@ describe("environment runtime catalog stores", () => {
           getSavedEnvironmentSecret: async () => null,
           setSavedEnvironmentSecret: async () => true,
           removeSavedEnvironmentSecret: async () => undefined,
+          getBelweaveCloudConfig: async () => null,
+          setBelweaveCloudConfig: async () => undefined,
+          getBelweaveCloudApiKey: async () => null,
+          setBelweaveCloudApiKey: async () => true,
+          removeBelweaveCloudApiKey: async () => undefined,
         },
       } satisfies Pick<LocalApi, "persistence">,
     });
@@ -112,6 +117,11 @@ describe("environment runtime catalog stores", () => {
           getSavedEnvironmentSecret: async () => null,
           setSavedEnvironmentSecret: async () => true,
           removeSavedEnvironmentSecret: async () => undefined,
+          getBelweaveCloudConfig: async () => null,
+          setBelweaveCloudConfig: async () => undefined,
+          getBelweaveCloudApiKey: async () => null,
+          setBelweaveCloudApiKey: async () => true,
+          removeBelweaveCloudApiKey: async () => undefined,
         },
       } satisfies Pick<LocalApi, "persistence">,
     });

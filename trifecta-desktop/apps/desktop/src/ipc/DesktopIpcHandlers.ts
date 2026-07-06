@@ -1,6 +1,13 @@
 import * as Effect from "effect/Effect";
 
 import * as DesktopIpc from "./DesktopIpc.ts";
+import {
+  getBelweaveCloudApiKey,
+  getBelweaveCloudConfig,
+  removeBelweaveCloudApiKey,
+  setBelweaveCloudApiKey,
+  setBelweaveCloudConfig,
+} from "./methods/belweaveCloud.ts";
 import { getClientSettings, setClientSettings } from "./methods/clientSettings.ts";
 import {
   getSavedEnvironmentRegistry,
@@ -15,7 +22,11 @@ import {
   setServerExposureMode,
   setTailscaleServeEnabled,
 } from "./methods/serverExposure.ts";
-import { fetchRemoteJson, resolveBoxWebSocketUrlMethod } from "./methods/remoteEnvironment.ts";
+import {
+  fetchBelweaveCloud,
+  fetchRemoteJson,
+  resolveBoxWebSocketUrlMethod,
+} from "./methods/remoteEnvironment.ts";
 import {
   bootstrapSshBearerSession,
   disconnectSshEnvironment,
@@ -57,6 +68,12 @@ export const installDesktopIpcHandlers = Effect.gen(function* () {
   yield* ipc.handle(setSavedEnvironmentSecret);
   yield* ipc.handle(removeSavedEnvironmentSecret);
 
+  yield* ipc.handle(getBelweaveCloudConfig);
+  yield* ipc.handle(setBelweaveCloudConfig);
+  yield* ipc.handle(getBelweaveCloudApiKey);
+  yield* ipc.handle(setBelweaveCloudApiKey);
+  yield* ipc.handle(removeBelweaveCloudApiKey);
+
   yield* ipc.handle(discoverSshHosts);
   yield* ipc.handle(ensureSshEnvironment);
   yield* ipc.handle(disconnectSshEnvironment);
@@ -66,6 +83,7 @@ export const installDesktopIpcHandlers = Effect.gen(function* () {
   yield* ipc.handle(issueSshWebSocketToken);
   yield* ipc.handle(resolveSshPasswordPrompt);
   yield* ipc.handle(fetchRemoteJson);
+  yield* ipc.handle(fetchBelweaveCloud);
   yield* ipc.handle(resolveBoxWebSocketUrlMethod);
 
   yield* ipc.handle(getServerExposureState);

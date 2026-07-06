@@ -355,6 +355,11 @@ const createDesktopBridgeStub = (overrides?: {
     getSavedEnvironmentSecret: vi.fn().mockResolvedValue(null),
     setSavedEnvironmentSecret: vi.fn().mockResolvedValue(true),
     removeSavedEnvironmentSecret: vi.fn().mockResolvedValue(undefined),
+    getBelweaveCloudConfig: vi.fn().mockResolvedValue(null),
+    setBelweaveCloudConfig: vi.fn().mockResolvedValue(undefined),
+    getBelweaveCloudApiKey: vi.fn().mockResolvedValue(null),
+    setBelweaveCloudApiKey: vi.fn().mockResolvedValue(true),
+    removeBelweaveCloudApiKey: vi.fn().mockResolvedValue(undefined),
     discoverSshHosts: overrides?.discoverSshHosts ?? vi.fn().mockResolvedValue([]),
     ensureSshEnvironment: vi.fn().mockImplementation(async (target) => ({
       target,
