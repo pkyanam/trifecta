@@ -1,4 +1,4 @@
-# Trifecta [![Socket Badge](https://socket.dev/api/badge/npm/package/@belweave/trifecta)](https://socket.dev/npm/package/@belweave/trifecta)
+# Trifecta
 
 > One interface for every AI coding agent — on every device you own.
 
