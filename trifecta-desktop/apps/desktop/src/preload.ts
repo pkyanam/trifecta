@@ -68,6 +68,9 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.invoke(IpcChannels.FETCH_SSH_SESSION_STATE_CHANNEL, { httpBaseUrl, bearerToken }),
   issueSshWebSocketToken: (httpBaseUrl, bearerToken) =>
     ipcRenderer.invoke(IpcChannels.ISSUE_SSH_WEBSOCKET_TOKEN_CHANNEL, { httpBaseUrl, bearerToken }),
+  fetchRemoteJson: (request) => ipcRenderer.invoke(IpcChannels.FETCH_REMOTE_JSON_CHANNEL, request),
+  resolveBoxWebSocketUrl: (wsBaseUrl) =>
+    ipcRenderer.invoke(IpcChannels.RESOLVE_BOX_WEB_SOCKET_URL_CHANNEL, { wsBaseUrl }),
   onSshPasswordPrompt: (listener) => {
     const wrappedListener = (_event: Electron.IpcRendererEvent, request: unknown) => {
       if (typeof request !== "object" || request === null) return;

@@ -4,7 +4,7 @@ import { serverDisplayName, serverHostname, useConnection, type PairedServer } f
 import { useActiveThread } from "@/stores/active-thread";
 import { useThreadList } from "@/stores/thread-list";
 import { usePreferences, type ThemePreference } from "@/stores/preferences";
-import { useWsClient } from "@/stores/ws-client";
+import { useWsClient, type WsStatus } from "@/stores/ws-client";
 import { cn } from "@/utils/tailwind";
 import { useRouter } from "expo-router";
 import type { LucideIcon } from "lucide-react-native";
@@ -178,6 +178,7 @@ function ServersSection({
               server={server}
               active={active}
               connected={active && isConnected}
+              status={active ? status : "offline"}
               isFirst={i === 0}
               onSelect={() => onSelect(server)}
               onRemove={() => onRemove(server)}
@@ -194,6 +195,7 @@ function ServerRow({
   server,
   active,
   connected,
+  status,
   isFirst,
   onSelect,
   onRemove,
@@ -201,6 +203,7 @@ function ServerRow({
   server: PairedServer;
   active: boolean;
   connected: boolean;
+  status: WsStatus;
   isFirst: boolean;
   onSelect: () => void;
   onRemove: () => void;
@@ -236,7 +239,7 @@ function ServerRow({
         <Text numberOfLines={1} className="text-[12px] text-muted-foreground/70 mt-0.5">
           {showHost ? `${host} · ` : ""}
           {flavorLabel}
-          {active && !connected ? " · connecting…" : ""}
+          {active && !connected ? (status === "error" ? " · error" : " · connecting…") : ""}
         </Text>
       </View>
       {active ? (

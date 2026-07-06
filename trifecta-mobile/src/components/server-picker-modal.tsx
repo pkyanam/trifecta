@@ -1,6 +1,6 @@
 import { Icon } from "@/components/icon";
 import { serverDisplayName, serverHostname, useConnection, type PairedServer } from "@/stores/connection";
-import { useWsClient } from "@/stores/ws-client";
+import { useWsClient, type WsStatus } from "@/stores/ws-client";
 import { cn } from "@/utils/tailwind";
 import * as Haptics from "expo-haptics";
 import { Check, ChevronRight, Plus, Server, X } from "lucide-react-native";
@@ -116,6 +116,7 @@ function ServerPickerContent({
                     server={server}
                     active={active}
                     connected={active && isConnected}
+                    status={active ? status : "offline"}
                     isFirst={i === 0}
                     onSelect={() => void handleSelect(server)}
                   />
@@ -147,12 +148,14 @@ function PickerServerRow({
   server,
   active,
   connected,
+  status,
   isFirst,
   onSelect,
 }: {
   server: PairedServer;
   active: boolean;
   connected: boolean;
+  status: WsStatus;
   isFirst: boolean;
   onSelect: () => void;
 }) {
@@ -185,7 +188,7 @@ function PickerServerRow({
         <Text numberOfLines={1} className="text-[12px] text-muted-foreground/70 mt-0.5">
           {showHost ? `${host} · ` : ""}
           {flavorLabel}
-          {active && !connected ? " · connecting…" : ""}
+          {active && !connected ? (status === "error" ? " · error" : " · connecting…") : ""}
         </Text>
       </View>
       {active ? (

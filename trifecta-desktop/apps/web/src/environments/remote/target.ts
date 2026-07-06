@@ -1,6 +1,8 @@
 import { getPairingTokenFromUrl } from "../../pairingUrl";
 import { readHostedPairingRequest } from "../../hostedPairing";
 
+const PAIRING_TOKEN_PARAM = "token";
+
 export interface ResolvedRemotePairingTarget {
   readonly credential: string;
   readonly httpBaseUrl: string;
@@ -22,7 +24,7 @@ function normalizeRemoteBaseUrl(rawValue: string): URL {
       ? trimmed
       : `https://${trimmed}`;
   const url = new URL(normalizedInput, window.location.origin);
-  url.search = "";
+  url.searchParams.delete(PAIRING_TOKEN_PARAM);
   url.hash = "";
   if (url.pathname.endsWith("/pair")) {
     url.pathname = url.pathname.slice(0, -"/pair".length) || "/";
@@ -40,7 +42,7 @@ function toHttpBaseUrl(url: URL): string {
   } else if (next.protocol === "wss:") {
     next.protocol = "https:";
   }
-  next.search = "";
+  next.searchParams.delete(PAIRING_TOKEN_PARAM);
   next.hash = "";
   return next.toString();
 }
@@ -52,7 +54,7 @@ function toWsBaseUrl(url: URL): string {
   } else if (next.protocol === "https:") {
     next.protocol = "wss:";
   }
-  next.search = "";
+  next.searchParams.delete(PAIRING_TOKEN_PARAM);
   next.hash = "";
   return next.toString();
 }

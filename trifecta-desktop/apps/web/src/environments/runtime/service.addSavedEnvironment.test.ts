@@ -113,6 +113,7 @@ vi.mock("../../rpc/wsRpcClient", () => ({
   createWsRpcClient: vi.fn(() => ({
     server: {
       getConfig: mockClientGetConfig,
+      refreshProviders: vi.fn(async () => undefined),
     },
     orchestration: {
       subscribeThread: vi.fn(() => () => {}),

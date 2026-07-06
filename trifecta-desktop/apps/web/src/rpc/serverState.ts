@@ -27,7 +27,7 @@ export interface ServerConfigUpdatedNotification {
 
 type ServerStateClient = Pick<
   WsRpcClient["server"],
-  "getConfig" | "subscribeConfig" | "subscribeLifecycle"
+  "getConfig" | "subscribeConfig" | "subscribeLifecycle" | "refreshProviders"
 >;
 
 function makeStateAtom<A>(label: string, initialValue: A) {
@@ -196,6 +196,14 @@ export function startServerStateSync(client: ServerStateClient): () => void {
       })
       .catch(() => undefined);
   }
+
+  // Trigger a provider refresh so the client receives fresh provider
+  // statuses. The initial config snapshot may contain stale or pending
+  // probe results (e.g. if the server's boot-time probe completed before
+  // the client subscribed to the PubSub). Refreshing ensures the client
+  // always sees the current provider state without requiring a manual
+  // "refresh" button press.
+  void client.refreshProviders().catch(() => undefined);
 
   return () => {
     disposed = true;

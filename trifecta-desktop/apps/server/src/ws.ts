@@ -1848,11 +1848,13 @@ export const websocketRpcRouteLayer = Layer.unwrap(
         // hijacking (CSWSH). Browsers always send the Origin header on WS
         // upgrades; non-browser clients are not restricted by this check
         // but still require authentication. Mobile clients (React Native)
-        // connecting via LAN/Tailscale are allowed via isWebSocketOriginAllowed,
-        // which permits private/local network origins in addition to the
-        // configured CORS allowlist.
+        // connecting via LAN/Tailscale or through a reverse proxy / tunnel
+        // domain are allowed via isWebSocketOriginAllowed, which permits
+        // private/local network origins and same-host origins in addition
+        // to the configured CORS allowlist.
         const requestOrigin = request.headers["origin"] ?? undefined;
-        if (requestOrigin && !isWebSocketOriginAllowed(requestOrigin, config)) {
+        const requestHost = request.headers["host"] ?? undefined;
+        if (requestOrigin && !isWebSocketOriginAllowed(requestOrigin, config, requestHost)) {
           return HttpServerResponse.text("Forbidden: origin not allowed", { status: 403 });
         }
 

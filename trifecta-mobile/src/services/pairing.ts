@@ -22,6 +22,155 @@ export type ServerFlavor = "belweave" | "t3code";
 
 // Android emulator uses 10.0.2.2 to access host machine's localhost
 const ANDROID_LOCALHOST_ALIAS = "10.0.2.2";
+const PAIRING_TOKEN_PARAM = "token";
+
+export type BoxPortAuth = {
+  token: string;
+  cookieHeader: string;
+};
+
+function isValidCookieValue(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f || value[index] === ";") return false;
+  }
+  return true;
+}
+
+export function extractBoxPortAuth(url: URL): BoxPortAuth | null {
+  const token = url.searchParams.get("_token");
+  if (!token) return null;
+  if (!isValidCookieValue(token)) return null;
+  return {
+    token,
+    cookieHeader: `_port_auth=${encodeURIComponent(token)}`,
+  };
+}
+
+export function stripBoxToken(url: URL): URL {
+  const next = new URL(url.toString());
+  next.searchParams.delete("_token");
+  return next;
+}
+
+export function getBoxPortAuth(serverURL: string): BoxPortAuth | null {
+  try {
+    return extractBoxPortAuth(new URL(serverURL));
+  } catch {
+    return null;
+  }
+}
+
+// ─── XHR-based fetch helper ─────────────────────────────────────────────
+//
+// Expo SDK 56 replaces the global `fetch` with `expo/fetch`, a WinterCG-
+// compliant implementation that:
+//   1. Treats `Cookie` as a forbidden request header (strips it silently)
+//   2. Does NOT store cookies from 302 `Set-Cookie` responses into
+//      `NSHTTPCookieStorage`
+//
+// This breaks Box (Caddy) auth, which requires either `_token` in the URL
+// (triggers a 302 redirect) or a `_port_auth` cookie. Since `expo/fetch`
+// strips the Cookie header AND doesn't store redirect cookies, neither
+// approach works with `fetch` for POST requests.
+//
+// `XMLHttpRequest` on React Native uses `RCTNetworking` → `NSURLSession`,
+// which:
+//   1. Does NOT strip the `Cookie` header
+//   2. DOES store cookies from 302 `Set-Cookie` responses into
+//      `NSHTTPCookieStorage` (when `HTTPShouldSetCookies = YES`)
+//   3. DOES send cookies from `NSHTTPCookieStorage` on subsequent requests
+//
+// So we use XHR for POST requests (where we need the Cookie header) and
+// for the priming request (where we need the cookie to be stored). For
+// GET requests, we keep `_token` in the URL and use `fetch` (Caddy's 302
+// is followed automatically, no cookie needed).
+
+type XhrResponse = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  headers: Map<string, string>;
+  text: () => Promise<string>;
+  json: () => Promise<unknown>;
+};
+
+export function xhrFetch(
+  url: string,
+  options: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  } = {},
+): Promise<XhrResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(options.method ?? "GET", url, true);
+    if (options.headers) {
+      for (const [key, value] of Object.entries(options.headers)) {
+        xhr.setRequestHeader(key, value);
+      }
+    }
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState !== 4) return;
+      const headers = new Map<string, string>();
+      const rawHeaders = xhr.getAllResponseHeaders();
+      if (rawHeaders) {
+        for (const line of rawHeaders.split("\r\n")) {
+          const idx = line.indexOf(": ");
+          if (idx > 0) {
+            headers.set(line.slice(0, idx).toLowerCase(), line.slice(idx + 2));
+          }
+        }
+      }
+      const status = xhr.status;
+      const response: XhrResponse = {
+        ok: status >= 200 && status < 300,
+        status,
+        statusText: xhr.statusText,
+        headers,
+        text: () => Promise.resolve(xhr.responseText),
+        json: () => Promise.resolve(JSON.parse(xhr.responseText)),
+      };
+      resolve(response);
+    };
+    xhr.onerror = () => reject(new Error(`XHR error: ${xhr.statusText || "network error"}`));
+    xhr.ontimeout = () => reject(new Error("XHR timeout"));
+    xhr.send(options.body);
+  });
+}
+
+/**
+ * Primes the platform's native cookie store (NSHTTPCookieStorage on iOS,
+ * CookieManager on Android) with the Box `_port_auth` cookie by making a
+ * GET request that includes `_token` in the URL.
+ *
+ * Uses XHR (not fetch) because Expo SDK 56's `expo/fetch` does NOT store
+ * cookies from 302 redirect responses. XHR uses NSURLSession which does
+ * store them, making the cookie available to SocketRocket for WebSocket
+ * upgrades.
+ *
+ * Safe to call when there is no `_token` (no-op). Also safe to call
+ * repeatedly — the cookie store deduplicates.
+ */
+export async function primeBoxPortAuth(serverURL: string): Promise<void> {
+  const auth = getBoxPortAuth(serverURL);
+  if (!auth) return;
+  try {
+    const url = new URL(getServerURLForPlatform(serverURL));
+    url.pathname = "/.well-known/belweave/environment";
+    if (!url.searchParams.has("_token")) {
+      url.searchParams.set("_token", auth.token);
+    }
+    // Use XHR so the cookie from the 302 Set-Cookie is stored in
+    // NSHTTPCookieStorage. expo/fetch does not store redirect cookies.
+    const res = await xhrFetch(url.toString());
+    console.log(`[pairing] primeBoxPortAuth: priming response status=${res.status}`);
+  } catch {
+    // Best-effort — if priming fails, POST requests will still try
+    // with the manual Cookie header via XHR.
+  }
+}
 
 // Convert localhost to Android emulator alias for network requests
 export function getServerURLForPlatform(url: string): string {
@@ -68,9 +217,41 @@ export function normalizeServerURL(url: URL): string {
   } else if (path.endsWith("/pair")) {
     u.pathname = path.slice(0, -"/pair".length);
   }
-  u.search = "";
+  u.searchParams.delete(PAIRING_TOKEN_PARAM);
   u.hash = "";
   return u.toString().replace(/\/+$/, "");
+}
+
+function joinUrlPath(basePath: string, endpointPath: string): string {
+  const base = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
+  const endpoint = endpointPath.startsWith("/") ? endpointPath : `/${endpointPath}`;
+  if (!base || base === "/") {
+    return endpoint;
+  }
+  return `${base}${endpoint}`;
+}
+
+/**
+ * Builds the URL for an endpoint. When `keepToken` is true, `_token` is
+ * retained in the query string so Caddy's 302 redirect handles auth
+ * (used for GET requests with expo/fetch). When false, `_token` is
+ * stripped and the caller must include the Cookie header via XHR
+ * (used for POST requests).
+ */
+function endpointURL(baseURL: string, endpointPath: string, keepToken = false): string {
+  const url = new URL(baseURL);
+  url.pathname = joinUrlPath(url.pathname, endpointPath);
+  url.searchParams.delete(PAIRING_TOKEN_PARAM);
+  if (!keepToken && extractBoxPortAuth(url)) {
+    url.searchParams.delete("_token");
+  }
+  url.hash = "";
+  return url.toString();
+}
+
+function boxHeadersFor(serverURL: string): Record<string, string> {
+  const auth = getBoxPortAuth(serverURL);
+  return auth ? { Cookie: auth.cookieHeader } : {};
 }
 
 /**
@@ -143,8 +324,12 @@ export function isSecureTransportURL(rawURL: string): boolean {
  */
 export async function fetchEnvironment(serverURL: string): Promise<ServerFlavor> {
   const platformURL = getServerURLForPlatform(serverURL);
-  const belweaveURL = `${platformURL}/.well-known/belweave/environment`;
-  const t3codeURL = `${platformURL}/.well-known/t3/environment`;
+  // Keep _token in the URL for GET requests. Caddy responds with a 302
+  // redirect + Set-Cookie, and expo/fetch follows the redirect automatically,
+  // yielding the JSON body. This avoids the need for a Cookie header (which
+  // expo/fetch strips as a "forbidden" header).
+  const belweaveURL = endpointURL(platformURL, "/.well-known/belweave/environment", true);
+  const t3codeURL = endpointURL(platformURL, "/.well-known/t3/environment", true);
 
   // Try belweave first (native flavor).
   if (await isJsonEndpoint(belweaveURL)) return "belweave";
@@ -201,14 +386,21 @@ async function exchangeTokenBelweave(
   platformURL: string,
   credential: string,
 ): Promise<PairingResult> {
-  const res = await fetch(`${platformURL}/api/auth/bootstrap/bearer`, {
+  // Strip _token for POST — Caddy's 302 would convert POST to GET.
+  // Use XHR (not fetch) because expo/fetch strips Cookie headers.
+  // Don't set Cookie header manually — RN's XHR also strips it. Instead,
+  // rely on NSHTTPCookieStorage being primed by primeBoxPortAuth(). XHR
+  // uses NSURLSession which automatically sends cookies from the cookie
+  // store.
+  const url = endpointURL(platformURL, "/api/auth/bootstrap/bearer", false);
+  const res = await xhrFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ credential }),
   });
 
   if (!res.ok) {
-    throw await authErrorFromResponse(res, "Pairing failed");
+    throw await authErrorFromXhrResponse(res, "Pairing failed");
   }
 
   const json = (await res.json()) as Record<string, unknown>;
@@ -246,20 +438,34 @@ async function exchangeTokenT3Code(
   form.set("scope", T3CODE_STANDARD_CLIENT_SCOPES);
   form.set("client_device_type", "mobile");
 
-  const res = await fetch(`${platformURL}/oauth/token`, {
+  const url = endpointURL(platformURL, "/oauth/token", false);
+  const res = await xhrFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
   });
 
   if (!res.ok) {
-    throw await authErrorFromResponse(res, "Pairing failed");
+    throw await authErrorFromXhrResponse(res, "Pairing failed");
   }
 
   const json = (await res.json()) as Record<string, unknown>;
   const token = (json.access_token ?? json.accessToken) as string | undefined;
   if (!token?.trim()) throw new Error("Server did not return an access token");
   return { bearerToken: token, flavor: "t3code" };
+}
+
+async function authErrorFromXhrResponse(res: XhrResponse, fallback: string): Promise<Error> {
+  let msg = `${fallback} (HTTP ${res.status})`;
+  try {
+    const text = await res.text();
+    const j = JSON.parse(text) as { error?: string; error_description?: string; message?: string };
+    if (j.error_description) msg = j.error_description;
+    else if (j.error) msg = j.error;
+    else if (j.message) msg = j.message;
+    else if (text.length < 300) msg = text;
+  } catch {}
+  return new Error(msg);
 }
 
 async function authErrorFromResponse(res: Response, fallback: string): Promise<Error> {
@@ -293,7 +499,10 @@ export async function issueWebSocketToken(
   const platformURL = getServerURLForPlatform(serverURL);
   const endpoint =
     flavor === "t3code" ? "/api/auth/websocket-ticket" : "/api/auth/ws-token";
-  const res = await fetch(`${platformURL}${endpoint}`, {
+  // Strip _token for POST — use XHR. Cookie is sent automatically from
+  // NSHTTPCookieStorage (primed by primeBoxPortAuth).
+  const url = endpointURL(platformURL, endpoint, false);
+  const res = await xhrFetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${bearerToken}` },
   });
@@ -308,11 +517,16 @@ export async function issueWebSocketToken(
 export function makeWebSocketURL(serverURL: string, wsTicket: string, flavor: ServerFlavor): string {
   const u = new URL(serverURL);
   u.protocol = u.protocol === "https:" ? "wss:" : "ws:";
-  u.pathname = "/ws";
-  u.search = "";
+  u.pathname = joinUrlPath(u.pathname, "/ws");
   u.hash = "";
   // belweave uses `wsToken`, t3code uses `wsTicket`.
   const param = flavor === "t3code" ? "wsTicket" : "wsToken";
+  if (extractBoxPortAuth(u)) {
+    u.searchParams.delete("_token");
+  }
+  u.searchParams.delete(PAIRING_TOKEN_PARAM);
+  u.searchParams.delete("wsToken");
+  u.searchParams.delete("wsTicket");
   u.searchParams.set(param, wsTicket);
   return u.toString();
 }

@@ -1,7 +1,7 @@
 import { Icon } from "@/components/icon";
 import { LiquidMetalButton } from "@/components/liquid-metal";
 import { SymbolImage } from "@/components/symbol-image";
-import { exchangeToken, fetchEnvironment, parsePairingURL, getServerURLForPlatform, isSecureTransportURL } from "@/services/pairing";
+import { exchangeToken, fetchEnvironment, parsePairingURL, getServerURLForPlatform, isSecureTransportURL, primeBoxPortAuth } from "@/services/pairing";
 import { useConnection } from "@/stores/connection";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
@@ -92,6 +92,13 @@ export default function PairScreen() {
     try {
       // Use platform-specific URL for connection
       const platformURL = getServerURLForPlatform(url);
+      // Prime the native cookie store with the Box `_port_auth` cookie before
+      // any HTTP requests. Uses XHR (not fetch) because Expo SDK 56's
+      // expo/fetch does not store cookies from 302 redirect responses.
+      // XHR uses NSURLSession which does store them, making the cookie
+      // available to SocketRocket for WebSocket upgrades. No-op when
+      // there is no `_token`.
+      await primeBoxPortAuth(platformURL);
       const flavor = await fetchEnvironment(platformURL);
       const result = await exchangeToken(platformURL, tok, flavor);
       // Store the original URL (not the Android alias) for consistency
@@ -103,6 +110,7 @@ export default function PairScreen() {
         router.replace("/");
       }
     } catch (err) {
+      console.log(`[pair] doConnect error: ${err instanceof Error ? err.message : String(err)}`);
       setError(err instanceof Error ? err.message : "Connection failed");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {

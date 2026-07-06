@@ -1485,6 +1485,13 @@ async function ensureSavedEnvironmentConnection(
           throw new SavedEnvironmentConnectionCancelledError(activeRecord.environmentId);
         }
         registerConnection(connection);
+        // Trigger a provider refresh so the client receives fresh provider
+        // statuses. The initial config snapshot may contain stale or pending
+        // probe results (e.g. if the server's boot-time probe completed
+        // before the client subscribed to the PubSub). Refreshing ensures the
+        // client always sees the current provider state without requiring a
+        // manual "refresh" button press.
+        client.server.refreshProviders().catch(() => undefined);
         return connection;
       } catch (error) {
         if (error instanceof SavedEnvironmentConnectionCancelledError) {

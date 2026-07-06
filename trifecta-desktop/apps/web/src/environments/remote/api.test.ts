@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { DesktopBridge } from "@belweave/contracts";
 
 import {
   bootstrapRemoteBearerSession,
@@ -18,7 +19,7 @@ beforeEach(() => {
       location: {
         origin: "https://app.example.com",
       },
-    },
+    } satisfies { location: { origin: string }; desktopBridge?: Partial<DesktopBridge> },
   });
   vi.restoreAllMocks();
 });
@@ -48,6 +49,18 @@ describe("remote environment api", () => {
     });
   });
 
+  it("preserves proxy query parameters from direct pairing urls", () => {
+    expect(
+      resolveRemotePairingTarget({
+        pairingUrl: "https://box-3773.on.ascii.dev/pair?_token=box-token#token=pairing-token",
+      }),
+    ).toEqual({
+      credential: "pairing-token",
+      httpBaseUrl: "https://box-3773.on.ascii.dev/?_token=box-token",
+      wsBaseUrl: "wss://box-3773.on.ascii.dev/?_token=box-token",
+    });
+  });
+
   it("derives backend urls and token from a hosted app pairing link", () => {
     expect(
       resolveRemotePairingTarget({
@@ -58,6 +71,19 @@ describe("remote environment api", () => {
       credential: "pairing-token",
       httpBaseUrl: "https://desktop.tailnet.ts.net:44342/",
       wsBaseUrl: "wss://desktop.tailnet.ts.net:44342/",
+    });
+  });
+
+  it("preserves proxy query parameters from hosted app pairing hosts", () => {
+    expect(
+      resolveRemotePairingTarget({
+        pairingUrl:
+          "https://app.trifecta.belweave.ai/pair?host=https%3A%2F%2Fbox-3773.on.ascii.dev%2F%3F_token%3Dbox-token#token=pairing-token",
+      }),
+    ).toEqual({
+      credential: "pairing-token",
+      httpBaseUrl: "https://box-3773.on.ascii.dev/?_token=box-token",
+      wsBaseUrl: "wss://box-3773.on.ascii.dev/?_token=box-token",
     });
   });
 
@@ -308,6 +334,74 @@ describe("remote environment api", () => {
     );
   });
 
+  it("strips Box proxy tokens and includes credentials when joining API paths in browser fetch", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          environmentId: "environment-remote",
+          label: "Sandbox",
+          platform: { os: "linux", arch: "x64" },
+          serverVersion: "0.0.0-test",
+          capabilities: { repositoryIdentity: true },
+        }),
+        { status: 200 },
+      ),
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await fetchRemoteEnvironmentDescriptor({
+      httpBaseUrl: "https://box-3773.on.ascii.dev/?_token=box-token",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://box-3773.on.ascii.dev/.well-known/belweave/environment",
+      {
+        method: "GET",
+        headers: {},
+        credentials: "include",
+      },
+    );
+  });
+
+  it("routes Box proxy token API requests through the desktop bridge when available", async () => {
+    const fetchRemoteJson = vi.fn().mockResolvedValue({
+      environmentId: "environment-remote",
+      label: "Sandbox",
+      platform: { os: "linux", arch: "x64" },
+      serverVersion: "0.0.0-test",
+      capabilities: { repositoryIdentity: true },
+    });
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        location: {
+          origin: "belweave://app",
+        },
+        desktopBridge: {
+          fetchRemoteJson,
+        },
+      } satisfies { location: { origin: string }; desktopBridge?: Partial<DesktopBridge> },
+    });
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await expect(
+      fetchRemoteEnvironmentDescriptor({
+        httpBaseUrl: "https://box-3773.on.ascii.dev/?_token=box-token",
+      }),
+    ).resolves.toMatchObject({
+      environmentId: "environment-remote",
+      label: "Sandbox",
+    });
+
+    expect(fetchRemoteJson).toHaveBeenCalledWith({
+      httpBaseUrl: "https://box-3773.on.ascii.dev/?_token=box-token",
+      pathname: "/.well-known/belweave/environment",
+      method: "GET",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("mints a websocket url with a short-lived ws token", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
@@ -327,6 +421,27 @@ describe("remote environment api", () => {
         bearerToken: "bearer-token",
       }),
     ).resolves.toBe("wss://remote.example.com/?wsToken=ws-token");
+  });
+
+  it("strips Box proxy tokens when minting a websocket url", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          token: "ws-token",
+          expiresAt: "2026-05-01T12:05:00.000Z",
+        }),
+        { status: 200 },
+      ),
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await expect(
+      resolveRemoteWebSocketConnectionUrl({
+        wsBaseUrl: "wss://box-3773.on.ascii.dev/?_token=box-token",
+        httpBaseUrl: "https://box-3773.on.ascii.dev/?_token=box-token",
+        bearerToken: "bearer-token",
+      }),
+    ).resolves.toBe("wss://box-3773.on.ascii.dev/?wsToken=ws-token");
   });
 });
 

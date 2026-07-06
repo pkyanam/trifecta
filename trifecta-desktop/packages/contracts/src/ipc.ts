@@ -373,6 +373,16 @@ export const PickFolderOptionsSchema = Schema.Struct({
   initialPath: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 
+export const DesktopRemoteJsonRequestSchema = Schema.Struct({
+  httpBaseUrl: Schema.String,
+  pathname: Schema.String,
+  method: Schema.optionalKey(Schema.Literals(["GET", "POST"])),
+  bearerToken: Schema.optionalKey(Schema.String),
+  body: Schema.optionalKey(Schema.Unknown),
+});
+
+export type DesktopRemoteJsonRequest = typeof DesktopRemoteJsonRequestSchema.Type;
+
 export interface DesktopBridge {
   getAppBranding: () => DesktopAppBranding | null;
   getLocalEnvironmentBootstrap: () => DesktopEnvironmentBootstrap | null;
@@ -401,6 +411,8 @@ export interface DesktopBridge {
     httpBaseUrl: string,
     bearerToken: string,
   ) => Promise<AuthWebSocketTokenResult>;
+  fetchRemoteJson?: (request: DesktopRemoteJsonRequest) => Promise<unknown>;
+  resolveBoxWebSocketUrl?: (wsBaseUrl: string) => Promise<string>;
   onSshPasswordPrompt: (listener: (request: DesktopSshPasswordPromptRequest) => void) => () => void;
   resolveSshPasswordPrompt: (requestId: string, password: string | null) => Promise<void>;
   getServerExposureState: () => Promise<DesktopServerExposureState>;

@@ -5,6 +5,8 @@ import type {
   ExecutionEnvironmentDescriptor,
 } from "@belweave/contracts";
 
+import { extractBoxPortAuth, hasBoxPortAuth, stripBoxToken } from "./boxPortAuth";
+
 class RemoteEnvironmentAuthHttpError extends Error {
   readonly status: number;
 
@@ -41,9 +43,13 @@ function joinUrlPath(basePath: string, endpointPath: string): string {
 function remoteEndpointUrl(httpBaseUrl: string, pathname: string): string {
   const url = new URL(httpBaseUrl);
   url.pathname = joinUrlPath(url.pathname, pathname);
-  url.search = "";
   url.hash = "";
   return url.toString();
+}
+
+function browserFetchUrl(httpBaseUrl: string, pathname: string): string {
+  const url = new URL(remoteEndpointUrl(httpBaseUrl, pathname));
+  return extractBoxPortAuth(url) ? stripBoxToken(url).toString() : url.toString();
 }
 
 async function readRemoteAuthErrorMessage(
@@ -75,19 +81,31 @@ async function fetchRemoteJson<T>(input: {
   readonly body?: unknown;
 }): Promise<T> {
   const requestUrl = remoteEndpointUrl(input.httpBaseUrl, input.pathname);
+  const requestUrlForFetch = browserFetchUrl(input.httpBaseUrl, input.pathname);
+  if (hasBoxPortAuth(requestUrl) && window.desktopBridge?.fetchRemoteJson) {
+    return (await window.desktopBridge.fetchRemoteJson({
+      httpBaseUrl: input.httpBaseUrl,
+      pathname: input.pathname,
+      method: input.method ?? "GET",
+      ...(input.bearerToken ? { bearerToken: input.bearerToken } : {}),
+      ...(input.body !== undefined ? { body: input.body } : {}),
+    })) as T;
+  }
+
   let response: Response;
   try {
-    response = await fetch(requestUrl, {
+    response = await fetch(requestUrlForFetch, {
       method: input.method ?? "GET",
       headers: {
         ...(input.body !== undefined ? { "content-type": "application/json" } : {}),
         ...(input.bearerToken ? { authorization: `Bearer ${input.bearerToken}` } : {}),
       },
+      ...(hasBoxPortAuth(requestUrl) ? { credentials: "include" as const } : {}),
       ...(input.body !== undefined ? { body: JSON.stringify(input.body) } : {}),
     });
   } catch (error) {
     throw new Error(
-      `Failed to fetch remote auth endpoint ${requestUrl} (${(error as Error).message}).`,
+      `Failed to fetch remote auth endpoint ${requestUrlForFetch} (${(error as Error).message}).`,
       { cause: error },
     );
   }
@@ -166,6 +184,23 @@ export async function resolveRemoteWebSocketConnectionUrl(input: {
     bearerToken: input.bearerToken,
   });
   const url = new URL(input.wsBaseUrl, window.location.origin);
+  const boxAuth = extractBoxPortAuth(url);
+  url.searchParams.delete("wsToken");
   url.searchParams.set("wsToken", issued.token);
+
+  // If running inside the desktop app with a box origin, route the WebSocket
+  // through a local TCP proxy. Chromium negotiates HTTP/2 via ALPN for TLS
+  // connections, but the box proxy (Caddy) does not support WebSocket over
+  // HTTP/2. The desktop main process starts a local HTTP/1.1 proxy that
+  // forwards the WS upgrade to the box server with the _port_auth cookie.
+  // The proxy uses the _token query param to look up the box origin, so we
+  // must call resolveBoxWebSocketUrl before stripping _token.
+  if (boxAuth && window.desktopBridge?.resolveBoxWebSocketUrl) {
+    return await window.desktopBridge.resolveBoxWebSocketUrl(url.toString());
+  }
+
+  if (boxAuth) {
+    url.searchParams.delete("_token");
+  }
   return url.toString();
 }

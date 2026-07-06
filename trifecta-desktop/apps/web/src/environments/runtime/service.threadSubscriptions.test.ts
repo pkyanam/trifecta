@@ -175,6 +175,7 @@ describe("retainThreadDetailSubscription", () => {
             capabilities: { repositoryIdentity: true, ssh: false },
           },
         })),
+        refreshProviders: vi.fn(async () => undefined),
       },
       orchestration: {
         subscribeThread: mockSubscribeThread,

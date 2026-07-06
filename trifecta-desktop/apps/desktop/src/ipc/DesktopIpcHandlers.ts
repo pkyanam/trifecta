@@ -15,6 +15,7 @@ import {
   setServerExposureMode,
   setTailscaleServeEnabled,
 } from "./methods/serverExposure.ts";
+import { fetchRemoteJson, resolveBoxWebSocketUrlMethod } from "./methods/remoteEnvironment.ts";
 import {
   bootstrapSshBearerSession,
   disconnectSshEnvironment,
@@ -64,6 +65,8 @@ export const installDesktopIpcHandlers = Effect.gen(function* () {
   yield* ipc.handle(fetchSshSessionState);
   yield* ipc.handle(issueSshWebSocketToken);
   yield* ipc.handle(resolveSshPasswordPrompt);
+  yield* ipc.handle(fetchRemoteJson);
+  yield* ipc.handle(resolveBoxWebSocketUrlMethod);
 
   yield* ipc.handle(getServerExposureState);
   yield* ipc.handle(setServerExposureMode);

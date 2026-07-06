@@ -89,10 +89,10 @@ describe("ssh command", () => {
       );
       assert.equal(
         resolveRemoteBelweaveCliPackageSpec({
-          appVersion: "0.0.17-nightly.20260415.44",
+          appVersion: "0.0.17-nightly.44",
           updateChannel: "nightly",
         }),
-        "@belweave/trifecta@0.0.17-nightly.20260415.44",
+        "@belweave/trifecta@0.0.17-nightly.44",
       );
       assert.equal(
         resolveRemoteBelweaveCliPackageSpec({

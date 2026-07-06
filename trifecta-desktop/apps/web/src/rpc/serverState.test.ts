@@ -97,6 +97,7 @@ const baseServerConfig: ServerConfig = {
 
 const serverApi = {
   getConfig: vi.fn<() => Promise<ServerConfig>>(),
+  refreshProviders: vi.fn(() => Promise.resolve({ providers: [] })),
   subscribeConfig: vi.fn((listener: (event: ServerConfigStreamEvent) => void) =>
     registerListener(configListeners, listener),
   ),

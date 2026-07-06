@@ -280,8 +280,17 @@ function parsePairingUrlFields(
 
     const pairingCode = getPairingTokenFromUrl(url);
     if (!pairingCode) return null;
+    const hostUrl = new URL(url);
+    hostUrl.searchParams.delete("token");
+    hostUrl.hash = "";
+    if (hostUrl.pathname.endsWith("/pair")) {
+      hostUrl.pathname = hostUrl.pathname.slice(0, -"/pair".length) || "/";
+    }
+    if (hostUrl.pathname !== "/" && !hostUrl.pathname.endsWith("/")) {
+      hostUrl.pathname += "/";
+    }
     return {
-      host: url.origin,
+      host: hostUrl.toString(),
       pairingCode,
     };
   } catch {

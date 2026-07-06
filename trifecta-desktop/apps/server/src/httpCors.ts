@@ -150,6 +150,26 @@ export function isOriginAllowed(
 }
 
 /**
+ * Returns true if the Origin URL's host matches the request's `Host` header.
+ *
+ * A same-host Origin is by definition a same-origin WebSocket upgrade, which
+ * cannot be Cross-Site WebSocket Hijacking. Native WS clients (iOS
+ * SocketRocket, Android OkHttp) derive the Origin header from the connection
+ * URL, so when the server is reached through a reverse proxy / tunnel domain
+ * (e.g. an HTTPS preview URL) the Origin host always equals the request host.
+ */
+function isSameHostOrigin(originUrl: URL, requestHost: string): boolean {
+  try {
+    // Parse the Host header with the origin's protocol so default ports
+    // (80/443) normalize identically on both sides before comparing.
+    const hostUrl = new URL(`${originUrl.protocol}//${requestHost}`);
+    return hostUrl.host.toLowerCase() === originUrl.host.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Determines whether the given WebSocket upgrade origin should be allowed.
  *
  * This is more permissive than {@link isOriginAllowed} because WebSocket
@@ -159,17 +179,23 @@ export function isOriginAllowed(
  * against browser-based Cross-Site WebSocket Hijacking (CSWSH) — not a
  * primary auth boundary.
  *
- * In addition to the CORS allowlist, this allows any private/local network
- * origin (RFC 1918, mDNS, Tailscale, loopback) so mobile apps connecting
- * over LAN can establish the persistent WebSocket connection.
+ * In addition to the CORS allowlist, this allows:
+ * - Any private/local network origin (RFC 1918, mDNS, Tailscale, loopback)
+ *   so mobile apps connecting over LAN can establish the persistent
+ *   WebSocket connection.
+ * - Same-host origins (Origin host equals the request's `Host` header),
+ *   which are same-origin upgrades and cannot be CSWSH. This covers native
+ *   clients connecting through reverse proxy / tunnel domains, where the
+ *   WS library derives the Origin from the connection URL.
  */
 export function isWebSocketOriginAllowed(
   requestOrigin: string | undefined,
   config: ServerConfigShape,
+  requestHost?: string,
 ): boolean {
   if (!requestOrigin) {
-    // No Origin header — non-browser clients (iOS/SocketRocket). Allow;
-    // authentication via wsToken still applies.
+    // No Origin header — non-browser clients. Allow; authentication via
+    // wsToken still applies.
     return true;
   }
 
@@ -184,6 +210,11 @@ export function isWebSocketOriginAllowed(
   // Mobile clients connect via these addresses and Android/OkHttp sends an
   // Origin header derived from the connection URL.
   if (isLocalNetworkOrigin(originUrl)) {
+    return true;
+  }
+
+  // Allow same-origin upgrades: Origin host matches the request Host header.
+  if (requestHost && isSameHostOrigin(originUrl, requestHost)) {
     return true;
   }
 

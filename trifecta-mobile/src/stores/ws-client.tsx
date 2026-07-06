@@ -1,7 +1,10 @@
 import {
+  getBoxPortAuth,
   issueWebSocketToken,
   makeWebSocketURL,
   getServerURLForPlatform,
+  primeBoxPortAuth,
+  xhrFetch,
   type ServerFlavor,
 } from "@/services/pairing";
 import { secureRandomHex } from "@/utils/secure-id";
@@ -54,6 +57,26 @@ const devLog = (...args: unknown[]) => {
   if (__DEV__) console.log(...args);
 };
 
+type WebSocketWithHeadersConstructor = new (
+  url: string,
+  protocols?: string | string[],
+  options?: { headers?: Record<string, string> },
+) => WebSocket;
+
+function makeWebSocket(url: string, serverURL: string): WebSocket {
+  const auth = getBoxPortAuth(serverURL);
+  console.log("[ws] makeWebSocket url:", url, "serverURL:", serverURL, "boxAuthFound:", !!auth, "cookieHeader(first20):", auth ? auth.cookieHeader.slice(0, 20) : "(none)");
+  // Don't pass Cookie header manually — the native WebSocket module
+  // (RCTWebSocketModule.mm) already reads from NSHTTPCookieStorage.shared
+  // and sets the Cookie header. Passing it manually would create a duplicate
+  // header (addValue:forHTTPHeaderField: appends with comma, not semicolon),
+  // which Caddy rejects with 403.
+  // The cookie is primed by primeBoxPortAuth() via XHR → NSURLSession →
+  // NSHTTPCookieStorage.shared, which the WebSocket module reads from.
+  if (!auth) return new WebSocket(url);
+  return new WebSocket(url);
+}
+
 function makeRpcFrame(
   id: string,
   tag: string,
@@ -99,14 +122,43 @@ class WsRpcClient {
     try {
       // Use platform-specific URL for WebSocket connection
       const platformURL = getServerURLForPlatform(this.serverURL);
+      console.log("[ws] connect platformURL:", platformURL);
+      // Prime the native cookie store with the Box _port_auth cookie.
+      // The Box gateway (Caddy) sets the cookie via Set-Cookie when _token
+      // is in the URL. This ensures the WebSocket upgrade — which uses the
+      // native cookie store on iOS (SocketRocket) and Android (OkHttp) —
+      // includes the _port_auth cookie automatically, without relying on
+      // custom header forwarding which is unreliable across RN versions.
+      console.log("[ws] before primeBoxPortAuth");
+      await primeBoxPortAuth(platformURL);
+      console.log("[ws] after primeBoxPortAuth");
+      // Diagnostic: verify the cookie was stored by making a test XHR to
+      // the well-known endpoint WITHOUT _token. If the cookie is in the
+      // store, this should return 200 (cookie sent automatically by
+      // NSURLSession). If not, it returns 403.
+      if (getBoxPortAuth(platformURL)) {
+        try {
+          const testUrl = new URL(platformURL);
+          testUrl.pathname = "/.well-known/belweave/environment";
+          testUrl.searchParams.delete("_token");
+          const testRes = await xhrFetch(testUrl.toString());
+          console.log("[ws] cookie store test: status", testRes.status, testRes.ok ? "(cookie works!)" : "(cookie missing?)");
+        } catch (e) {
+          console.log("[ws] cookie store test error:", e);
+        }
+      }
+      if (!this.alive) return;
       const wsToken = await issueWebSocketToken(platformURL, this.bearerToken, this.flavor);
+      console.log("[ws] wsToken(first8):", wsToken ? wsToken.slice(0, 8) : "(empty)");
       if (!this.alive) return;
       const url = makeWebSocketURL(platformURL, wsToken, this.flavor);
-      const ws = new WebSocket(url);
+      console.log("[ws] final WS URL from makeWebSocketURL:", url);
+      const ws = makeWebSocket(url, platformURL);
       this.ws = ws;
 
       // Set connection timeout
       this.connectionTimeoutTimer = setTimeout(() => {
+        console.log("[ws] connection timeout fired");
         if (this.ws === ws && this.alive) {
           this.ws.close();
           this.onStatus("error");
@@ -115,6 +167,7 @@ class WsRpcClient {
       }, this.CONNECTION_TIMEOUT);
 
       ws.onopen = () => {
+        console.log("[ws] onopen fired");
         if (!this.alive || this.ws !== ws) return;
         this.clearConnectionTimeout();
         this.reconnectAttempt = 0;
@@ -132,13 +185,20 @@ class WsRpcClient {
       };
 
       ws.onerror = (error) => {
+        console.log("[ws] onerror fired, error:", error, "type:", typeof error, "detail:", (error as any)?.message ?? (error as any)?.error?.message ?? "(no message)");
         if (!this.alive || this.ws !== ws) return;
         this.clearConnectionTimeout();
         console.error("WebSocket error:", error);
         this.onStatus("error");
+        // Close the socket on error so onclose fires and schedules a
+        // reconnect. Without this, SocketRocket can leave the socket in
+        // a half-open state where neither onopen nor onclose fires,
+        // causing the client to stay stuck in "error" forever.
+        try { ws.close(); } catch {}
       };
 
       ws.onclose = (event) => {
+        console.log("[ws] onclose fired, code:", event.code, "reason:", event.reason, "wasClean:", event.wasClean);
         if (!this.alive) return;
         if (this.ws === ws) {
           this.clearConnectionTimeout();

@@ -237,6 +237,45 @@ describe("isWebSocketOriginAllowed", () => {
     expect(isWebSocketOriginAllowed("https://trifecta.example.com", configWithUrls)).toBe(true);
   });
 
+  it("allows same-host origins (native clients via reverse proxy / tunnel)", () => {
+    expect(
+      isWebSocketOriginAllowed(
+        "https://box-3773.on.example.dev",
+        config,
+        "box-3773.on.example.dev",
+      ),
+    ).toBe(true);
+    // Explicit default port in Host header normalizes to the same host.
+    expect(
+      isWebSocketOriginAllowed(
+        "https://box-3773.on.example.dev",
+        config,
+        "box-3773.on.example.dev:443",
+      ),
+    ).toBe(true);
+    // Case-insensitive host comparison.
+    expect(
+      isWebSocketOriginAllowed(
+        "https://Box-3773.on.Example.dev",
+        config,
+        "box-3773.on.example.dev",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects cross-host origins even when a request host is provided", () => {
+    expect(
+      isWebSocketOriginAllowed("https://evil.example.com", config, "box-3773.on.example.dev"),
+    ).toBe(false);
+    expect(
+      isWebSocketOriginAllowed(
+        "https://box-3773.on.example.dev:8443",
+        config,
+        "box-3773.on.example.dev",
+      ),
+    ).toBe(false);
+  });
+
   it("rejects arbitrary external origins", () => {
     expect(isWebSocketOriginAllowed("https://evil.example.com", config)).toBe(false);
     expect(isWebSocketOriginAllowed("http://8.8.8.8:13773", config)).toBe(false);
@@ -244,5 +283,6 @@ describe("isWebSocketOriginAllowed", () => {
 
   it("rejects malformed origins", () => {
     expect(isWebSocketOriginAllowed("not-a-url", config)).toBe(false);
+    expect(isWebSocketOriginAllowed("not-a-url", config, "box-3773.on.example.dev")).toBe(false);
   });
 });
