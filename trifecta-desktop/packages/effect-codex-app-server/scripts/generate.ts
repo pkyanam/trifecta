@@ -17,7 +17,7 @@ import {
 } from "effect/unstable/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-const UPSTREAM_REF = "07b695190f30a450e4921f71f77473e564395c59";
+const UPSTREAM_REF = "rust-v0.144.1";
 const USER_AGENT = "effect-codex-app-server-generator";
 const GITHUB_API_BASE =
   "https://api.github.com/repos/openai/codex/contents/codex-rs/app-server-protocol";
@@ -308,7 +308,7 @@ function parseRequestEntries(fileContents: string): ReadonlyArray<MethodEntry> {
 }
 
 function parseNotificationEntries(fileContents: string): ReadonlyArray<MethodEntry> {
-  const entryPattern = /\{\s*"method":\s*"([^"]+)"(?:,\s*"params":\s*([^ }]+))?\s*\}/g;
+  const entryPattern = /\{\s*"method":\s*"([^"]+)"(?:,\s*"params":\s*([^, }]+))?\s*\}/g;
   const entries: Array<MethodEntry> = [];
   let match: RegExpExecArray | null;
   while ((match = entryPattern.exec(fileContents)) !== null) {
@@ -351,10 +351,13 @@ function resolveResponseTypeName(
   const overrides: Record<string, string> = {
     "account/logout": "LogoutAccountResponse",
     "account/rateLimits/read": "GetAccountRateLimitsResponse",
+    "account/usage/read": "GetAccountTokenUsageResponse",
+    "account/workspaceMessages/read": "GetWorkspaceMessagesResponse",
     "config/batchWrite": "ConfigWriteResponse",
     "config/mcpServer/reload": "McpServerRefreshResponse",
     "config/value/write": "ConfigWriteResponse",
     "configRequirements/read": "ConfigRequirementsReadResponse",
+    "externalAgentConfig/import/readHistories": "ExternalAgentConfigImportHistoriesReadResponse",
   };
 
   const override = overrides[method];
