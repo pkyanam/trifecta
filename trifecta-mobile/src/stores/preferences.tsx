@@ -1,6 +1,9 @@
-import React, { createContext, use, useCallback, useMemo, useState } from "react";
+import React, { createContext, use, useCallback, useEffect, useMemo, useState } from "react";
 import { useColorScheme } from "react-native";
 import { Uniwind } from "uniwind";
+import * as SecureStore from "expo-secure-store";
+
+const PREFERENCES_KEY = "trifecta.mobile.preferences.v1";
 
 export type ThemePreference = "system" | "light" | "dark";
 export type ResolvedColorScheme = "light" | "dark";
@@ -19,6 +22,29 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const systemColorScheme = useColorScheme();
   const [themePreferenceValue, setThemePreferenceValue] = useState<ThemePreference>("system");
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void SecureStore.getItemAsync(PREFERENCES_KEY).then((raw) => {
+      if (cancelled || !raw) return;
+      try {
+        const value = JSON.parse(raw) as { theme?: ThemePreference; haptics?: boolean };
+        if (value.theme === "system" || value.theme === "light" || value.theme === "dark") {
+          setThemePreferenceValue(value.theme);
+          Uniwind.setTheme(value.theme);
+        }
+        if (typeof value.haptics === "boolean") setHapticsEnabled(value.haptics);
+      } catch {}
+    }).finally(() => { if (!cancelled) setHydrated(true); });
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    void SecureStore.setItemAsync(
+      PREFERENCES_KEY,
+      JSON.stringify({ theme: themePreferenceValue, haptics: hapticsEnabled }),
+    );
+  }, [hapticsEnabled, hydrated, themePreferenceValue]);
   const resolvedSystemColorScheme: ResolvedColorScheme =
     systemColorScheme === "dark" ? "dark" : "light";
 
@@ -30,15 +56,19 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     Uniwind.setTheme(value);
   }, []);
 
+  const setPersistedHapticsEnabled = useCallback((value: boolean) => {
+    setHapticsEnabled(value);
+  }, []);
+
   const value = useMemo(
     () => ({
       themePreference: themePreferenceValue,
       setThemePreference,
       resolvedColorScheme,
       hapticsEnabled,
-      setHapticsEnabled,
+      setHapticsEnabled: setPersistedHapticsEnabled,
     }),
-    [hapticsEnabled, resolvedColorScheme, setThemePreference, themePreferenceValue],
+    [hapticsEnabled, resolvedColorScheme, setPersistedHapticsEnabled, setThemePreference, themePreferenceValue],
   );
 
   return (

@@ -7,7 +7,7 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, Copy, Link2, Terminal, Wifi, X, Zap } from "lucide-react-native";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -35,11 +35,15 @@ export default function PairScreen() {
   const { pair } = useConnection();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ returnTo?: string }>();
+  const params = useLocalSearchParams<{
+    returnTo?: string;
+    serverURL?: string;
+    token?: string;
+  }>();
   const fromSettings = params.returnTo === "settings";
 
-  const [serverURL, setServerURL] = useState("");
-  const [token, setToken] = useState("");
+  const [serverURL, setServerURL] = useState(params.serverURL ?? "");
+  const [token, setToken] = useState(params.token ?? "");
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -48,6 +52,7 @@ export default function PairScreen() {
   const appMutedFg = useCSSVariable("--app-muted-foreground") as string;
 
   const tokenRef = useRef<TextInput>(null);
+  const handledDeepLink = useRef(false);
 
   const canConnect = (() => {
     if (!serverURL.trim() || !token.trim()) return false;
@@ -110,13 +115,26 @@ export default function PairScreen() {
         router.replace("/");
       }
     } catch (err) {
-      console.log(`[pair] doConnect error: ${err instanceof Error ? err.message : String(err)}`);
       setError(err instanceof Error ? err.message : "Connection failed");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsConnecting(false);
     }
   }, [pair, router, fromSettings]);
+
+  useEffect(() => {
+    if (
+      handledDeepLink.current ||
+      !params.serverURL?.trim() ||
+      !params.token?.trim() ||
+      !isSecureTransportURL(params.serverURL.trim())
+    ) return;
+    handledDeepLink.current = true;
+    void doConnect(
+      params.serverURL.trim().replace(/\/+$/, ""),
+      params.token.trim(),
+    );
+  }, [doConnect, params.serverURL, params.token]);
 
   const handleConnect = useCallback(async () => {
     if (!canConnect || isConnecting) return;

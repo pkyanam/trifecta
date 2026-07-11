@@ -1,6 +1,7 @@
 import { createContext, use } from "react";
 import type { StreamingStore } from "./streaming-store";
 import type { ChatMessage } from "./types";
+import type { UploadChatAttachment } from "@/types/thread";
 
 export type ChatContextValue = {
   messages: ChatMessage[];
@@ -8,8 +9,12 @@ export type ChatContextValue = {
   setInput: (value: string) => void;
   isGenerating: boolean;
   onSend: () => void;
+  onStop: () => void;
   streamingStore: StreamingStore;
-  error?: Error | null;
+  error?: string | null;
+  attachments: UploadChatAttachment[];
+  addAttachments: (attachments: UploadChatAttachment[]) => void;
+  removeAttachment: (name: string) => void;
   cursorPosition: number;
   setCursorPosition: (position: number) => void;
 };

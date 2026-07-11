@@ -72,6 +72,7 @@ export function DrawerLayout({
   children,
 }: DrawerLayoutProps) {
   const { width: layoutWidth } = useWindowDimensions();
+  const isExpanded = layoutWidth >= 840;
   const drawerWidth = getDrawerWidth(layoutWidth, drawerWidthProp);
 
   // Use refs for callbacks to keep toggleDrawer stable
@@ -251,6 +252,12 @@ export function DrawerLayout({
 
   return (
     <GestureHandlerRootView className="flex-1">
+      {isExpanded ? (
+        <View className="flex-1 flex-row bg-sidebar">
+          <View className="w-80 border-r border-border">{drawerContent}</View>
+          <View className="flex-1 bg-background">{children}</View>
+        </View>
+      ) : (
       <GestureDetector gesture={pan}>
         <Animated.View className="flex-1 overflow-hidden">
           <Animated.View
@@ -281,6 +288,7 @@ export function DrawerLayout({
           </Animated.View>
         </Animated.View>
       </GestureDetector>
+      )}
     </GestureHandlerRootView>
   );
 }

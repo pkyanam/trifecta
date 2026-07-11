@@ -1,4 +1,5 @@
 import "@/global.css";
+/* eslint-disable @typescript-eslint/no-require-imports -- Expo release assets require static module IDs. */
 
 import { Icon } from "@/components/icon";
 import { TouchableGlass } from "@/components/touchable-glass";
@@ -6,12 +7,12 @@ import { useSsh } from "@/stores/ssh";
 import type { SshTerminalEvent } from "@/types/ssh";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, Dimensions, Modal, Animated } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, Dimensions, Modal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import { Asset } from "expo-asset";
-import { FadeIn, FadeOut } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { WebView } from "react-native-webview";
 import { X, Maximize2, Minimize2, Copy, Check, Shield, AlertTriangle } from "lucide-react-native";
 
@@ -711,7 +712,6 @@ export default function SshTerminalScreen() {
             mediaPlaybackRequiresUserAction={false}
             startInLoadingState={false}
             allowsBackForwardNavigationGestures={false}
-            keyboardAppearance="dark"
             hideKeyboardAccessoryView={true}
             textInteractionEnabled={true}
             onShouldStartLoadWithRequest={(request) => {

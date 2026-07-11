@@ -14,6 +14,10 @@ import {
   createStreamingStore,
   type ChatMessage,
 } from "@/components/chat";
+import {
+  ThreadActionBanner,
+  ThreadTimelineExtras,
+} from "@/components/chat/thread-surfaces";
 import { Icon } from "@/components/icon";
 import { MainHeader } from "@/components/main-header";
 import { useModel } from "@/components/model-context";
@@ -23,9 +27,10 @@ import { usePreferences } from "@/stores/preferences";
 import { useThreadList } from "@/stores/thread-list";
 import { useWsClient } from "@/stores/ws-client";
 import { useThread } from "@/hooks/use-thread";
-import { Redirect, Link, useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import {
   useCallback,
   useEffect,
@@ -33,7 +38,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { View } from "react-native";
+import { Alert, Platform, View } from "react-native";
+import type { UploadChatAttachment } from "@/types/thread";
+import { Image } from "expo-image";
+import { getServerURLForPlatform } from "@/services/pairing";
 
 const STREAMING_THROTTLE_MS = 32;
 const STREAMING_HAPTIC_THROTTLE_MS = 180;
@@ -53,6 +61,7 @@ function useRealChat() {
         id: m.id,
         role: m.role as "user" | "assistant",
         content: m.text,
+        attachments: m.attachments,
       })),
     [thread.messages],
   );
@@ -99,17 +108,27 @@ function useRealChat() {
 
   const [input, setInput] = useState("");
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [attachments, setAttachments] = useState<UploadChatAttachment[]>([]);
+
+  const addAttachments = useCallback((incoming: UploadChatAttachment[]) => {
+    setAttachments((current) => [...current, ...incoming].slice(0, 8));
+  }, []);
+  const removeAttachment = useCallback((name: string) => {
+    setAttachments((current) => current.filter((item) => item.name !== name));
+  }, []);
 
   const onSend = useCallback(async () => {
     const text = input.trim();
-    if (!text || thread.isTurnRunning || !selectedModelSelection) return;
+    if ((!text && attachments.length === 0) || thread.isTurnRunning || !selectedModelSelection) return;
     if (hapticsEnabled) {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     setInput("");
     setCursorPosition(0);
+    const outgoingAttachments = attachments;
+    setAttachments([]);
     if (activeThreadId) {
-      await thread.sendMessage(text, selectedModelSelection);
+      await thread.sendMessage(text, selectedModelSelection, outgoingAttachments);
     } else {
       const projectId = newChatProjectId ?? projects[0]?.id;
       if (!projectId) {
@@ -117,19 +136,96 @@ function useRealChat() {
         router.navigate("/new-chat");
         return;
       }
-      await createThread(projectId, text, selectedModelSelection);
+      await createThread(projectId, text, selectedModelSelection, outgoingAttachments);
     }
-  }, [input, thread, activeThreadId, newChatProjectId, projects, selectedModelSelection, createThread, router, hapticsEnabled]);
+  }, [input, attachments, thread, activeThreadId, newChatProjectId, projects, selectedModelSelection, createThread, router, hapticsEnabled]);
 
-  return { messages, input, setInput, isGenerating: thread.isTurnRunning, onSend, streamingStore, thread, cursorPosition, setCursorPosition };
+  return {
+    messages,
+    input,
+    setInput,
+    isGenerating: thread.isTurnRunning,
+    onSend,
+    onStop: thread.interruptTurn,
+    streamingStore,
+    thread,
+    cursorPosition,
+    setCursorPosition,
+    error: thread.error,
+    attachments,
+    addAttachments,
+    removeAttachment,
+  };
+}
+
+async function pickImages(
+  source: "camera" | "library",
+): Promise<UploadChatAttachment[]> {
+  const permission =
+    source === "camera"
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) return [];
+  const result =
+    source === "camera"
+      ? await ImagePicker.launchCameraAsync({
+          mediaTypes: ["images"],
+          base64: true,
+          quality: 0.88,
+        })
+      : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          allowsMultipleSelection: true,
+          selectionLimit: 8,
+          base64: true,
+          quality: 0.88,
+        });
+  if (result.canceled) return [];
+  return result.assets.flatMap((asset, index) => {
+    if (!asset.base64) return [];
+    const mimeType = asset.mimeType ?? "image/jpeg";
+    const sizeBytes = Math.floor(asset.base64.length * 0.75);
+    if (sizeBytes > 10 * 1024 * 1024) return [];
+    return [{
+      type: "image" as const,
+      name: asset.fileName ?? `image-${Date.now()}-${index + 1}.jpg`,
+      mimeType,
+      sizeBytes,
+      dataUrl: `data:${mimeType};base64,${asset.base64}`,
+    }];
+  });
 }
 
 export default function ChatScreen() {
-  const { isPaired, isLoading } = useConnection();
+  const { isPaired, isLoading, serverURL, bearerToken } = useConnection();
   const { activeThreadId, activeThreadHydrated, newChatMode } = useActiveThread();
   const { status } = useWsClient();
   const chat = useRealChat();
   const { isGenerating, streamingStore } = chat;
+
+  const addPhoto = useCallback(() => {
+    const choose = (source: "camera" | "library") => {
+      void pickImages(source).then(chat.addAttachments).catch((cause) => {
+        Alert.alert(
+          "Couldn’t add image",
+          cause instanceof Error ? cause.message : "Please try again.",
+        );
+      });
+    };
+    if (Platform.OS === "ios") {
+      Alert.alert("Add image", undefined, [
+        { text: "Camera", onPress: () => choose("camera") },
+        { text: "Photo Library", onPress: () => choose("library") },
+        { text: "Cancel", style: "cancel" },
+      ]);
+    } else {
+      Alert.alert("Add image", "Choose a source", [
+        { text: "Camera", onPress: () => choose("camera") },
+        { text: "Photos", onPress: () => choose("library") },
+        { text: "Cancel", style: "cancel" },
+      ]);
+    }
+  }, [chat.addAttachments]);
 
   if (isLoading) return null;
   if (!isPaired) return <Redirect href="/pair" />;
@@ -148,7 +244,29 @@ export default function ChatScreen() {
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     if (item.role === "user") {
-      return <Message from="user">{item.content}</Message>;
+      return (
+        <View className="items-end">
+          {item.attachments?.length ? (
+            <View className="mb-2 flex-row flex-wrap justify-end gap-2">
+              {item.attachments.map((attachment) => (
+                <Image
+                  key={attachment.id}
+                  source={{
+                    uri: `${getServerURLForPlatform(serverURL ?? "").replace(/\/$/, "")}/attachments/${encodeURIComponent(attachment.id)}`,
+                    headers: bearerToken
+                      ? { Authorization: `Bearer ${bearerToken}` }
+                      : undefined,
+                  }}
+                  contentFit="cover"
+                  style={{ width: 112, height: 112, borderRadius: 18 }}
+                  accessibilityLabel={attachment.name}
+                />
+              ))}
+            </View>
+          ) : null}
+          <Message from="user">{item.content}</Message>
+        </View>
+      );
     }
     const isStreaming =
       isGenerating &&
@@ -174,6 +292,7 @@ export default function ChatScreen() {
       <ChatProvider value={chat}>
         <Conversation
           renderMessage={renderMessage}
+          footer={<ThreadTimelineExtras detail={chat.thread.detail} />}
           emptyState={
             <ConversationEmptyState
               title={emptyTitle}
@@ -182,12 +301,10 @@ export default function ChatScreen() {
           }
         >
           <ConversationScrollButton />
-          <PromptInput>
-            <Link href="/attachments" asChild>
-              <PromptInputAction>
-                <Icon icon={Plus} className="w-5 h-5 text-muted-foreground" />
-              </PromptInputAction>
-            </Link>
+          <PromptInput banner={<ThreadActionBanner detail={chat.thread.detail} />}>
+            <PromptInputAction onPress={addPhoto}>
+              <Icon icon={Plus} className="w-5 h-5 text-muted-foreground" />
+            </PromptInputAction>
             <PromptInputBody>
               <PromptInputTextarea />
               <PromptInputSubmit />

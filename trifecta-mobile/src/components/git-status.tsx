@@ -1,6 +1,6 @@
 import { SymbolImage } from "@/components/symbol-image";
 import { cn } from "@/utils/tailwind";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text } from "react-native";
 import { useEffect, useState } from "react";
 import Animated, { Layout } from "react-native-reanimated";
 import { useGitService, type VcsStatusResult } from "@/services/git";

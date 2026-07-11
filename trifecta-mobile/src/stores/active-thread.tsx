@@ -1,4 +1,8 @@
-import type { ModelSelection, ThreadId } from "@/types/thread";
+import type {
+  ModelSelection,
+  ThreadId,
+  UploadChatAttachment,
+} from "@/types/thread";
 import { secureRandomId } from "@/utils/secure-id";
 import * as SecureStore from "expo-secure-store";
 import React, {
@@ -26,6 +30,7 @@ interface ActiveThreadContextValue {
     projectId: string,
     text: string,
     modelSelection: ModelSelection,
+    attachments?: UploadChatAttachment[],
   ) => Promise<ThreadId>;
   dispatchTurnStart: (
     threadId: ThreadId,
@@ -33,6 +38,8 @@ interface ActiveThreadContextValue {
     modelSelection: ModelSelection,
     runtimeMode?: string,
     interactionMode?: string,
+    attachments?: UploadChatAttachment[],
+    sourceProposedPlan?: { threadId: ThreadId; planId: string },
   ) => Promise<void>;
 }
 
@@ -107,6 +114,8 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
       modelSelection: ModelSelection,
       runtimeMode = "full-access",
       interactionMode = "default",
+      attachments: UploadChatAttachment[] = [],
+      sourceProposedPlan?: { threadId: ThreadId; planId: string },
     ) => {
       const payload: Record<string, unknown> = {
         type: "thread.turn.start",
@@ -116,12 +125,13 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
           messageId: secureRandomId(),
           role: "user",
           text,
-          attachments: [],
+          attachments,
         },
         modelSelection,
         runtimeMode,
         interactionMode,
         createdAt: nowISO(),
+        ...(sourceProposedPlan ? { sourceProposedPlan } : {}),
       };
       await request("orchestration.dispatchCommand", payload);
     },
@@ -133,6 +143,7 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
       projectId: string,
       text: string,
       modelSelection: ModelSelection,
+      attachments: UploadChatAttachment[] = [],
       runtimeMode = "full-access",
       interactionMode = "default",
     ): Promise<ThreadId> => {
@@ -148,7 +159,7 @@ export function ActiveThreadProvider({ children }: { children: React.ReactNode }
           messageId: secureRandomId(),
           role: "user",
           text,
-          attachments: [],
+          attachments,
         },
         modelSelection,
         titleSeed,

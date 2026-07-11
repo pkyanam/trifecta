@@ -165,7 +165,7 @@ export async function primeBoxPortAuth(serverURL: string): Promise<void> {
     // Use XHR so the cookie from the 302 Set-Cookie is stored in
     // NSHTTPCookieStorage. expo/fetch does not store redirect cookies.
     const res = await xhrFetch(url.toString());
-    console.log(`[pairing] primeBoxPortAuth: priming response status=${res.status}`);
+    if (__DEV__) console.debug(`[pairing] cookie priming status=${res.status}`);
   } catch {
     // Best-effort — if priming fails, POST requests will still try
     // with the manual Cookie header via XHR.
@@ -247,11 +247,6 @@ function endpointURL(baseURL: string, endpointPath: string, keepToken = false): 
   }
   url.hash = "";
   return url.toString();
-}
-
-function boxHeadersFor(serverURL: string): Record<string, string> {
-  const auth = getBoxPortAuth(serverURL);
-  return auth ? { Cookie: auth.cookieHeader } : {};
 }
 
 /**
@@ -456,19 +451,6 @@ async function exchangeTokenT3Code(
 }
 
 async function authErrorFromXhrResponse(res: XhrResponse, fallback: string): Promise<Error> {
-  let msg = `${fallback} (HTTP ${res.status})`;
-  try {
-    const text = await res.text();
-    const j = JSON.parse(text) as { error?: string; error_description?: string; message?: string };
-    if (j.error_description) msg = j.error_description;
-    else if (j.error) msg = j.error;
-    else if (j.message) msg = j.message;
-    else if (text.length < 300) msg = text;
-  } catch {}
-  return new Error(msg);
-}
-
-async function authErrorFromResponse(res: Response, fallback: string): Promise<Error> {
   let msg = `${fallback} (HTTP ${res.status})`;
   try {
     const text = await res.text();

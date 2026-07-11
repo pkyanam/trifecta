@@ -217,6 +217,15 @@ export function DrawerContent({
             onOpenModal("/(settings)/settings");
           }}
         />
+        <DrawerNavItem label="Projects" onPress={() => onOpenModal("/projects")} />
+        <DrawerNavItem label="Archived" onPress={() => onOpenModal("/archived")} />
+        {activeThreadId ? (
+          <>
+            <DrawerNavItem label="Thread details" onPress={() => onOpenModal("/thread-details")} />
+            <DrawerNavItem label="Workspace files" onPress={() => onOpenModal("/files")} />
+            <DrawerNavItem label="Thread terminal" onPress={() => onOpenModal("/terminal")} />
+          </>
+        ) : null}
 
         {activeProjects.map((project) => (
           <ProjectSection

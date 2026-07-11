@@ -28,9 +28,23 @@ const AnimatedGlassContainer = Animated.createAnimatedComponent(GlassContainer);
  * the `<Conversation />` using the shared conversation context. Children are
  * laid out in a horizontal row inside a glass container.
  */
-export function PromptInput({ children }: { children: ReactNode }) {
+export function PromptInput({
+  children,
+  banner,
+}: {
+  children: ReactNode;
+  banner?: ReactNode;
+}) {
   const { promptInputStyle, onPromptInputLayout } = useConversationContext();
-  const { error, input, cursorPosition, setInput, setCursorPosition } = useChatContext();
+  const {
+    error,
+    input,
+    cursorPosition,
+    setInput,
+    setCursorPosition,
+    attachments,
+    removeAttachment,
+  } = useChatContext();
   const { serverConfig } = useWsClient();
   const { search: searchProjectEntries } = useProjectSearch();
   const { activeThreadId, newChatProjectId } = useActiveThread();
@@ -257,18 +271,8 @@ export function PromptInput({ children }: { children: ReactNode }) {
         return;
       }
       
-      if (item.id === "plan" || item.id === "default") {
-        // Handle mode switching - this would need to be implemented in the thread context
-        // For now, just replace the command
-        const result = replaceRange(input, currentTrigger.rangeStart, currentTrigger.rangeEnd, "");
-        setInput(result.text);
-        setCursorPosition(result.cursor);
-        setShowSuggestions(false);
-        setSuggestions([]);
-        setCurrentTrigger(null);
-        setSearchQuery(null);
-        return;
-      }
+      // /plan and /default are sent through to the provider. Thread-wide mode
+      // changes live in Thread Details, so slash commands are never fake local UI.
     }
 
     let replacement = "";
@@ -302,7 +306,24 @@ export function PromptInput({ children }: { children: ReactNode }) {
         loading={loadingSuggestions}
         type={suggestionType}
       />
-      {error && <PromptInputError message={error.message} />}
+      {banner}
+      {error && <PromptInputError message={error} />}
+      {attachments.length > 0 ? (
+        <View className="flex-row flex-wrap gap-2 px-2 pb-2">
+          {attachments.map((attachment) => (
+            <TouchableGlass
+              key={attachment.name}
+              onPress={() => removeAttachment(attachment.name)}
+              accessibilityLabel={`Remove ${attachment.name}`}
+              className="rounded-full px-3 py-2 active:opacity-60"
+            >
+              <Text className="text-xs text-foreground" numberOfLines={1}>
+                {attachment.name} · Remove
+              </Text>
+            </TouchableGlass>
+          ))}
+        </View>
+      ) : null}
       <AnimatedGlassContainer
         style={{
           flex: 1,
@@ -388,10 +409,9 @@ export function PromptInputBody({ children }: { children: ReactNode }) {
     );
   }
 
-  // TODO: Android version...
   return (
     <BlurView
-      tint="systemChromeMaterial"
+      tint="systemMaterial"
       className="border-continuous"
       style={{
         flex: 1,
@@ -437,13 +457,9 @@ export function PromptInputTextarea({
     <TextInput
       ref={inputRef}
       nativeID="composer"
-      style={{
-        fontSize: 16,
-        color: 'var(--app-foreground)'
-      }}
+      className="flex-1 pl-4 pr-2 py-3 max-h-25 text-base text-foreground"
       cursorColor="#3b82f6"
       selectionColor="rgba(59, 130, 246, 0.3)"
-      className="flex-1 pl-4 pr-2 py-3 max-h-25"
       value={input}
       onChangeText={setInput}
       onSelectionChange={handleSelectionChange}
@@ -461,14 +477,14 @@ export function PromptInputTextarea({
  * Uses 'stop' variant with higher turbulence when generating.
  */
 export function PromptInputSubmit() {
-  const { input, isGenerating, onSend } = useChatContext();
-  const disabled = !input.trim() || isGenerating;
+  const { input, attachments, isGenerating, onSend, onStop } = useChatContext();
+  const disabled = !isGenerating && !input.trim() && attachments.length === 0;
 
   return (
     <LiquidMetalSubmitButton
-      onPress={onSend}
+      onPress={isGenerating ? onStop : onSend}
       disabled={disabled}
-      isLoading={isGenerating}
+      isLoading={false}
       size={34}
       variant={isGenerating ? 'stop' : 'default'}
       style={{ margin: 5 }}

@@ -5,8 +5,8 @@ import { TouchableGlass } from "@/components/touchable-glass";
 import { useSsh } from "@/stores/ssh";
 import { useConnection } from "@/stores/connection";
 import { cn } from "@/utils/tailwind";
-import { ActivityIndicator, Alert, Dimensions, Modal, Pressable, ScrollView, Text, TextInput, View, Animated } from "react-native";
-import { FadeIn, FadeOut } from "react-native-reanimated";
+import { ActivityIndicator, Alert, Dimensions, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
@@ -318,7 +318,7 @@ function AddHostModal({
         port: port.trim() || "22",
         username: username.trim(),
         authMethod,
-        expectedFingerprint: expectedFingerprint.trim() || null,
+        expectedFingerprint: expectedFingerprint.trim() || undefined,
       });
     } finally {
       setIsLoading(false);

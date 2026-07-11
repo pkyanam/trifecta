@@ -3,7 +3,7 @@
     "name": "Trifecta",
     "slug": "trifecta-mobile",
     "version": "1.4.2",
-    "orientation": "portrait",
+    "orientation": "default",
     "scheme": "trifecta",
     "userInterfaceStyle": "automatic",
     "owner": "belweave",
@@ -46,11 +46,11 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 300,
+          "imageWidth": 120,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#09090b",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#09090b"
           }
         }
       ],

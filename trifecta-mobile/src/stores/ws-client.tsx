@@ -57,15 +57,36 @@ const devLog = (...args: unknown[]) => {
   if (__DEV__) console.log(...args);
 };
 
-type WebSocketWithHeadersConstructor = new (
-  url: string,
-  protocols?: string | string[],
-  options?: { headers?: Record<string, string> },
-) => WebSocket;
+function normalizeServerConfig(raw: Record<string, unknown>): ServerConfig {
+  const cwd = (raw.cwd as string) ?? "";
+  const rawProviders = (raw.providers as Record<string, unknown>[]) ?? [];
+  return {
+    ...raw,
+    cwd,
+    projectName:
+      (raw.projectName as string | undefined) ??
+      cwd.split("/").filter(Boolean).pop() ??
+      "Trifecta Server",
+    providers: rawProviders.map((provider) => ({
+      ...provider,
+      instanceId: (provider.instanceId as string) ?? "",
+      driver: (provider.driver as string) ?? "",
+      enabled: (provider.enabled as boolean) ?? false,
+      installed: (provider.installed as boolean) ?? false,
+      models: ((provider.models as Record<string, unknown>[]) ?? []).map(
+        (model) => ({
+          ...model,
+          slug: (model.slug as string) ?? "",
+          name: (model.name as string) ?? "",
+        }),
+      ),
+    })) as ServerConfig["providers"],
+  };
+}
 
 function makeWebSocket(url: string, serverURL: string): WebSocket {
   const auth = getBoxPortAuth(serverURL);
-  console.log("[ws] makeWebSocket url:", url, "serverURL:", serverURL, "boxAuthFound:", !!auth, "cookieHeader(first20):", auth ? auth.cookieHeader.slice(0, 20) : "(none)");
+  devLog("[ws] opening socket", { serverURL, boxAuthFound: !!auth });
   // Don't pass Cookie header manually — the native WebSocket module
   // (RCTWebSocketModule.mm) already reads from NSHTTPCookieStorage.shared
   // and sets the Cookie header. Passing it manually would create a duplicate
@@ -107,6 +128,7 @@ class WsRpcClient {
   private connectionTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly CONNECTION_TIMEOUT = 10_000; // 10 seconds
   private readonly REQUEST_TIMEOUT = 30_000; // 30 seconds
+  private configUnsubscribe: (() => void) | null = null;
 
   constructor(
     private serverURL: string,
@@ -122,16 +144,14 @@ class WsRpcClient {
     try {
       // Use platform-specific URL for WebSocket connection
       const platformURL = getServerURLForPlatform(this.serverURL);
-      console.log("[ws] connect platformURL:", platformURL);
+      devLog("[ws] connecting", platformURL);
       // Prime the native cookie store with the Box _port_auth cookie.
       // The Box gateway (Caddy) sets the cookie via Set-Cookie when _token
       // is in the URL. This ensures the WebSocket upgrade — which uses the
       // native cookie store on iOS (SocketRocket) and Android (OkHttp) —
       // includes the _port_auth cookie automatically, without relying on
       // custom header forwarding which is unreliable across RN versions.
-      console.log("[ws] before primeBoxPortAuth");
       await primeBoxPortAuth(platformURL);
-      console.log("[ws] after primeBoxPortAuth");
       // Diagnostic: verify the cookie was stored by making a test XHR to
       // the well-known endpoint WITHOUT _token. If the cookie is in the
       // store, this should return 200 (cookie sent automatically by
@@ -142,23 +162,21 @@ class WsRpcClient {
           testUrl.pathname = "/.well-known/belweave/environment";
           testUrl.searchParams.delete("_token");
           const testRes = await xhrFetch(testUrl.toString());
-          console.log("[ws] cookie store test: status", testRes.status, testRes.ok ? "(cookie works!)" : "(cookie missing?)");
+          devLog("[ws] cookie store test", testRes.status);
         } catch (e) {
-          console.log("[ws] cookie store test error:", e);
+          devLog("[ws] cookie store test error", e);
         }
       }
       if (!this.alive) return;
       const wsToken = await issueWebSocketToken(platformURL, this.bearerToken, this.flavor);
-      console.log("[ws] wsToken(first8):", wsToken ? wsToken.slice(0, 8) : "(empty)");
       if (!this.alive) return;
       const url = makeWebSocketURL(platformURL, wsToken, this.flavor);
-      console.log("[ws] final WS URL from makeWebSocketURL:", url);
       const ws = makeWebSocket(url, platformURL);
       this.ws = ws;
 
       // Set connection timeout
       this.connectionTimeoutTimer = setTimeout(() => {
-        console.log("[ws] connection timeout fired");
+        devLog("[ws] connection timeout");
         if (this.ws === ws && this.alive) {
           this.ws.close();
           this.onStatus("error");
@@ -167,13 +185,24 @@ class WsRpcClient {
       }, this.CONNECTION_TIMEOUT);
 
       ws.onopen = () => {
-        console.log("[ws] onopen fired");
+        devLog("[ws] connected");
         if (!this.alive || this.ws !== ws) return;
         this.clearConnectionTimeout();
         this.reconnectAttempt = 0;
         this.onStatus("connected");
         this.resubscribeAll();
         this.fetchServerConfig();
+        if (!this.configUnsubscribe) {
+          this.configUnsubscribe = this.subscribe(
+            "subscribeServerConfig",
+            {},
+            (value) => {
+              if (value && typeof value === "object") {
+                this.onConfig(normalizeServerConfig(value as Record<string, unknown>));
+              }
+            },
+          );
+        }
         this.startHeartbeat();
       };
 
@@ -185,7 +214,7 @@ class WsRpcClient {
       };
 
       ws.onerror = (error) => {
-        console.log("[ws] onerror fired, error:", error, "type:", typeof error, "detail:", (error as any)?.message ?? (error as any)?.error?.message ?? "(no message)");
+        devLog("[ws] socket error", error);
         if (!this.alive || this.ws !== ws) return;
         this.clearConnectionTimeout();
         console.error("WebSocket error:", error);
@@ -198,7 +227,7 @@ class WsRpcClient {
       };
 
       ws.onclose = (event) => {
-        console.log("[ws] onclose fired, code:", event.code, "reason:", event.reason, "wasClean:", event.wasClean);
+        devLog("[ws] closed", { code: event.code, reason: event.reason, wasClean: event.wasClean });
         if (!this.alive) return;
         if (this.ws === ws) {
           this.clearConnectionTimeout();
@@ -229,6 +258,8 @@ class WsRpcClient {
     this.clearConnectionTimeout();
     this.stopHeartbeat();
     this.failPending();
+    this.configUnsubscribe?.();
+    this.configUnsubscribe = null;
     this.streams.clear(); // Clear all stream subscriptions
     this.ws?.close();
     this.ws = null;
@@ -465,39 +496,7 @@ class WsRpcClient {
     try {
       const raw = await this.request("server.getConfig", {}) as Record<string, unknown>;
       if (!raw) return;
-      const cwd = (raw.cwd as string) ?? "";
-      const rawProviders = (raw.providers as Record<string, unknown>[]) ?? [];
-      const providers: ServerConfig["providers"] = rawProviders.map((p) => ({
-        instanceId: (p.instanceId as string) ?? "",
-        driver: (p.driver as string) ?? "",
-        displayName: p.displayName as string | undefined,
-        label: p.label as string | undefined,
-        enabled: (p.enabled as boolean) ?? false,
-        installed: (p.installed as boolean) ?? false,
-        status: p.status as string | undefined,
-        models: ((p.models as Record<string, unknown>[]) ?? []).map((m) => ({
-          slug: (m.slug as string) ?? "",
-          name: (m.name as string) ?? "",
-          shortName: m.shortName as string | undefined,
-          subProvider: m.subProvider as string | undefined,
-          eligible: m.eligible as boolean | undefined,
-        })),
-        slashCommands: ((p.slashCommands as Record<string, unknown>[]) ?? []).map((sc) => ({
-          name: (sc.name as string) ?? "",
-          description: sc.description as string | undefined,
-          input: (sc.input && typeof sc.input === "object") ? (sc.input as { hint?: string }) : undefined,
-        })),
-        skills: ((p.skills as Record<string, unknown>[]) ?? []).map((s) => ({
-          name: (s.name as string) ?? "",
-          description: s.description as string | undefined,
-          shortDescription: s.shortDescription as string | undefined,
-        })),
-      }));
-      this.onConfig({
-        cwd,
-        projectName: cwd.split("/").filter(Boolean).pop() ?? "Trifecta Server",
-        providers,
-      });
+      this.onConfig(normalizeServerConfig(raw));
     } catch {}
   }
 
