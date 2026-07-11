@@ -1,5 +1,6 @@
 import { useWsClient } from "@/stores/ws-client";
 import type { ModelSelection, ServerProvider } from "@/types/thread";
+import { findDefaultModelSelection } from "@/utils/model-selection";
 import React, { createContext, use, useEffect, useMemo, useState } from "react";
 
 export type { ServerProvider };
@@ -62,17 +63,4 @@ export function useModel() {
   const context = use(ModelContext);
   if (!context) throw new Error("useModel must be used within a ModelProvider");
   return context;
-}
-
-function findDefaultModelSelection(
-  providers: ServerProvider[],
-): ModelSelection | null {
-  for (const p of providers) {
-    if (!p.enabled || !p.installed) continue;
-    const eligible = p.models.find((m) => m.eligible !== false);
-    if (eligible) {
-      return { model: eligible.slug, instanceId: p.instanceId };
-    }
-  }
-  return null;
 }

@@ -16,6 +16,7 @@ export interface ModelSelection {
   model: string;
   /** Provider instance ID from server config */
   instanceId: string;
+  options?: { id: string; value: string | boolean }[];
 }
 
 export interface LatestTurn {
@@ -102,6 +103,9 @@ export interface ServerProviderModel {
   name: string;
   shortName?: string;
   subProvider?: string;
+  isCustom?: boolean;
+  capabilities?: Record<string, unknown> | null;
+  /** Legacy server compatibility; current servers gate at provider readiness. */
   eligible?: boolean;
 }
 
@@ -126,9 +130,11 @@ export interface ServerProvider {
   driver: string;
   displayName?: string;
   label?: string; // Alternative display name
+  accentColor?: string;
   enabled: boolean;
   installed: boolean;
   status?: string;
+  availability?: string;
   models: ServerProviderModel[];
   slashCommands?: ServerProviderSlashCommand[];
   skills?: ServerProviderSkill[];

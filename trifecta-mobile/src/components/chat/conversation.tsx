@@ -6,6 +6,7 @@ import {
   createContext,
   use,
   useCallback,
+  useRef,
   useState,
   type ReactElement,
   type ReactNode,
@@ -14,7 +15,6 @@ import { LayoutChangeEvent, Text, View } from "react-native";
 import { useKeyboardHandler } from "react-native-keyboard-controller";
 import Animated, {
   useAnimatedProps,
-  useAnimatedRef,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -64,7 +64,7 @@ export function Conversation({
   children?: ReactNode;
 }) {
   const { messages } = useChatContext();
-  const listRef = useAnimatedRef<LegendListRef>();
+  const listRef = useRef<LegendListRef>(null);
   const insets = useSafeAreaInsets();
 
   // -- Keyboard tracking --------------------------------------------------

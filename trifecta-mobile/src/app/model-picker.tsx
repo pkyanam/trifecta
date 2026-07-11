@@ -2,27 +2,17 @@ import { AndroidGrabber } from "@/components/grabber";
 import { useModel } from "@/components/model-context";
 import { ProviderIcon } from "@/components/provider-icon";
 import type { ModelSelection, ServerProvider, ServerProviderModel } from "@/types/thread";
+import {
+  providerLabel,
+  selectableModels,
+  selectableProviders,
+} from "@/utils/model-selection";
 import { useRouter } from "expo-router";
 import { Check, Search, X } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 const IS_ANDROID = Platform.OS === "android";
-
-const DRIVER_LABEL: Record<string, string> = {
-  claudeAgent: "Anthropic",
-  opencode: "OpenCode",
-  openaiChat: "OpenAI",
-  openAIChat: "OpenAI",
-  openai: "OpenAI",
-  gemini: "Google",
-  googleGemini: "Google",
-  cursor: "Cursor",
-  grok: "Grok",
-  groq: "Groq",
-  mistral: "Mistral",
-  cohere: "Cohere",
-};
 
 const DRIVER_COLOR: Record<string, string> = {
   claudeAgent: "#da7756",
@@ -40,11 +30,6 @@ const DRIVER_COLOR: Record<string, string> = {
 };
 
 const CONTENT_TOP_OFFSET = 22;
-
-function providerLabel(p: ServerProvider): string {
-  if (p.displayName) return p.displayName;
-  return DRIVER_LABEL[p.driver] ?? p.driver;
-}
 
 function providerColor(p: ServerProvider): string {
   return DRIVER_COLOR[p.driver] ?? "#888888";
@@ -93,10 +78,18 @@ export default function ModelPickerSheet() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
 
-  const usableProviders = providers.filter((p) => p.enabled && p.installed);
+  const usableProviders = useMemo(() => selectableProviders(providers), [providers]);
 
   const activeInstanceId =
-    selectedInstanceId ?? usableProviders[0]?.instanceId ?? null;
+    (selectedInstanceId && usableProviders.some((p) => p.instanceId === selectedInstanceId)
+      ? selectedInstanceId
+      : null) ??
+    (selectedModelSelection &&
+    usableProviders.some((p) => p.instanceId === selectedModelSelection.instanceId)
+      ? selectedModelSelection.instanceId
+      : null) ??
+    usableProviders[0]?.instanceId ??
+    null;
 
   const isSearching = searchQuery.trim().length > 0;
 
@@ -105,8 +98,7 @@ export default function ModelPickerSheet() {
       const q = searchQuery.toLowerCase();
       const results: { provider: ServerProvider; model: ServerProviderModel }[] = [];
       for (const p of usableProviders) {
-        for (const m of p.models) {
-          if (m.eligible === false) continue;
+        for (const m of selectableModels(p)) {
           if (
             m.name.toLowerCase().includes(q) ||
             (m.shortName ?? "").toLowerCase().includes(q) ||
@@ -122,9 +114,7 @@ export default function ModelPickerSheet() {
 
     const provider = usableProviders.find((p) => p.instanceId === activeInstanceId);
     if (!provider) return [];
-    return provider.models
-      .filter((m) => m.eligible !== false)
-      .map((m) => ({ provider, model: m }));
+    return selectableModels(provider).map((m) => ({ provider, model: m }));
   }, [isSearching, searchQuery, usableProviders, activeInstanceId]);
 
   function isSelected(p: ServerProvider, m: ServerProviderModel): boolean {

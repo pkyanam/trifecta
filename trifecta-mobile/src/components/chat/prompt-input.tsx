@@ -19,7 +19,7 @@ import { useProjectSearch } from "@/services/project-search";
 import { useWsClient } from "@/stores/ws-client";
 import { useActiveThread } from "@/stores/active-thread";
 import { useThreadList } from "@/stores/thread-list";
-import { ModelPicker } from "@/components/model-picker";
+import { useRouter } from "expo-router";
 
 const AnimatedGlassContainer = Animated.createAnimatedComponent(GlassContainer);
 
@@ -50,7 +50,7 @@ export function PromptInput({ children }: { children: ReactNode }) {
   const [currentTrigger, setCurrentTrigger] = useState<{ kind: ComposerTriggerKind; rangeStart: number; rangeEnd: number } | null>(null);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showModelPicker, setShowModelPicker] = useState(false);
+  const router = useRouter();
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestionType, setSuggestionType] = useState<SuggestionType | undefined>(undefined);
 
@@ -246,7 +246,7 @@ export function PromptInput({ children }: { children: ReactNode }) {
     if (currentTrigger.kind === ComposerTriggerKind.SlashCommand) {
       if (item.id === "model") {
         // Show model picker
-        setShowModelPicker(true);
+        router.navigate("/model-picker");
         const result = replaceRange(input, currentTrigger.rangeStart, currentTrigger.rangeEnd, "");
         setInput(result.text);
         setCursorPosition(result.cursor);
@@ -288,7 +288,7 @@ export function PromptInput({ children }: { children: ReactNode }) {
     setSuggestions([]);
     setCurrentTrigger(null);
     setSearchQuery(null);
-  }, [currentTrigger, input, setInput, setCursorPosition]);
+  }, [currentTrigger, input, router, setInput, setCursorPosition]);
 
   return (
     <Animated.View
@@ -315,10 +315,6 @@ export function PromptInput({ children }: { children: ReactNode }) {
       >
         {children}
       </AnimatedGlassContainer>
-      <ModelPicker
-        visible={showModelPicker}
-        onClose={() => setShowModelPicker(false)}
-      />
     </Animated.View>
   );
 }
