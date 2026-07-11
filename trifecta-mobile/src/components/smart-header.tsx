@@ -1,7 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { SymbolImage } from "@/components/symbol-image";
 import { GitActionsSheet } from "@/components/git-actions-sheet";
-import { cn } from "@/utils/tailwind";
 import { useEffect, useState } from "react";
 import {
   Pressable,
@@ -26,7 +25,6 @@ export function SmartHeader({ onMenuPress }: SmartHeaderProps) {
   const { serverConfig, request } = useWsClient();
   const [showGitActions, setShowGitActions] = useState(false);
   const [branchName, setBranchName] = useState("");
-  const [hasChanges, setHasChanges] = useState(false);
   const { selectedModelLabel } = useModel();
   const { activeThreadId, newChatProjectId } = useActiveThread();
   const { getThread, getProject } = useThreadList();
@@ -60,7 +58,6 @@ export function SmartHeader({ onMenuPress }: SmartHeaderProps) {
   useEffect(() => {
     if (!cwd) {
       setBranchName("");
-      setHasChanges(false);
       return;
     }
     const fetchGitStatus = async () => {
@@ -68,7 +65,6 @@ export function SmartHeader({ onMenuPress }: SmartHeaderProps) {
         const status = await request("vcs.refreshStatus", { cwd }) as any;
         if (status?.refName) {
           setBranchName(status.refName);
-          setHasChanges(status?.hasWorkingTreeChanges || false);
         } else {
           setBranchName("");
         }

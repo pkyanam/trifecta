@@ -69,13 +69,7 @@ bun run web
 
 ### Environment Variables
 
-Copy `.env.example` to `.env`:
-
-```bash
-cp .env.example .env
-```
-
-The only variable currently required is `EXPO_UNSTABLE_DEPLOY_SERVER=1` for the Expo server-side web output.
+No environment variables are required for local development. Create a `.env` file only if you need to override defaults.
 
 ## Customization
 
@@ -89,6 +83,20 @@ Edit `src/global.css` to change design tokens. Colors use OKLCH for perceptual u
 --app-muted       ->  bg-muted
 --app-border      ->  border-border
 ```
+
+## Quality checks
+
+```bash
+bun run typecheck
+bun run lint
+```
+
+## Verification
+
+This app requires a custom Expo development build and does not work in Expo Go.
+
+- Use `npx serve-sim` to verify iOS and Apple platforms.
+- Use `npx agent-browser` to verify on web.
 
 ## Support
 

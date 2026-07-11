@@ -1,14 +1,18 @@
-import type {
-  Message,
-  ModelSelection,
-  OrchestrationSession,
-  ThreadDetail,
-  ThreadId,
-} from "@/types/thread";
-import { useCallback, useEffect, useState } from "react";
 import { useActiveThread } from "@/stores/active-thread";
 import { useWsClient } from "@/stores/ws-client";
 import { secureRandomId } from "@/utils/secure-id";
+import type {
+  CheckpointSummary,
+  Message,
+  ModelSelection,
+  OrchestrationSession,
+  ProposedPlan,
+  ThreadActivity,
+  ThreadDetail,
+  ThreadId,
+  UploadChatAttachment,
+} from "@/types/thread";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface UseThreadResult {
   detail: ThreadDetail | null;
@@ -16,155 +20,302 @@ export interface UseThreadResult {
   session: OrchestrationSession | null;
   isTurnRunning: boolean;
   isSending: boolean;
+  error: string | null;
   sendMessage: (
     text: string,
     modelSelection: ModelSelection,
+    attachments?: UploadChatAttachment[],
   ) => Promise<void>;
   interruptTurn: () => Promise<void>;
+}
+
+function byCreatedAt<T extends { createdAt: string; id: string }>(a: T, b: T) {
+  return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
+}
+
+function upsert<T extends { id: string }>(items: T[], item: T): T[] {
+  const index = items.findIndex((candidate) => candidate.id === item.id);
+  if (index < 0) return [...items, item];
+  const next = [...items];
+  next[index] = { ...next[index], ...item };
+  return next;
+}
+
+function normalizeThread(raw: Record<string, unknown>): ThreadDetail {
+  return {
+    ...(raw as unknown as ThreadDetail),
+    branch: typeof raw.branch === "string" ? raw.branch : null,
+    worktreePath:
+      typeof raw.worktreePath === "string" ? raw.worktreePath : null,
+    latestTurn: (raw.latestTurn as ThreadDetail["latestTurn"]) ?? null,
+    archivedAt: typeof raw.archivedAt === "string" ? raw.archivedAt : null,
+    deletedAt: typeof raw.deletedAt === "string" ? raw.deletedAt : null,
+    messages: Array.isArray(raw.messages)
+      ? ([...raw.messages] as Message[]).sort(byCreatedAt)
+      : [],
+    proposedPlans: Array.isArray(raw.proposedPlans)
+      ? (raw.proposedPlans as ProposedPlan[])
+      : [],
+    activities: Array.isArray(raw.activities)
+      ? (raw.activities as ThreadActivity[])
+      : [],
+    checkpoints: Array.isArray(raw.checkpoints)
+      ? (raw.checkpoints as CheckpointSummary[])
+      : [],
+    session: (raw.session as OrchestrationSession) ?? null,
+  };
+}
+
+function reduceEvent(
+  thread: ThreadDetail,
+  event: Record<string, unknown>,
+): ThreadDetail | null {
+  const type = event.type;
+  const payload = (event.payload ?? {}) as Record<string, unknown>;
+  switch (type) {
+    case "thread.deleted":
+      return null;
+    case "thread.archived":
+      return {
+        ...thread,
+        archivedAt: payload.archivedAt as string,
+        updatedAt: (payload.updatedAt as string) ?? thread.updatedAt,
+      };
+    case "thread.unarchived":
+      return {
+        ...thread,
+        archivedAt: null,
+        updatedAt: (payload.updatedAt as string) ?? thread.updatedAt,
+      };
+    case "thread.meta-updated":
+      return {
+        ...thread,
+        ...(typeof payload.title === "string" ? { title: payload.title } : {}),
+        ...(payload.modelSelection
+          ? { modelSelection: payload.modelSelection as ModelSelection }
+          : {}),
+        ...(Object.hasOwn(payload, "branch")
+          ? { branch: (payload.branch as string | null) ?? null }
+          : {}),
+        ...(Object.hasOwn(payload, "worktreePath")
+          ? { worktreePath: (payload.worktreePath as string | null) ?? null }
+          : {}),
+        updatedAt: (payload.updatedAt as string) ?? thread.updatedAt,
+      };
+    case "thread.runtime-mode-set":
+      return {
+        ...thread,
+        runtimeMode: payload.runtimeMode as ThreadDetail["runtimeMode"],
+        updatedAt: (payload.updatedAt as string) ?? thread.updatedAt,
+      };
+    case "thread.interaction-mode-set":
+      return {
+        ...thread,
+        interactionMode:
+          payload.interactionMode as ThreadDetail["interactionMode"],
+        updatedAt: (payload.updatedAt as string) ?? thread.updatedAt,
+      };
+    case "thread.message-sent": {
+      const message: Message = {
+        id: payload.messageId as string,
+        role: payload.role as Message["role"],
+        text: (payload.text as string) ?? "",
+        attachments: Array.isArray(payload.attachments)
+          ? (payload.attachments as Message["attachments"])
+          : undefined,
+        turnId: (payload.turnId as string | null) ?? null,
+        streaming: payload.streaming === true,
+        createdAt: payload.createdAt as string,
+        updatedAt: payload.updatedAt as string,
+      };
+      const existing = thread.messages.find((item) => item.id === message.id);
+      if (existing && message.streaming) {
+        message.text = existing.text + message.text;
+      } else if (existing && !message.text) {
+        message.text = existing.text;
+      }
+      return {
+        ...thread,
+        messages: upsert(thread.messages, message).sort(byCreatedAt),
+      };
+    }
+    case "thread.session-set":
+      {
+        const session = payload.session as OrchestrationSession;
+        const latestTurn =
+          session.activeTurnId &&
+          (!thread.latestTurn || thread.latestTurn.turnId !== session.activeTurnId)
+            ? {
+                turnId: session.activeTurnId,
+                state: "running" as const,
+                requestedAt: session.updatedAt,
+                startedAt: session.updatedAt,
+                completedAt: null,
+                assistantMessageId: null,
+              }
+            : thread.latestTurn && session.status !== "running" && thread.latestTurn.state === "running"
+              ? {
+                  ...thread.latestTurn,
+                  state: session.status === "error" ? ("error" as const) : ("completed" as const),
+                  completedAt: session.updatedAt,
+                }
+              : thread.latestTurn;
+        return {
+        ...thread,
+          session,
+          latestTurn,
+        };
+      }
+    case "thread.proposed-plan-upserted": {
+      const proposedPlan = payload.proposedPlan as ProposedPlan;
+      return {
+        ...thread,
+        proposedPlans: upsert(thread.proposedPlans, proposedPlan),
+      };
+    }
+    case "thread.turn-diff-completed": {
+      const checkpoint: CheckpointSummary = {
+        turnId: payload.turnId as string,
+        checkpointTurnCount: payload.checkpointTurnCount as number,
+        checkpointRef: payload.checkpointRef as string,
+        status: payload.status as CheckpointSummary["status"],
+        files: (payload.files as CheckpointSummary["files"]) ?? [],
+        assistantMessageId: (payload.assistantMessageId as string | null) ?? null,
+        completedAt: payload.completedAt as string,
+      };
+      const index = thread.checkpoints.findIndex(
+        (item) => item.turnId === checkpoint.turnId,
+      );
+      const checkpoints = [...thread.checkpoints];
+      if (index < 0) checkpoints.push(checkpoint);
+      else checkpoints[index] = checkpoint;
+      return {
+        ...thread,
+        checkpoints,
+        latestTurn:
+          thread.latestTurn?.turnId === checkpoint.turnId
+            ? {
+                ...thread.latestTurn,
+                state: "completed",
+                completedAt: checkpoint.completedAt,
+                assistantMessageId: checkpoint.assistantMessageId,
+              }
+            : thread.latestTurn,
+      };
+    }
+    case "thread.activity-appended": {
+      const activity = payload.activity as ThreadActivity;
+      return { ...thread, activities: upsert(thread.activities, activity) };
+    }
+    case "thread.reverted": {
+      const turnCount = payload.turnCount as number;
+      const retainedTurnIds = new Set(
+        thread.checkpoints
+          .filter((checkpoint) => checkpoint.checkpointTurnCount <= turnCount)
+          .map((checkpoint) => checkpoint.turnId),
+      );
+      return {
+        ...thread,
+        messages: thread.messages.filter(
+          (message) => message.turnId === null || retainedTurnIds.has(message.turnId),
+        ),
+        activities: thread.activities.filter(
+          (activity) => activity.turnId === null || retainedTurnIds.has(activity.turnId),
+        ),
+        proposedPlans: thread.proposedPlans.filter(
+          (plan) => plan.turnId === null || retainedTurnIds.has(plan.turnId),
+        ),
+        checkpoints: thread.checkpoints.filter(
+          (checkpoint) => checkpoint.checkpointTurnCount <= turnCount,
+        ),
+      };
+    }
+    default:
+      return thread;
+  }
 }
 
 export function useThread(threadId: ThreadId | null): UseThreadResult {
   const { subscribe, request } = useWsClient();
   const { dispatchTurnStart } = useActiveThread();
-
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [session, setSession] = useState<OrchestrationSession | null>(null);
   const [isSending, setIsSending] = useState(false);
-
-  const applyMessageSent = useCallback((fields: Record<string, unknown>) => {
-    // Merge top-level fields with nested message object
-    const inner = (fields.message ?? {}) as Record<string, unknown>;
-    const merged = { ...fields, ...inner };
-
-    const msgId = (merged.messageId ?? merged.id) as string | undefined;
-    const role = merged.role as string | undefined;
-    if (!msgId || !role) return;
-
-    const payloadText = (merged.text as string) ?? "";
-    const streaming = (merged.streaming as boolean) ?? false;
-    const createdAt = (merged.createdAt as string) ?? new Date().toISOString();
-    const updatedAt = (merged.updatedAt as string) ?? createdAt;
-    const turnId = merged.turnId as string | undefined;
-
-    setMessages((prev) => {
-      const idx = prev.findIndex((m) => m.id === msgId);
-      if (idx >= 0) {
-        const updated = [...prev];
-        const existing = updated[idx];
-        updated[idx] = {
-          ...existing,
-          // streaming=true -> delta append; streaming=false + text -> replace; streaming=false + no text -> keep accumulated
-          text: streaming
-            ? existing.text + payloadText
-            : payloadText || existing.text,
-          streaming,
-          updatedAt,
-        };
-        return updated;
-      } else {
-        const msg: Message = {
-          id: msgId,
-          role: role as Message["role"],
-          text: payloadText,
-          streaming,
-          turnId,
-          createdAt,
-          updatedAt,
-        };
-        const next = [...prev, msg].sort(
-          (a, b) => (a.createdAt > b.createdAt ? 1 : -1),
-        );
-        return next;
-      }
-    });
-  }, []);
+  const [error, setError] = useState<string | null>(null);
+  const generationRef = useRef(0);
 
   useEffect(() => {
-    if (!threadId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing stale subscription state when no thread is active is intentional.
-      setDetail(null);
-      setMessages([]);
-      setSession(null);
-      return;
-    }
-
-    setDetail(null);
-    setMessages([]);
-    setSession(null);
-
-    const unsubscribe = subscribe(
-      "orchestration.subscribeThread",
-      { threadId },
-      (value) => {
-        const item = value as Record<string, unknown>;
-        const kind = item.kind as string;
-
-        if (kind === "snapshot") {
-          const snap = item.snapshot as Record<string, unknown>;
-          const thread = (snap.thread ?? {}) as Record<string, unknown>;
-          const rawMessages = (thread.messages as Message[]) ?? [];
-          const sorted = [...rawMessages].sort(
-            (a, b) => (a.createdAt > b.createdAt ? 1 : -1),
-          );
-          setMessages(sorted);
-          setSession((thread.session as OrchestrationSession) ?? null);
-          setDetail(thread as unknown as ThreadDetail);
-        } else if (kind === "event") {
-          const event = item.event as Record<string, unknown>;
-          const type = event.type as string;
-          const payload = (event.payload ?? {}) as Record<string, unknown>;
-
-          if (type === "thread.message-sent") {
-            applyMessageSent(payload);
-          } else if (type === "thread.session-set") {
-            const sessionData = payload.session as OrchestrationSession | undefined;
-            if (sessionData) setSession(sessionData);
-          } else if (type === "thread.meta-updated") {
-            setDetail((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                ...(payload.title != null && { title: payload.title as string }),
-              };
-            });
-          }
-        }
-      },
-    );
-
-    return unsubscribe;
-  }, [applyMessageSent, threadId, subscribe]);
+    const generation = ++generationRef.current;
+    if (!threadId) return;
+    return subscribe("orchestration.subscribeThread", { threadId }, (value) => {
+      if (generation !== generationRef.current) return;
+      const item = value as Record<string, unknown>;
+      if (item.kind === "snapshot") {
+        const snapshot = item.snapshot as Record<string, unknown>;
+        const raw = snapshot.thread as Record<string, unknown>;
+        setDetail(normalizeThread(raw));
+      } else if (item.kind === "event") {
+        const event = item.event as Record<string, unknown>;
+        setDetail((current) => (current ? reduceEvent(current, event) : current));
+      }
+    });
+  }, [threadId, subscribe]);
 
   const sendMessage = useCallback(
-    async (text: string, modelSelection: ModelSelection) => {
-      if (!threadId || !text.trim()) return;
+    async (
+      text: string,
+      modelSelection: ModelSelection,
+      attachments: UploadChatAttachment[] = [],
+    ) => {
+      if (!threadId || (!text.trim() && attachments.length === 0)) return;
       setIsSending(true);
+      setError(null);
       try {
-        await dispatchTurnStart(threadId, text, modelSelection);
+        await dispatchTurnStart(
+          threadId,
+          text,
+          modelSelection,
+          detail?.runtimeMode,
+          detail?.interactionMode,
+          attachments,
+        );
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Failed to send message");
+        throw cause;
       } finally {
         setIsSending(false);
       }
     },
-    [threadId, dispatchTurnStart],
+    [detail, dispatchTurnStart, threadId],
   );
 
   const interruptTurn = useCallback(async () => {
     if (!threadId) return;
-    try {
-      await request("orchestration.dispatchCommand", {
-        type: "thread.turn.interrupt",
-        commandId: secureRandomId(),
-        threadId,
-        createdAt: new Date().toISOString(),
-      });
-    } catch {}
-  }, [threadId, request]);
+    await request("orchestration.dispatchCommand", {
+      type: "thread.turn.interrupt",
+      commandId: secureRandomId(),
+      threadId,
+      ...(detail?.latestTurn?.turnId
+        ? { turnId: detail.latestTurn.turnId }
+        : {}),
+      createdAt: new Date().toISOString(),
+    });
+  }, [detail, request, threadId]);
 
+  const messages = detail?.messages ?? [];
+  const session = detail?.session ?? null;
   const isTurnRunning =
     session?.status === "running" ||
     detail?.latestTurn?.state === "running" ||
     isSending;
 
-  return { detail, messages, session, isTurnRunning, isSending, sendMessage, interruptTurn };
+  return {
+    detail,
+    messages,
+    session,
+    isTurnRunning,
+    isSending,
+    error,
+    sendMessage,
+    interruptTurn,
+  };
 }

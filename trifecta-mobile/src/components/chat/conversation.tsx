@@ -1,6 +1,6 @@
 import { SymbolImage } from "@/components/symbol-image";
 import { LiquidMetalButton } from "@/components/liquid-metal";
-import { LegendList, LegendListRef } from "@legendapp/list";
+import { LegendList, type LegendListRef } from "@legendapp/list";
 /* eslint-disable react-hooks/immutability -- Reanimated shared values are mutable animation cells. */
 import {
   createContext,
@@ -54,12 +54,14 @@ export function useConversationContext() {
 export function Conversation({
   renderMessage,
   emptyState,
+  footer,
   children,
 }: {
   /** Render callback for each message – passed to the underlying list. */
   renderMessage: (info: { item: ChatMessage }) => ReactElement;
   /** Element shown when the message list is empty. */
   emptyState?: ReactElement;
+  footer?: ReactNode;
   /** Compound children: <ConversationScrollButton />, <PromptInput />, etc. */
   children?: ReactNode;
 }) {
@@ -316,7 +318,10 @@ export function Conversation({
             onContentSizeChange={onContentSizeChange}
             ListHeaderComponent={<View style={{ height: topPadding }} />}
             ListFooterComponent={
-              <Animated.View style={footerSpacerStyle} />
+              <>
+                {footer}
+                <Animated.View style={footerSpacerStyle} />
+              </>
             }
           />
           {!messages.length && emptyState ? (

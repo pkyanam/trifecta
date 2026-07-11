@@ -131,12 +131,11 @@ function HeaderTitleMenu() {
 
 export function MainHeader() {
   const { openDrawer } = useDrawer();
-  const { serverConfig, request } = useWsClient();
+  const { request } = useWsClient();
   const { activeThreadId, newChatProjectId } = useActiveThread();
   const { getThread, getProject } = useThreadList();
   const [showGitActions, setShowGitActions] = useState(false);
   const [branchName, setBranchName] = useState("");
-  const [hasChanges, setHasChanges] = useState(false);
 
   // Get the actual thread data using the thread ID
   const activeThread = activeThreadId ? getThread(activeThreadId) : null;
@@ -166,7 +165,6 @@ export function MainHeader() {
   useEffect(() => {
     if (!cwd) {
       setBranchName("");
-      setHasChanges(false);
       return;
     }
 
@@ -175,11 +173,10 @@ export function MainHeader() {
         const status = await request("vcs.refreshStatus", { cwd }) as any;
         if (status?.refName) {
           setBranchName(status.refName);
-          setHasChanges(status?.hasWorkingTreeChanges || false);
         } else {
           setBranchName("");
         }
-      } catch (error) {
+      } catch {
         setBranchName("");
       }
     };

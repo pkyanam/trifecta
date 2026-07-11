@@ -8,9 +8,12 @@ Live at [trifecta.belweave.com](https://trifecta.belweave.com) and [trifecta.bel
 
 | Route | Page |
 |---|---|
-| `/` | Landing — overview of the desktop app, iOS, Android, and the VS Code extension |
-| `/developers` | Setup guide for the desktop server |
-| `/docs` | API and integration docs |
+| `/` | Landing — overview of the desktop app, mobile clients, and the VS Code extension |
+| `/pricing` | Pricing |
+| `/triad` | Triad API / developer accounts |
+| `/dashboard` | Cloud dashboard (requires sign-in) |
+| `/dashboard/billing` | Billing |
+| `/dashboard/[sandboxId]` | Sandbox details |
 | `/privacy` | Privacy policy |
 
 ## Tech stack
@@ -22,6 +25,9 @@ Live at [trifecta.belweave.com](https://trifecta.belweave.com) and [trifecta.bel
 | Components | Base UI + shadcn-style primitives (CVA, `tailwind-merge`) |
 | Icons | lucide-react |
 | Fonts | Geist Sans / Geist Mono |
+| Auth | Clerk |
+| Database | Supabase |
+| Sandboxes | Daytona |
 | Hosting | Vercel |
 
 ## Develop

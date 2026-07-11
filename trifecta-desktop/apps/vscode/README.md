@@ -1,22 +1,23 @@
 # Trifecta — AI Coding Agent for VS Code / Cursor
 
-Embed a full coding-agent chat sidebar directly in your editor. Companion apps available for [iOS](../../../trifecta-ios) and [Android](../../../trifecta-android), all pairing with the same Trifecta Desktop server.
+Embed a full coding-agent chat sidebar directly in your editor. Companion app available for [mobile](../../trifecta-mobile) (iOS, Android, and web), all pairing with the same Trifecta Desktop server.
 
 ## What's inside
 
-Trifecta is a universal coding-agent interface — it wraps **nine** agents behind one UI in your editor's activity bar:
+Trifecta is a universal coding-agent interface — it wraps **ten** agents behind one UI in your editor's activity bar:
 
-| Agent            | Connection       | Install / sign in                                                                         |
-| ---------------- | ---------------- | ----------------------------------------------------------------------------------------- |
-| **Codex**        | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) · `codex login`                      |
-| **Claude Code**  | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) · `claude auth login`               |
-| **OpenCode**     | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) · `opencode auth login`                                   |
-| **Gemini**       | Headless CLI     | [Gemini CLI](https://github.com/google-gemini/gemini-cli) · `npm i -g @google/gemini-cli` |
-| **Antigravity**  | Python SDK / CLI | Google Antigravity · `google-antigravity` SDK or the `agy` CLI                            |
-| **Cursor**       | ACP (stdio)      | [Cursor](https://cursor.sh) · bundled `cursor-agent` _(Early Access)_                     |
-| **Hermes**       | ACP (stdio)      | [Hermes Agent](https://github.com/NousResearch/hermes-agent) · `hermes setup`             |
-| **Devin**        | ACP (stdio)      | [Devin](https://devin.ai) · `devin acp`                                                   |
-| **ACP Registry** | ACP (stdio)      | Any [ACP](https://agentclientprotocol.com)-compatible agent                               |
+| Agent            | Connection       | Install / sign in                                                                             |
+| ---------------- | ---------------- | --------------------------------------------------------------------------------------------- |
+| **Codex**        | JSON-RPC (stdio) | [Codex CLI](https://developers.openai.com/codex/cli) · `codex login`                          |
+| **Claude Code**  | JSON-RPC (stdio) | [Claude Code](https://claude.com/product/claude-code) · `claude auth login`                   |
+| **OpenCode**     | JSON-RPC (stdio) | [OpenCode](https://opencode.ai) · `opencode auth login`                                       |
+| **Gemini**       | Headless CLI     | [Gemini CLI](https://github.com/google-gemini/gemini-cli) · `npm i -g @google/gemini-cli`     |
+| **Antigravity**  | Python SDK / CLI | Google Antigravity · `google-antigravity` SDK or the `agy` CLI                                |
+| **Cursor**       | ACP (stdio)      | [Cursor](https://cursor.sh) · bundled `cursor-agent` _(Early Access)_                         |
+| **Grok**         | ACP (stdio)      | [xAI CLI](https://x.ai/cli) · `curl -fsSL https://x.ai/cli/install.sh \| bash` · `grok login` |
+| **Hermes**       | ACP (stdio)      | [Hermes Agent](https://github.com/NousResearch/hermes-agent) · `hermes setup`                 |
+| **Devin**        | ACP (stdio)      | [Devin](https://devin.ai) · `devin acp`                                                       |
+| **ACP Registry** | ACP (stdio)      | Any [ACP](https://agentclientprotocol.com)-compatible agent                                   |
 
 ## Architecture
 
@@ -62,7 +63,7 @@ Then, in VS Code: **Extensions: Install from VSIX…** and select the built `.vs
 ## Development
 
 ```bash
-cd apps/vscode && npm run watch        # rebundle the extension on save
+cd apps/vscode && bun run watch        # rebundle the extension on save
 bun run build --filter=@belweave/trifecta   # rebuild web UI + server
 ```
 

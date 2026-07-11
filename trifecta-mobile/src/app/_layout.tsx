@@ -22,6 +22,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { BackHandler, Platform } from "react-native";
 
 import { ModelProvider } from "@/components/model-context";
+import { LaunchExperience } from "@/components/launch-experience";
 import {
   DarkTheme,
   DefaultTheme,
@@ -50,22 +51,24 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   return (
-    <PreferencesProvider>
-      <ThemeProvider>
-        <ConnectionProvider>
-          <WsClientInner>
-            <KeyboardProvider>
-              <ModelProvider>
-                <DrawerProvider>
-                  <RootDrawer />
-                </DrawerProvider>
-              </ModelProvider>
-              {process.env.EXPO_OS !== "ios" && <StatusBar style="auto" />}
-            </KeyboardProvider>
-          </WsClientInner>
-        </ConnectionProvider>
-      </ThemeProvider>
-    </PreferencesProvider>
+    <LaunchExperience>
+      <PreferencesProvider>
+        <ThemeProvider>
+          <ConnectionProvider>
+            <WsClientInner>
+              <KeyboardProvider>
+                <ModelProvider>
+                  <DrawerProvider>
+                    <RootDrawer />
+                  </DrawerProvider>
+                </ModelProvider>
+                {process.env.EXPO_OS !== "ios" && <StatusBar style="auto" />}
+              </KeyboardProvider>
+            </WsClientInner>
+          </ConnectionProvider>
+        </ThemeProvider>
+      </PreferencesProvider>
+    </LaunchExperience>
   );
 }
 
@@ -218,19 +221,16 @@ function StackLayout() {
         }}
       />
 
-      <Stack.Screen
-        name="attachments"
-        options={{
-          title: "Add to chat",
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.55],
-          // following https://m3.material.io/components/bottom-sheets/specs
-          sheetCornerRadius: IS_ANDROID ? 28 : undefined,
-          sheetGrabberVisible: true,
-          headerTransparent: GLASS,
-          headerLargeTitleShadowVisible: false,
-        }}
-      />
+      <Stack.Screen name="thread-details" options={{ title: "Thread Details", presentation: IS_ANDROID ? undefined : "formSheet", sheetAllowedDetents: [0.85], sheetGrabberVisible: true }} />
+      <Stack.Screen name="archived" options={{ title: "Archived Threads" }} />
+      <Stack.Screen name="projects" options={{ title: "Projects" }} />
+      <Stack.Screen name="files" options={{ title: "Workspace Files" }} />
+      <Stack.Screen name="server-settings" options={{ title: "Server & Providers" }} />
+      <Stack.Screen name="mcp-settings" options={{ title: "MCP Servers" }} />
+      <Stack.Screen name="diagnostics" options={{ title: "Diagnostics" }} />
+      <Stack.Screen name="terminal" options={{ title: "Thread Terminal", presentation: "fullScreenModal", headerStyle: { backgroundColor: "#000" }, headerTintColor: "#fff" }} />
+      <Stack.Screen name="source-control" options={{ title: "Source Control" }} />
+      <Stack.Screen name="provider-instances" options={{ title: "Provider Instances" }} />
 
       <Stack.Screen
         name="model-picker"

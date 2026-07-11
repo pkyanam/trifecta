@@ -1,4 +1,5 @@
 import "@/global.css";
+/* eslint-disable @typescript-eslint/no-require-imports -- Expo release assets require static module IDs. */
 
 import { Icon } from "@/components/icon";
 import { TouchableGlass } from "@/components/touchable-glass";

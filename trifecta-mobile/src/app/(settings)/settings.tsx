@@ -12,11 +12,13 @@ import { useCallback } from "react";
 import {
   Check,
   ChevronRight,
-  LogOut,
+  Activity,
+  Blocks,
   Plus,
   Server,
   SunMoon,
-  TrendingUp,
+  SlidersHorizontal,
+  GitFork,
   Trash2,
   Vibrate,
 } from "lucide-react-native";
@@ -81,8 +83,10 @@ export default function SettingsScreen() {
         onAdd={handleAddServer}
       />
 
-      {/* Account */}
-      <SettingsRow icon={TrendingUp} label="Usage" />
+      <SettingsRow icon={SlidersHorizontal} label="Server & providers" onPress={() => router.navigate("/server-settings")} />
+      <SettingsRow icon={Blocks} label="MCP servers" onPress={() => router.navigate("/mcp-settings")} />
+      <SettingsRow icon={Activity} label="Diagnostics" onPress={() => router.navigate("/diagnostics")} />
+      <SettingsRow icon={GitFork} label="Source control" onPress={() => router.navigate("/source-control")} />
 
       <SectionDivider />
 
@@ -113,16 +117,6 @@ export default function SettingsScreen() {
         </>
       )}
 
-      {/* Log out */}
-      <Pressable className="flex-row items-center px-5 py-3.5 gap-4 active:bg-muted">
-        <Icon
-          icon={LogOut}
-          className="w-5 h-5 text-foreground"
-        />
-        <Text className="text-[17px] text-foreground">
-          Log out
-        </Text>
-      </Pressable>
     </ScrollView>
   );
 }
@@ -310,13 +304,15 @@ function SettingsRow({
   icon,
   label,
   detail,
+  onPress,
 }: {
   icon: LucideIcon;
   label: string;
   detail?: string;
+  onPress: () => void;
 }) {
   return (
-    <View className="flex-row items-center px-5 py-3.5 gap-4 active:bg-muted">
+    <Pressable onPress={onPress} className="flex-row items-center px-5 py-3.5 gap-4 active:bg-muted">
       <Icon
         icon={icon}
         className="w-5 h-5 text-foreground"
@@ -333,7 +329,7 @@ function SettingsRow({
         icon={ChevronRight}
         className="w-3.5 h-3.5 text-muted-foreground"
       />
-    </View>
+    </Pressable>
   );
 }
 
