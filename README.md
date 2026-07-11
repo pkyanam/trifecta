@@ -50,9 +50,8 @@ Open the pairing URL in any Trifecta client to connect. For the desktop app, gra
 |------|-------------|
 | [`trifecta-desktop/`](./trifecta-desktop) | Core platform — server, web UI, Electron app, VS Code extension, shared packages |
 | [`trifecta-mobile/`](./trifecta-mobile) | Cross-platform mobile + web client (Expo, React Native) |
-| [`server/`](./server) | Pre-built server bundle + systemd unit for self-hosting |
-| [`docs/`](./docs) | Architecture notes |
-| [`_reference/`](./_reference) | Read-only reference checkouts |
+| [`trifecta-www/`](./trifecta-www) | Marketing site and cloud dashboard |
+| [`trifecta-desktop/docs/`](./trifecta-desktop/docs) | Architecture notes |
 
 ---
 

@@ -1,5 +1,7 @@
 # Maintainability Plans
 
+## Numbered plans
+
 1. `01-shared-model-normalization.md`
 2. `02-typed-ipc-boundaries.md`
 3. `03-split-codex-app-server-manager.md`
@@ -10,5 +12,26 @@
 8. `08-precommit-format-and-lint.md`
 9. `09-event-state-test-expansion.md`
 10. `10-unify-process-session-abstraction.md`
-19. `19-version-control-phase-1-vcs-driver-foundation.md`
+11. `11-effect.md`
+12. `12-effect-new.md`
+13. `13-provider-service-integration-tests.md`
+14. `14-server-authoritative-event-sourcing-cleanup.md`
+15. `15-effect-server.md`
+16. `16-pr89-review-remediation-phases.md`
+16c. `16c-pr89-remediation-checklist.md`
+17. `17-claude-agent.md`
+17b. `17-provider-neutral-runtime-determinism.md`
+18. `18-server-auth-model.md`
+19. `19-remote-endpoints-hosted-static.md`
+19b. `19-version-control-phase-1-vcs-driver-foundation.md`
 20. `20-version-control-phase-2-source-control-provider-foundation.md`
+
+## Additional plans
+
+- `branch-environment-picker-in-chatview-input.md`
+- `effect-atom.md`
+- `git-flows-integration-tests.md`
+- `git-flows-test-plan.md`
+- `git-integration-branch-picker-worktrees.md`
+- `spec-1-1-cutover-plan.md`
+- `spec-contract-matrix.md`
